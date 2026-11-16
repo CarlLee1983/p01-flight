@@ -8,7 +8,7 @@ const waitGameTime = (page: any, seconds: number) =>
       intervals: [50],
     })
     .toBeGreaterThanOrEqual(seconds);
-test.use({ video: "on" });
+test.use({ video: { mode: "on", size: { width: 500, height: 450 } } });
 test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   test.setTimeout(180000);
   const errors: string[] = [];
@@ -49,23 +49,28 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await page.screenshot({ path: "docs/playing.png" });
   await waitGameTime(page, 21.5);
   await page.screenshot({ path: "docs/cross-formation.png" });
-  await waitGameTime(page, 35);
-  expect((await state(page)).section.at).toBe(32);
-  await page.screenshot({ path: "docs/dive-attack.png" });
-  const groundBefore = (await state(page)).activeEnemies.find(
+  // Measure newly spawned ground travel before normal player fire can destroy it.
+  await waitGameTime(page, 32.2);
+  const groundSnapshot = await state(page);
+  const groundBefore = groundSnapshot.activeEnemies.find(
     (e: any) => e.behavior === "groundBattery",
   );
   expect(groundBefore).toBeTruthy();
-  const groundAt = (await state(page)).time;
-  await waitGameTime(page, groundAt + 1);
-  const groundAfter = (await state(page)).activeEnemies.find(
+  await waitGameTime(page, 32.8);
+  const groundNext = await state(page);
+  const groundAfter = groundNext.activeEnemies.find(
     (e: any) => e.id === groundBefore.id,
   );
   expect(groundAfter).toBeTruthy();
-  const groundNow = (await state(page)).time;
   expect(
-    Math.abs((groundAfter.y - groundBefore.y) / (groundNow - groundAt) - 32),
-  ).toBeLessThan(2);
+    Math.abs(
+      (groundAfter.y - groundBefore.y) /
+        (groundNext.time - groundSnapshot.time) -
+        32,
+    ),
+  ).toBeLessThan(0.1);
+  await waitGameTime(page, 35);
+  expect((await state(page)).section.at).toBe(32);
   await page.screenshot({ path: "docs/harbor-ground-targets.png" });
   await waitGameTime(page, 45);
   await expect
