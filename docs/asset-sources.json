@@ -1,0 +1,22 @@
+[
+  {
+    "file": "public/assets/kenney/playerShip1_blue.png",
+    "source": "https://raw.githubusercontent.com/shorepine/kenney/3694c6879e487c108f55677be7dd2ca75b07cc3b/2d/Space%20Shooter%20Remastered/playerShip1_blue.png",
+    "sha256": "6df7d6bc297b6657e717962af03094045af03a21e6f2b925bd89c7b854b1f25e"
+  },
+  {
+    "file": "public/assets/kenney/enemyRed1.png",
+    "source": "https://raw.githubusercontent.com/shorepine/kenney/3694c6879e487c108f55677be7dd2ca75b07cc3b/2d/Space%20Shooter%20Remastered/Enemies/enemyRed1.png",
+    "sha256": "d7da73047472afdf2e0d30a3f4f08cfa293b84844c0c0aa25a0a628d0b2bf7c6"
+  },
+  {
+    "file": "public/assets/kenney/laserBlue01.png",
+    "source": "https://raw.githubusercontent.com/shorepine/kenney/3694c6879e487c108f55677be7dd2ca75b07cc3b/2d/Space%20Shooter%20Remastered/Lasers/laserBlue01.png",
+    "sha256": "eced881c4ebd76a13e48c388c3d8a82c7c177085b053b40124de517d9c563a3a"
+  },
+  {
+    "file": "public/assets/kenney/fire03.png",
+    "source": "https://raw.githubusercontent.com/shorepine/kenney/3694c6879e487c108f55677be7dd2ca75b07cc3b/2d/Space%20Shooter%20Remastered/Effects/fire03.png",
+    "sha256": "13e53881d96cadc44e4c7f6f9004900233b66629d14c2faf6b811f6b210b0269"
+  }
+]

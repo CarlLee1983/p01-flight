@@ -1,118 +1,490 @@
+:root {
+  color-scheme: dark;
+  --ink: #d4eae7;
+  --muted: #90aaa8;
+  --mint: #78f4ce;
+  --amber: #ffc276;
+  --line: #2b4c4e;
+  --stage-width: clamp(324px, calc((100svh - 190px) * 0.5625), 450px);
+  font-family: "Segoe UI", "Noto Sans TC", system-ui, sans-serif;
+  font-synthesis: none;
+}
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
-  background: #07111d;
-  color: #d7e5f2;
-  font:
-    15px system-ui,
-    sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at 28% 35%, #163a3b 0, transparent 52%),
+    linear-gradient(145deg, #07191e, #050b10 80%);
+  min-height: 100svh;
 }
-main {
-  max-width: 900px;
-  margin: auto;
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image:
+    linear-gradient(#66b0a8 1px, transparent 1px),
+    linear-gradient(90deg, #66b0a8 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(#000, transparent 85%);
+}
+.flight-deck {
+  position: relative;
+  width: fit-content;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 22px 28px 26px;
   display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 20px;
-  padding: 24px;
+  grid-template-columns: calc(var(--stage-width) + 24px) minmax(290px, 348px);
+  column-gap: 34px;
+  row-gap: 20px;
 }
-header {
+.masthead {
   grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--line);
 }
-header span {
-  color: #5ce1e6;
-  letter-spacing: 0.18em;
-  font-size: 12px;
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.emblem {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 43px;
+  border: 1px solid var(--mint);
+  color: var(--mint);
+  font-size: 34px;
+  transform: skewY(-10deg);
+  box-shadow: inset 0 0 16px #78f4ce15;
+}
+.eyebrow {
+  margin: 0 0 3px;
+  color: var(--mint);
+  font:
+    9px ui-monospace,
+    monospace;
+  letter-spacing: 0.19em;
 }
 h1 {
-  margin: 5px 0;
-  font-size: 30px;
-}
-header p {
-  color: #8fa4bd;
   margin: 0;
+  color: #f0f8f4;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 0.12em;
+}
+.edition {
+  margin: 0;
+  color: var(--amber);
+  text-align: right;
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 0.12em;
+}
+.edition span {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font:
+    10px system-ui,
+    sans-serif;
+  letter-spacing: 0.15em;
+}
+.stage-shell {
+  align-self: start;
+  background: linear-gradient(120deg, #203b3d, #101e24 35%, #172b30);
+  border: 1px solid #3a5b5a;
+  box-shadow:
+    0 24px 60px #0009,
+    inset 0 0 0 3px #09161a;
+  padding: 0 10px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
+}
+.stage-topline,
+.stage-bottomline {
+  height: 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font:
+    8px ui-monospace,
+    monospace;
+  letter-spacing: 0.09em;
+  color: #a7bfbb;
+}
+.stage-topline i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: var(--mint);
+  margin-right: 5px;
+  box-shadow: 0 0 6px #78f4ce80;
+}
+.stage-bottomline {
+  color: #6f8d8d;
+  height: 22px;
+}
+.screen-bezel {
+  border: 1px solid #456364;
+  background: #030a0e;
+  box-shadow:
+    0 0 0 3px #050c12,
+    0 0 24px #70ffcf12;
 }
 #game {
-  width: 360px;
-  height: 640px;
-  box-shadow: 0 10px 60px #0009;
-  border: 1px solid #29455f;
-  grid-row: 2/4;
+  width: var(--stage-width);
+  height: calc(var(--stage-width) * 16 / 9);
+  position: relative;
+  overflow: hidden;
+}
+#game canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+}
+.command-deck {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+.deck-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0 12px;
+  border-top: 3px solid var(--amber);
+  color: var(--amber);
+  font:
+    11px ui-monospace,
+    monospace;
+  letter-spacing: 0.15em;
+}
+.deck-heading span:last-child {
+  font-size: 20px;
+  opacity: 0.65;
 }
 #panel {
-  padding: 25px;
-  background: #102236;
-  border: 1px solid #29455f;
-  border-radius: 8px;
-  align-self: start;
+  position: relative;
+  padding: 25px 22px 21px;
+  background: linear-gradient(120deg, #142b30ed, #0d1c24ed);
+  border-top: 1px solid #406062;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 3px 0 #557e77;
+}
+#panel::after {
+  content: "";
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  top: 0;
+  right: 0;
+  border-top: 2px solid var(--mint);
+  border-right: 2px solid var(--mint);
+  pointer-events: none;
+}
+h2 {
+  margin: 0 0 18px;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: 0.025em;
+  color: #f0faf5;
+}
+#panel p {
+  line-height: 1.8;
+  font-size: 13px;
+  color: #bdcfce;
+}
+#panel b {
+  color: var(--amber);
+}
+.stat {
+  display: inline-block;
+  font:
+    36px ui-monospace,
+    monospace;
+  font-weight: 700;
+  color: var(--mint);
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 20px #78f4ce20;
 }
 button {
-  background: #6de5de;
-  color: #08222c;
-  border: 0;
-  border-radius: 5px;
-  padding: 13px 20px;
-  font-weight: 700;
+  appearance: none;
   cursor: pointer;
-  margin: 8px 8px 8px 0;
+  border: 1px solid #a9ffe4;
+  border-radius: 0;
+  margin: 7px 6px 7px 0;
+  padding: 12px 17px;
+  color: #07231e;
+  background: var(--mint);
+  font:
+    800 13px system-ui,
+    sans-serif;
+  letter-spacing: 0.06em;
+  box-shadow: 0 3px 0 #2e7462;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+button:hover {
+  background: #b6ffe6;
+  transform: translateY(-1px);
+}
+button:active {
+  transform: translateY(2px);
+  box-shadow: none;
 }
 button.secondary {
-  background: #29455f;
-  color: #eaf4ff;
+  background: #142a30;
+  color: #c5dfd9;
+  border-color: #3d6263;
+  box-shadow: 0 3px 0 #071318;
+}
+button.secondary:hover {
+  background: #23434a;
+}
+#start,
+#retry {
+  min-width: 145px;
+}
+#start::after,
+#retry::after {
+  content: "  ↗";
+}
+#mute {
+  display: block;
+  padding: 7px 0;
+  margin: 11px 0 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 button:focus-visible,
-input:focus-visible {
-  outline: 3px solid #ffd581;
-  outline-offset: 3px;
+input:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 4px;
+}
+details {
+  margin: 18px 0 8px;
+  border-top: 1px dashed var(--line);
+  padding-top: 14px;
+  font-size: 12px;
+}
+summary {
+  cursor: pointer;
+  color: #accec6;
 }
 label {
   display: block;
-  margin: 16px 0;
+  margin: 15px 0;
+  color: #b3cbc7;
+  font-size: 12px;
 }
 input {
+  display: block;
   width: 100%;
+  accent-color: var(--mint);
+  margin-top: 8px;
 }
-.help {
-  line-height: 1.7;
-  color: #8fa4bd;
-  font-size: 13px;
+.help,
+#panel p.help {
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--muted);
 }
-.notice {
-  color: #ffd581;
-  font-size: 13px;
-  line-height: 1.6;
+.notice,
+#panel p.notice {
+  color: var(--amber);
+  font-size: 12px;
+  border-left: 2px solid var(--amber);
+  padding-left: 9px;
 }
-.stat {
-  font-size: 27px;
-  color: #6de5de;
+.pilot-guide {
+  margin-top: 22px;
 }
-h2 {
-  margin-top: 0;
+h3 {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #b9ceca;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+h3 small {
+  font:
+    9px ui-monospace,
+    monospace;
+  color: #658681;
+  letter-spacing: 0.14em;
+}
+dl {
+  margin: 11px 0 0;
+}
+dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #25413f;
+}
+dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+dd {
+  margin: 0;
+  font-size: 11px;
+  color: #91aaa5;
+}
+kbd {
+  display: inline-block;
+  padding: 5px 7px;
+  min-width: 26px;
+  background: #182e32;
+  border: 1px solid #47605d;
+  border-bottom: 3px solid #47605d;
+  border-radius: 3px;
+  color: #deeee7;
+  text-align: center;
+  font:
+    10px ui-monospace,
+    monospace;
+}
+.or {
+  color: #607a75;
+  font-size: 10px;
+}
+.tactical-note {
+  color: #a0b4ab;
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 16px 0;
+}
+.tactical-note span {
+  color: var(--amber);
+  padding-right: 5px;
+}
+.local-note {
+  display: flex;
+  gap: 10px;
+  border-top: 1px dashed #35534e;
+  padding-top: 14px;
+  margin-top: auto;
+  color: #8aa39c;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.local-note p {
+  margin: 0;
+}
+.local-note small {
+  color: #6f8884;
+  font-size: 10px;
+}
+.local-mark {
+  color: var(--mint);
+  font-size: 21px;
+  line-height: 1.25;
+}
+.combat-readout {
+  color: var(--amber);
+  border-left: 2px solid var(--amber);
+  padding: 8px 12px;
+  font:
+    12px/1.8 ui-monospace,
+    monospace;
+  background: #07181c;
 }
 progress {
   width: 100%;
-  accent-color: #6de5de;
+  accent-color: var(--mint);
+}
+@media (min-width: 1180px) {
+  .flight-deck {
+    column-gap: 46px;
+  }
 }
 @media (max-width: 760px) {
-  main {
+  :root {
+    --stage-width: min(450px, calc(100vw - 54px));
+  }
+  .flight-deck {
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 14px;
+    gap: 18px;
+    padding: 17px 16px 28px;
   }
-  header,
-  #panel,
-  .help {
-    width: min(360px, 100%);
+  .masthead {
+    width: 100%;
+    max-width: 474px;
+    padding-bottom: 14px;
+    gap: 12px;
   }
-  #game {
-    max-width: 100%;
-    height: auto;
-    aspect-ratio: 9/16;
+  h1 {
+    font-size: 24px;
   }
-  canvas {
-    max-width: 100%;
-    height: auto !important;
+  .emblem {
+    width: 28px;
+    height: 34px;
+    font-size: 26px;
+  }
+  .eyebrow {
+    font-size: 7px;
+    letter-spacing: 0.08em;
+  }
+  .edition {
+    font-size: 7px;
+    max-width: 104px;
+  }
+  .edition span {
+    font-size: 8px;
+    line-height: 1.7;
+  }
+  .stage-shell {
+    align-self: center;
+  }
+  .command-deck {
+    width: 100%;
+    max-width: 474px;
+    align-self: center;
+  }
+  .local-note {
+    margin-top: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
   }
 }

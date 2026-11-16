@@ -1,0 +1,339 @@
+import { describe, it, expect } from "vitest";
+import { FlightModel } from "../src/game/model";
+import { stage01, type StageConfig } from "../src/data/stage";
+const empty: StageConfig = {
+  ...stage01,
+  waves: [],
+  boss: undefined,
+  pickups: [],
+};
+const run = (m: FlightModel, seconds: number, fire = false, fps = 60) => {
+  for (let i = 0; i < seconds * fps; i++) m.update(1 / fps, 0, 0, fire);
+};
+describe("combat increment", () => {
+  it.each([30, 60, 120])(
+    "normal center continuous fire clears actual Stage01 at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let sawBoss = false,
+        sawEnemyBullet = false,
+        sawDouble = false;
+      for (let i = 0; i < 76 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        sawBoss ||= !!m.boss?.active;
+        sawEnemyBullet ||= m.enemyBullets.some((b) => b.active);
+        sawDouble ||= m.weaponLevel > 1;
+      }
+      expect(sawBoss && sawEnemyBullet && sawDouble).toBe(true);
+      expect(m.mode).toBe("won");
+      expect(m.bossDefeated).toBe(true);
+      expect(m.time).toBeGreaterThan(60);
+      expect(m.time).toBeLessThan(75);
+      expect(m.score).toBeGreaterThanOrEqual(2500);
+      expect(m.hp).toBeGreaterThan(0);
+      console.log(
+        `Stage01 ${fps}fps: won at ${m.time.toFixed(2)}s, hp=${m.hp}, score=${m.score}`,
+      );
+    },
+  );
+  it("turret holds, fires and exits; weave shifts sideways; pools stay bounded", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 60,
+          speed: 100,
+          hp: 2,
+          points: 100,
+          behavior: "turret",
+          fireEvery: 0.5,
+        },
+        { at: 0, x: 280, speed: 100, hp: 2, points: 100, behavior: "weave" },
+      ],
+    });
+    m.start();
+    run(m, 3);
+    expect(m.enemies[0].y).toBeGreaterThanOrEqual(150);
+    expect(m.enemies[0].y).toBeLessThan(153);
+    expect(m.enemies[1].x).not.toBe(280);
+    expect(m.enemyBullets.some((b) => b.active)).toBe(true);
+    run(m, 13);
+    expect(m.enemies.some((e) => e.active)).toBe(false);
+    expect(m.enemyBullets.some((b) => b.active)).toBe(false);
+    expect(m.enemyBullets.length).toBeLessThan(24);
+  });
+  it("enemy bullet damage respects invulnerability and removes hit bullets", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    for (let i = 0; i < 3; i++)
+      m.enemyBullets.push({
+        id: i,
+        x: 180,
+        y: 540,
+        vx: 0,
+        vy: 0,
+        active: true,
+      });
+    m.update(0);
+    expect(m.hp).toBe(2);
+    expect(m.enemyBullets.every((b) => !b.active)).toBe(true);
+    m.enemyBullets.push({ id: 4, x: 180, y: 540, vx: 0, vy: 0, active: true });
+    m.update(0.05);
+    expect(m.hp).toBe(2);
+  });
+  it("pickup heals at most to cap and power permanently upgrades through three levels", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.hp = 2;
+    m.pickups.push({ id: 1, x: 180, y: 540, kind: "heal", active: true });
+    m.update(0);
+    expect(m.hp).toBe(3);
+    m.update(0);
+    expect(m.hp).toBe(3);
+    m.pickups.push({ id: 2, x: 180, y: 540, kind: "double", active: true });
+    m.update(0);
+    expect(m.weaponLevel).toBe(2);
+    m.update(0, 0, 0, true);
+    expect(m.bullets.filter((b) => b.active)).toHaveLength(3);
+    expect(m.bullets.map((b) => b.vx)).toEqual([
+      expect.any(Number),
+      0,
+      expect.any(Number),
+    ]);
+    run(m, 16);
+    expect(m.weaponLevel).toBe(2);
+    for (let i = 0; i < 3; i++) {
+      m.pickups.push({
+        id: 30 + i,
+        x: 180,
+        y: 540,
+        kind: "power",
+        active: true,
+      });
+      m.update(0);
+    }
+    expect(m.weaponLevel).toBe(3);
+    m.update(0, 0, 0, true);
+    expect(m.bullets.filter((b) => b.active)).toHaveLength(5);
+  });
+  it("enemy death drops exactly one pickup and boss score is awarded once", () => {
+    const m = new FlightModel({
+      ...empty,
+      boss: { at: 0, hp: 1, fireEvery: 9, bulletSpeed: 100, points: 500 },
+    });
+    m.start();
+    m.enemies.push({
+      id: 1,
+      x: 50,
+      y: 200,
+      speed: 0,
+      hp: 1,
+      points: 100,
+      drop: "double",
+      active: true,
+    });
+    m.bullets.push({ id: 2, x: 50, y: 200, active: true });
+    m.update(0);
+    expect(m.pickups).toHaveLength(1);
+    m.boss!.y = 100;
+    m.bullets.push(
+      { id: 3, x: 180, y: 100, active: true },
+      { id: 4, x: 180, y: 100, active: true },
+    );
+    m.update(0);
+    expect(m.mode).toBe("won");
+    expect(m.score).toBe(600);
+    m.update(0.05);
+    expect(m.score).toBe(600);
+  });
+  it("surviving without defeating boss times out instead of winning", () => {
+    const m = new FlightModel({
+      ...empty,
+      duration: 2,
+      boss: { at: 0, hp: 20, fireEvery: 99, bulletSpeed: 10, points: 500 },
+    });
+    m.start();
+    run(m, 3);
+    expect(m.mode).toBe("lost");
+    expect(m.lostReason).toBe("timeout");
+    expect(m.time).toBe(2);
+  });
+  it("pause and ten restarts clear every new transient state", () => {
+    const m = new FlightModel(stage01);
+    m.start();
+    run(m, 60, true);
+    m.pause();
+    const frozen = JSON.stringify({
+      time: m.time,
+      boss: m.boss,
+      enemyBullets: m.enemyBullets,
+      pickups: m.pickups,
+    });
+    run(m, 5, true);
+    expect(
+      JSON.stringify({
+        time: m.time,
+        boss: m.boss,
+        enemyBullets: m.enemyBullets,
+        pickups: m.pickups,
+      }),
+    ).toBe(frozen);
+    for (let i = 0; i < 10; i++) {
+      m.start();
+      expect(m.enemyBullets).toHaveLength(0);
+      expect(m.pickups).toHaveLength(0);
+      expect(m.boss).toBeNull();
+      expect(m.bossDefeated).toBe(false);
+      expect(m.weaponTime).toBe(0);
+      expect(m.lostReason).toBeNull();
+      run(m, 1, true);
+    }
+    expect(m.hp).toBe(3);
+    expect(m.score).toBe(0);
+  });
+});
+
+describe("weapon and encounter progression", () => {
+  it("bomb is a bounded one-shot action, clears bullets, damages armor and gives protection", () => {
+    const m = new FlightModel({
+      ...empty,
+      boss: { at: 0, hp: 100, fireEvery: 3, bulletSpeed: 100, points: 500 },
+    });
+    expect(m.useBomb()).toBe(false);
+    m.start();
+    m.update(0);
+    m.enemies.push({
+      id: 50,
+      x: 80,
+      y: 200,
+      hp: 10,
+      speed: 0,
+      points: 100,
+      active: true,
+    });
+    m.enemyBullets.push({
+      id: 51,
+      x: 180,
+      y: 300,
+      vx: 0,
+      vy: 100,
+      active: true,
+    });
+    expect(m.useBomb()).toBe(true);
+    expect(m.bombs).toBe(1);
+    expect(m.boss!.hp).toBe(82);
+    expect(m.enemyBullets.every((b) => !b.active)).toBe(true);
+    expect(m.enemies[0].active).toBe(false);
+    expect(m.killCount).toBe(1);
+    expect(m.score).toBe(100);
+    expect(m.invincible).toBe(2);
+    expect(m.bombFlash).toBeGreaterThan(0);
+    expect(m.useBomb()).toBe(false);
+    m.pause();
+    const before = JSON.stringify(m);
+    expect(m.useBomb()).toBe(false);
+    run(m, 1);
+    expect(JSON.stringify(m)).toBe(before);
+    m.pause();
+    run(m, 0.7);
+    expect(m.useBomb()).toBe(true);
+    run(m, 0.7);
+    expect(m.useBomb()).toBe(false);
+    expect(m.bombs).toBe(0);
+    m.start();
+    expect(m.bombs).toBe(2);
+    expect(m.weaponLevel).toBe(1);
+    expect(m.killCount + m.damageCount + m.pickupCount + m.bombFlash).toBe(0);
+  });
+  it("boss phase transitions announce and clear old bullets before new patterns", () => {
+    const m = new FlightModel({
+      ...empty,
+      boss: { at: 0, hp: 180, fireEvery: 2.5, bulletSpeed: 100, points: 500 },
+    });
+    m.start();
+    m.update(0);
+    expect(m.boss!.phase).toBe(1);
+    run(m, 3);
+    expect(m.enemyBullets.some((b) => b.active)).toBe(true);
+    m.boss!.hp = 110;
+    m.update(0);
+    expect(m.boss!.phase).toBe(2);
+    expect(m.boss!.telegraph).toBe(1.2);
+    expect(m.enemyBullets.every((b) => !b.active)).toBe(true);
+    run(m, 1);
+    expect(m.enemyBullets.every((b) => !b.active)).toBe(true);
+    run(m, 0.7);
+    expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(5);
+    m.boss!.hp = 50;
+    m.update(0);
+    expect(m.boss!.phase).toBe(3);
+    expect(m.boss!.telegraph).toBe(1.2);
+    run(m, 1.7);
+    expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(3);
+  });
+  it("formations are ordered, distinct, with a quiet supply window before boss", () => {
+    expect(stage01.waves.map((w) => w.at)).toEqual(
+      [...stage01.waves.map((w) => w.at)].sort((a, b) => a - b),
+    );
+    expect(
+      new Set(stage01.waves.filter((w) => w.at < 12).map((w) => w.behavior)),
+    ).toEqual(new Set(["straight"]));
+    expect(
+      stage01.waves
+        .filter((w) => w.at >= 15 && w.at < 30)
+        .every((w) => w.behavior === "weave"),
+    ).toBe(true);
+    expect(
+      stage01.waves.some((w) => w.behavior === "turret" && w.hp >= 10),
+    ).toBe(true);
+    expect(stage01.waves.every((w) => w.at < 45)).toBe(true);
+    expect(stage01.pickups!.some((p) => p.at === 46 && p.kind === "heal")).toBe(
+      true,
+    );
+  });
+  it.each([30, 60, 120])(
+    "normal keyboard fire with two timed bombs wins at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let bomb1 = false,
+        bomb2 = false;
+      const phases = new Set<number>();
+      for (let i = 0; i < 76 * fps; i++) {
+        if (m.boss?.phase) phases.add(m.boss.phase);
+        if (!bomb1 && m.time >= 62) {
+          bomb1 = m.useBomb();
+        }
+        if (!bomb2 && m.time >= 65) {
+          bomb2 = m.useBomb();
+        }
+        m.update(1 / fps, 0, 0, true);
+      }
+      expect(m.mode).toBe("won");
+      expect(bomb1 && bomb2).toBe(true);
+      expect(phases).toEqual(new Set([1, 2, 3]));
+      expect(m.bombs).toBe(0);
+    },
+  );
+  it("spread travels laterally, cleans up offscreen, and cannot revive a dead pilot", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.weaponLevel = 3;
+    m.update(0, 0, 0, true);
+    const xs = m.bullets.map((b) => b.x);
+    run(m, 0.1);
+    expect(m.bullets[0].x).toBeLessThan(xs[0]);
+    expect(m.bullets[4].x).toBeGreaterThan(xs[4]);
+    run(m, 2);
+    expect(m.bullets.every((b) => !b.active)).toBe(true);
+    m.hp = 1;
+    m.enemyBullets.push({ id: 99, x: 180, y: 540, vx: 0, vy: 0, active: true });
+    m.pickups.push({ id: 100, x: 180, y: 540, kind: "heal", active: true });
+    m.update(0);
+    expect(m.mode).toBe("lost");
+    expect(m.hp).toBe(0);
+    expect(m.useBomb()).toBe(false);
+  });
+});

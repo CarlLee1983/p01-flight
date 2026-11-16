@@ -1,28 +1,51 @@
 import { test, expect } from "@playwright/test";
 const state = (page: any) => page.evaluate(() => (window as any).__P01__());
-test("real 75-second stage, score, result, retry and reload", async ({
-  page,
-}) => {
+test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(page.getByRole("button", { name: "開始飛行" })).toBeVisible();
+  // Verify the actual loader resources, not only successful canvas creation.
+  for (const name of [
+    "playerShip1_blue",
+    "enemyRed1",
+    "laserBlue01",
+    "fire03",
+  ]) {
+    const response = await page.request.get(`/assets/kenney/${name}.png`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("image/png");
+  }
   await page.screenshot({ path: "docs/menu.png" });
   await page.getByRole("button", { name: "開始飛行" }).click();
   await page.keyboard.down("Space");
-  // Shoot from the center then move into a safe corridor; no debug mutation.
-  await page.waitForTimeout(12000);
-  await page.keyboard.down("ArrowLeft");
-  await page.waitForTimeout(800);
-  await page.keyboard.up("ArrowLeft");
-  expect((await state(page)).player.x).toBeLessThan(70);
+  // Normal keyboard input only. Center route naturally collects stage pickups.
+  await expect
+    .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
+    .toBeGreaterThan(1);
   await page.screenshot({ path: "docs/playing.png" });
+  await expect
+    .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 65000 })
+    .toBeGreaterThanOrEqual(105);
+  await page.screenshot({ path: "docs/boss.png" });
+  await expect
+    .poll(async () => (await state(page)).time, { timeout: 15000 })
+    .toBeGreaterThan(62);
+  await page.keyboard.press("x");
+  expect((await state(page)).bombs).toBe(1);
+  await page.screenshot({ path: "docs/bomb.png" });
+  await expect
+    .poll(async () => (await state(page)).boss?.phase, { timeout: 15000 })
+    .toBe(3);
+  await page.screenshot({ path: "docs/boss-phase3.png" });
   await expect
     .poll(async () => (await state(page)).mode, { timeout: 90000 })
     .toBe("won");
   await page.keyboard.up("Space");
   const won = await state(page);
-  expect(won.time).toBe(75);
+  expect(won.time).toBeGreaterThanOrEqual(58);
+  expect(won.time).toBeLessThanOrEqual(75);
+  expect(won.bossDefeated).toBe(true);
   expect(won.score).toBeGreaterThan(0);
   expect(won.save.stages["stage-01"].clearCount).toBe(1);
   await page.screenshot({ path: "docs/won.png" });
@@ -76,10 +99,6 @@ test("browser closes and reopens with persisted settings and record", async () =
     await page.goto("http://127.0.0.1:4173");
     await page.getByRole("button", { name: "開始飛行" }).click();
     await page.keyboard.down("Space");
-    await page.waitForTimeout(12000);
-    await page.keyboard.down("ArrowLeft");
-    await page.waitForTimeout(800);
-    await page.keyboard.up("ArrowLeft");
     await expect
       .poll(async () => (await state(page)).mode, { timeout: 90000 })
       .toBe("won");
@@ -130,4 +149,49 @@ test("storage write denial shows result warning without breaking game", async ({
   await expect(page.getByRole("status")).toContainText("未能保存");
   await page.getByRole("button", { name: "再飛一次" }).click();
   expect((await state(page)).hp).toBe(3);
+});
+
+test("G1/G2 v1 saved records remain compatible", async ({ page }) => {
+  const legacy = {
+    saveVersion: 1,
+    stages: { "stage-01": { cleared: true, bestScore: 12300, clearCount: 4 } },
+    settings: { musicVolume: 0.2, sfxVolume: 0.3 },
+  };
+  await page.addInitScript((save) => {
+    if (!localStorage.getItem("p01-flight:save:v1"))
+      localStorage.setItem("p01-flight:save:v1", JSON.stringify(save));
+  }, legacy);
+  await page.goto("/");
+  await expect(page.getByText("已通關 · 通關 4 次")).toBeVisible();
+  expect((await state(page)).save).toEqual(legacy);
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await page.getByRole("button", { name: "返回標題" }).click();
+  await page.reload();
+  expect((await state(page)).save).toEqual(legacy);
+});
+
+test("audio unlock, mute persistence and bomb edge trigger", async ({
+  page,
+}) => {
+  await page.goto("/");
+  expect((await state(page)).audio.state).not.toBe("running");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await expect
+    .poll(async () => (await state(page)).audio.state)
+    .toBe("running");
+  await page.keyboard.down("x");
+  await page.waitForTimeout(1000);
+  expect((await state(page)).bombs).toBe(1);
+  await page.keyboard.up("x");
+  await page.getByRole("button", { name: "全部靜音" }).click();
+  expect((await state(page)).audio.musicVolume).toBe(0);
+  expect((await state(page)).audio.sfxVolume).toBe(0);
+  await page.keyboard.press("p");
+  expect((await state(page)).audio.activeVoices).toBe(0);
+  await page.reload();
+  expect((await state(page)).save.settings).toEqual({
+    musicVolume: 0,
+    sfxVolume: 0,
+  });
+  await expect(page.getByRole("button", { name: "開啟聲音" })).toBeVisible();
 });
