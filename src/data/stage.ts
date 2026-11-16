@@ -1,3 +1,4 @@
+export const GROUND_SCROLL_SPEED = 32;
 export type Behavior =
   | "straight"
   | "weave"
@@ -5,7 +6,9 @@ export type Behavior =
   | "heavy"
   | "dive"
   | "cross"
-  | "carrier";
+  | "carrier"
+  | "groundBattery"
+  | "groundDepot";
 export type PickupKind =
   | "heal"
   | "double"
@@ -26,19 +29,28 @@ export interface Wave {
   spawnY?: number;
   direction?: number;
 }
+export interface StageSection {
+  id: string;
+  title: string;
+  at: number;
+  hint: string;
+}
 export interface StageConfig {
   id: string;
   title: string;
   duration: number;
+  groundSpeed?: number;
   width: number;
   height: number;
   waves: Wave[];
+  sections?: StageSection[];
   pickups?: { at: number; x: number; kind: PickupKind }[];
   boss?: {
     at: number;
     hp: number;
     fireEvery: number;
     bulletSpeed: number;
+    sideCannonHp?: number;
     points: number;
   };
 }
@@ -46,6 +58,39 @@ export const stage01: StageConfig = {
   id: "stage-01",
   title: "雲際航線",
   duration: 115,
+  groundSpeed: GROUND_SCROLL_SPEED,
+  sections: [
+    {
+      id: "approach",
+      title: "外海試探",
+      at: 0,
+      hint: "擊破小隊，取得主炮升級",
+    },
+    {
+      id: "crossing",
+      title: "交叉航道",
+      at: 15,
+      hint: "側向敵機可用追蹤彈攔截",
+    },
+    {
+      id: "harbor",
+      title: "港區火力",
+      at: 32,
+      hint: "看見蓄力光圈，側移避開瞄準彈",
+    },
+    {
+      id: "resupply",
+      title: "補給接近",
+      at: 56,
+      hint: "整隊補血，保留炸彈迎擊指揮艦",
+    },
+    {
+      id: "commander",
+      title: "指揮艦",
+      at: 70,
+      hint: "擊破兩側炮座可減少外側火力；核心擊破即通關",
+    },
+  ],
   width: 360,
   height: 640,
   // Small opening formations, alternating flank squadrons, armored batteries,
@@ -113,20 +158,21 @@ export const stage01: StageConfig = {
         at,
         x,
         speed: 110,
-        hp: 5,
+        hp: at === 32 ? 12 : 5,
         points: 350,
-        behavior: "turret" as const,
-        fireEvery: 2.2,
+        behavior: at === 32 ? ("groundBattery" as const) : ("turret" as const),
+        fireEvery: at === 32 ? 4.8 : 2.2,
       })),
     ),
     ...[36, 45, 54].map((at) => ({
       at,
-      x: 180,
+      x: at === 36 ? 270 : 180,
       speed: 95,
-      hp: 9,
+      hp: at === 36 ? 4 : 9,
       points: 150,
-      behavior: "heavy" as const,
-      fireEvery: 2.8,
+      behavior: at === 36 ? ("groundDepot" as const) : ("heavy" as const),
+      fireEvery: at === 36 ? undefined : 2.8,
+      drop: at === 36 ? ("heal" as const) : undefined,
     })),
   ].sort((a, b) => a.at - b.at),
   pickups: [
@@ -137,5 +183,12 @@ export const stage01: StageConfig = {
     { at: 60, x: 180, kind: "heal" },
     { at: 67, x: 90, kind: "support" },
   ],
-  boss: { at: 70, hp: 400, fireEvery: 2.7, bulletSpeed: 140, points: 3000 },
+  boss: {
+    at: 70,
+    hp: 400,
+    fireEvery: 2.7,
+    bulletSpeed: 140,
+    sideCannonHp: 24,
+    points: 3000,
+  },
 };

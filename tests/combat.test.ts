@@ -16,6 +16,7 @@ describe("combat increment", () => {
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
+      const cannonTimes: number[] = [];
       let sawBoss = false,
         sawEnemyBullet = false,
         sawDouble = false;
@@ -25,6 +26,7 @@ describe("combat increment", () => {
         if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
         if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
         m.update(1 / fps, 0, 0, true);
+        if (m.partsDestroyed > cannonTimes.length) cannonTimes.push(m.time);
         sawBoss ||= !!m.boss?.active;
         sawEnemyBullet ||= m.enemyBullets.some((b) => b.active);
         sawDouble ||= m.weaponLevel > 1;
@@ -32,12 +34,13 @@ describe("combat increment", () => {
       expect(sawBoss && sawEnemyBullet && sawDouble).toBe(true);
       expect(m.mode).toBe("won");
       expect(m.bossDefeated).toBe(true);
+      expect(m.partsDestroyed).toBe(2);
       expect(m.time).toBeGreaterThan(60);
       expect(m.time).toBeLessThan(115);
       expect(m.score).toBeGreaterThanOrEqual(2500);
       expect(m.hp).toBeGreaterThan(0);
       console.log(
-        `Stage01 ${fps}fps: won at ${m.time.toFixed(2)}s, hp=${m.hp}, score=${m.score}`,
+        `Stage01 ${fps}fps: won at ${m.time.toFixed(2)}s, hp=${m.hp}, score=${m.score}, cannons=${cannonTimes.map((t) => t.toFixed(2)).join(",")}`,
       );
     },
   );
@@ -609,7 +612,7 @@ it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
     }
     if (!b1 && m.time >= 85) b1 = m.useBomb();
     if (!b2 && m.time >= 91) b2 = m.useBomb();
-    m.update(1 / fps, 0, 0, true);
+    m.update(1 / fps, m.time >= 95 && m.time < 95.3 ? 1 : 0, 0, true, true);
   }
   console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
   expect(m.mode).toBe("won");
@@ -746,6 +749,215 @@ describe("weapon supply and temporary escorts", () => {
         m.pickups.filter((p) => p.active && p.kind === "missile"),
       ).toHaveLength(1);
       expect(m.score).toBe(200);
+    },
+  );
+});
+
+describe("encounter sections and breakable cannons", () => {
+  it("sections change at declared boundaries and restart returns approach", () => {
+    const m = new FlightModel(stage01);
+    m.start();
+    expect(m.section.id).toBe("approach");
+    for (const [at, id] of [
+      [15, "crossing"],
+      [32, "harbor"],
+      [56, "resupply"],
+      [70, "commander"],
+    ] as const) {
+      m.time = at - 0.01;
+      expect(m.section.id).not.toBe(id);
+      m.time = at;
+      expect(m.section.id).toBe(id);
+    }
+    expect(stage01.waves.some((w) => w.at >= 56 && w.at < 70)).toBe(false);
+    expect(stage01.pickups!.some((p) => p.kind === "heal" && p.at === 60)).toBe(
+      true,
+    );
+    expect(
+      stage01.pickups!.some((p) => p.kind === "support" && p.at === 39),
+    ).toBe(true);
+    m.start();
+    expect(m.section.id).toBe("approach");
+  });
+  it.each([30, 60, 120])(
+    "breaking a cannon removes its future outer shot but not the core objective at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        boss: {
+          at: 0,
+          hp: 400,
+          sideCannonHp: 24,
+          fireEvery: 2.7,
+          bulletSpeed: 140,
+          points: 3000,
+        },
+      });
+      m.start();
+      m.invincible = 100;
+      run(m, 2, false, fps);
+      const boss = m.boss!,
+        left = boss.cannons[0],
+        right = boss.cannons[1];
+      expect(left.x).toBeCloseTo(boss.x - 68);
+      expect(right.x).toBeCloseTo(boss.x + 68);
+      m.bullets.push({
+        id: 900,
+        x: left.x,
+        y: left.y,
+        active: true,
+        damage: 24,
+      });
+      m.update(0);
+      expect(left.active).toBe(false);
+      expect(left.hp).toBe(0);
+      expect(right.active).toBe(true);
+      expect(m.partsDestroyed).toBe(1);
+      expect(m.score).toBe(250);
+      expect(boss.hp).toBe(388);
+      expect(m.mode).toBe("playing");
+      const before = m.enemyBullets.filter((b) => b.active).length;
+      boss.telegraph = 0;
+      boss.fireCooldown = 0;
+      m.update(0);
+      expect(m.enemyBullets.filter((b) => b.active).length - before).toBe(1);
+      m.bullets.push({
+        id: 901,
+        x: left.x,
+        y: left.y,
+        active: true,
+        damage: 24,
+      });
+      m.update(0);
+      expect(m.score).toBe(250);
+      expect(m.partsDestroyed).toBe(1);
+      m.bullets.push({
+        id: 902,
+        x: boss.x,
+        y: boss.y,
+        active: true,
+        damage: 400,
+      });
+      m.update(0);
+      expect(m.mode).toBe("won");
+      expect(right.active).toBe(true);
+      expect(m.score).toBe(3250);
+      m.start();
+      expect(m.partsDestroyed).toBe(0);
+      expect(m.boss).toBeNull();
+    },
+  );
+  it("beam overlap damages each part once; bomb deals bounded damage without duplicate score", () => {
+    const m = new FlightModel({
+      ...empty,
+      boss: {
+        at: 0,
+        hp: 400,
+        sideCannonHp: 24,
+        fireEvery: 9,
+        bulletSpeed: 100,
+        points: 3000,
+      },
+    });
+    m.start();
+    run(m, 2);
+    const boss = m.boss!,
+      part = boss.cannons[0];
+    m.bullets.push({
+      id: 900,
+      x: part.x,
+      y: part.y,
+      active: true,
+      vx: 0,
+      vy: 0,
+      kind: "beam",
+      damage: 4,
+      pierceRemaining: 4,
+      hitIds: [],
+    });
+    m.update(0);
+    m.update(0);
+    expect(part.hp).toBe(20);
+    expect(boss.hp).toBe(400);
+    expect(m.bullets[0].hitIds).toEqual([part.id]);
+    expect(m.useBomb()).toBe(true);
+    expect(part.hp).toBe(14);
+    expect(m.useBomb()).toBe(false);
+    expect(part.hp).toBe(14);
+    m.pause();
+    const state = JSON.stringify(boss);
+    run(m, 2);
+    expect(JSON.stringify(boss)).toBe(state);
+  });
+});
+
+describe("ground targets", () => {
+  it.each([30, 60, 120])(
+    "ground objects move with terrain, never ram, but batteries shoot at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        waves: [
+          {
+            at: 0,
+            x: 180,
+            spawnY: 540,
+            speed: 999,
+            hp: 5,
+            points: 100,
+            behavior: "groundDepot",
+            fireEvery: 0.1,
+            drop: "heal",
+          },
+          {
+            at: 0,
+            x: 80,
+            spawnY: 70,
+            speed: 999,
+            hp: 5,
+            points: 100,
+            behavior: "groundBattery",
+            fireEvery: 1,
+          },
+        ],
+      });
+      m.start();
+      run(m, 2, false, fps);
+      expect(m.hp).toBe(3);
+      expect(m.enemies[0].y).toBeCloseTo(604, 6);
+      expect(m.enemies[1].y).toBeCloseTo(134, 6);
+      expect(m.enemies[0].x).toBe(180);
+      expect(m.enemyBullets.some((b) => b.active)).toBe(true);
+      m.bullets.push({ id: 990, x: 180, y: 604, active: true, damage: 5 });
+      m.update(0);
+      m.update(0);
+      expect(m.score).toBe(100);
+      expect(
+        m.pickups.filter((p) => p.kind === "heal" && p.active),
+      ).toHaveLength(1);
+    },
+  );
+  it.each([30, 60, 120])(
+    "ground batteries remain inspectable at 35–36 seconds at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      run(m, 35, true, fps);
+      const before = m.enemies
+        .filter((e) => e.active && e.behavior === "groundBattery")
+        .map((e) => ({ id: e.id, y: e.y }));
+      expect(before).toHaveLength(2);
+      run(m, 1, true, fps);
+      const batteries = m.enemies.filter(
+        (e) => e.active && e.behavior === "groundBattery",
+      );
+      console.log(
+        "ground at36",
+        batteries.map((e) => ({ x: e.x, y: e.y, hp: e.hp })),
+      );
+      expect(batteries).toHaveLength(2);
+      for (const e of batteries)
+        expect(e.y - before.find((b) => b.id === e.id)!.y).toBeCloseTo(32, 5);
     },
   );
 });
