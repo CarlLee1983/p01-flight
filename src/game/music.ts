@@ -86,7 +86,7 @@ export function scoreStep(
     notes.push({ part: "kick", midi: 35, steps: 1, level: 0.3 });
   if (!soft && (step === 4 || step === 12))
     notes.push({ part: "snare", midi: 50, steps: 1, level: 0.075 });
-  if (!soft && step % (dense ? 2 : 4) === 2)
+  if (!soft && (dense ? step % 2 === 0 : step % 4 === 2))
     notes.push({ part: "hat", midi: 105, steps: 0.25, level: 0.025 });
   const row = section === "boss" ? boss[bar % 4] : theme[bar % 8];
   let pitch = row[step];

@@ -41,6 +41,28 @@ describe("Cloudline original score", () => {
     expect(theme).not.toEqual(boss);
     expect(theme.slice(0, 16)).not.toEqual(theme.slice(16, 32));
   });
+  it("keeps explicit hi-hat patterns in themes and dense sections", () => {
+    for (const section of [
+      "intro",
+      "theme-a",
+      "theme-b",
+      "assault",
+      "breather",
+      "boss",
+    ] as MusicSection[]) {
+      const steps = Array.from({ length: 16 }, (_, step) => step).filter(
+        (step) =>
+          scoreStep(section, 0, step).some((note) => note.part === "hat"),
+      );
+      expect(steps).toEqual(
+        section === "intro" || section === "breather"
+          ? []
+          : section === "assault" || section === "boss"
+            ? [0, 2, 4, 6, 8, 10, 12, 14]
+            : [2, 6, 10, 14],
+      );
+    }
+  });
   it("arranges the full stage and permits heavy/boss cues", () => {
     expect(sectionFor(0, 0)).toBe("intro");
     expect(sectionFor(4, 0)).toBe("theme-a");
