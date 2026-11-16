@@ -63,7 +63,7 @@ describe("original procedural audio", () => {
     const ctx = Context.instances[0];
     a.update(0.016);
     a.play("shot");
-    expect(a.diagnostics().activeVoices).toBe(3);
+    expect(a.diagnostics().activeVoices).toBe(4);
     a.setPlaying(false);
     expect(a.diagnostics().activeVoices).toBe(0);
     expect(
@@ -154,6 +154,74 @@ describe("original procedural audio", () => {
     expect(a.diagnostics().activeVoices).toBe(0);
     a.play("bomb");
     expect(a.diagnostics().activeVoices).toBe(0);
+    a.dispose();
+  });
+  it("beam is a layered sustained buzz rather than the shot chirp", async () => {
+    vi.stubGlobal("AudioContext", Context);
+    const a = new FlightAudio();
+    await a.unlock();
+    const ctx = Context.instances[0];
+    a.play("shot");
+    a.play("beam");
+    a.play("beam");
+    expect(ctx.oscillators.map((o) => o.type)).toEqual([
+      "triangle",
+      "sawtooth",
+      "sine",
+    ]);
+    expect(ctx.oscillators[0].stop).toHaveBeenCalledWith(0.075);
+    expect(ctx.oscillators[1].stop).toHaveBeenCalledWith(0.19);
+    expect(ctx.gains[3].gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.075,
+      0.025,
+    );
+    a.dispose();
+  });
+  it("intensity changes the next rhythmic pulse without stopping current envelopes", async () => {
+    vi.stubGlobal("AudioContext", Context);
+    const a = new FlightAudio();
+    await a.unlock();
+    const ctx = Context.instances[0];
+    a.setPlaying(true);
+    a.update(0.01);
+    expect(ctx.oscillators).toHaveLength(3);
+    const stopCalls = ctx.oscillators.map((o) => o.stop.mock.calls.length);
+    a.setIntensity(2);
+    expect(a.diagnostics().intensity).toBe(2);
+    expect(ctx.oscillators.map((o) => o.stop.mock.calls.length)).toEqual(
+      stopCalls,
+    );
+    a.update(0.1);
+    a.update(0.1);
+    a.update(0.1);
+    expect(ctx.oscillators).toHaveLength(5); // offbeat arp plus high tick
+    a.setPlaying(false);
+    expect(a.diagnostics().activeVoices).toBe(0);
+    a.dispose();
+  });
+  it("leaves warning voice space during fire and temporarily suppresses routine sounds", async () => {
+    vi.stubGlobal("AudioContext", Context);
+    const a = new FlightAudio();
+    await a.unlock();
+    const ctx = Context.instances[0];
+    for (let i = 0; i < 20; i++) {
+      ctx.currentTime += 0.2;
+      a.play("beam");
+    }
+    expect(a.diagnostics().activeVoices).toBe(14);
+    a.play("hurt");
+    expect(a.diagnostics().activeVoices).toBe(16);
+    const total = ctx.oscillators.length;
+    ctx.oscillators[0].onended!();
+    ctx.oscillators[1].onended!();
+    ctx.currentTime += 0.1;
+    a.play("shot");
+    a.play("explode");
+    expect(ctx.oscillators).toHaveLength(total);
+    ctx.oscillators[2].onended!();
+    ctx.currentTime += 0.4;
+    a.play("shot");
+    expect(ctx.oscillators).toHaveLength(total + 1);
     a.dispose();
   });
 });

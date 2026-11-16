@@ -18,8 +18,6 @@ let recorded = false;
 let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
-let title: Phaser.GameObjects.Text;
-let subtitle: Phaser.GameObjects.Text;
 function start() {
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0 };
@@ -34,11 +32,11 @@ function renderPanel() {
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<h2>Stage 01</h2><p>穿越沿岸防線，在 75 秒內擊破三階段指揮艦。收集金色能量，將主炮升至三向、五向散射。</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">C 切換機炮／光束 · Shift 精準移動</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
     panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>按住 Space／Z 射擊。留意蓄力光圈，側移躲開瞄準彈。</p><p>金色能量永久升級主炮；青色十字補血。<br><b>X：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
-    panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / 75 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${stage01.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
   document.querySelector("#start")?.addEventListener("click", start);
   document.querySelector("#retry")?.addEventListener("click", start);
   document.querySelector("#pause")?.addEventListener("click", () => {
@@ -99,10 +97,18 @@ function renderPanel() {
   lastMode = model.mode;
 }
 class FlightScene extends Phaser.Scene {
+  bank = 0;
+  lastPlayerX = 180;
+  ambience = 0;
   keys!: Record<string, Phaser.Input.Keyboard.Key>;
   visuals: Phaser.GameObjects.Image[] = [];
   visualIndex = 0;
   preload() {
+    for (const file of ["player", "scout", "heavy", "boss", "coast"])
+      this.load.image(
+        file,
+        import.meta.env.BASE_URL + "assets/original/" + file + ".png",
+      );
     for (const file of [
       "playerShip1_blue",
       "enemyRed1",
@@ -136,33 +142,13 @@ class FlightScene extends Phaser.Scene {
       .setAlpha(alpha)
       .setAngle(angle)
       .setVisible(true)
+      .setDepth(1)
       .clearTint();
     return image;
   }
   create() {
     graphics = this.add.graphics();
     overlay = this.add.graphics().setDepth(3);
-    title = this.add
-      .text(180, 180, "", {
-        fontFamily: "sans-serif",
-        fontSize: "38px",
-        fontStyle: "bold",
-        color: "#f0f5dd",
-        stroke: "#071b29",
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5)
-      .setDepth(6);
-    subtitle = this.add
-      .text(180, 228, "", {
-        fontFamily: "monospace",
-        fontSize: "13px",
-        color: "#8bf3da",
-        align: "center",
-        lineSpacing: 8,
-      })
-      .setOrigin(0.5)
-      .setDepth(6);
     label = this.add
       .text(16, 14, "", {
         fontFamily: "monospace",
@@ -171,7 +157,7 @@ class FlightScene extends Phaser.Scene {
       })
       .setDepth(5);
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Z,ENTER,P,X",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Z,ENTER,P,X,C,SHIFT",
     ) as typeof this.keys;
     this.input.keyboard!.disableGlobalCapture();
     // Handle edge-triggered actions on keydown so a press released between
@@ -186,6 +172,9 @@ class FlightScene extends Phaser.Scene {
       if (!event.repeat && ["menu", "won", "lost"].includes(model.mode))
         start();
     });
+    this.input.keyboard!.on("keydown-C", (event: KeyboardEvent) => {
+      if (!event.repeat && model.switchWeapon()) audio.play("power");
+    });
     this.input.keyboard!.on("keydown-X", (event: KeyboardEvent) => {
       if (!event.repeat && model.useBomb()) {
         audio.play("bomb");
@@ -195,6 +184,8 @@ class FlightScene extends Phaser.Scene {
     renderPanel();
   }
   update(_time: number, delta: number) {
+    if (model.mode === "playing" || model.mode === "menu")
+      this.ambience += Math.min(delta / 1000, 0.05);
     if (model.mode === "playing") this.input.keyboard!.enableGlobalCapture();
     else this.input.keyboard!.disableGlobalCapture();
     const on = (...names: string[]) =>
@@ -204,8 +195,18 @@ class FlightScene extends Phaser.Scene {
       on("D", "RIGHT") - on("A", "LEFT"),
       on("S", "DOWN") - on("W", "UP"),
       !!on("SPACE", "Z"),
+      !!on("SHIFT"),
     );
-    if (model.shots > previous.shots) audio.play("shot");
+    const move = model.player.x - this.lastPlayerX;
+    this.bank = Phaser.Math.Linear(
+      this.bank,
+      Math.max(-12, Math.min(12, move * 8)),
+      0.16,
+    );
+    this.lastPlayerX = model.player.x;
+    if (model.shots > previous.shots)
+      audio.play(model.weaponMode === "beam" ? "beam" : "shot");
+    audio.setIntensity(model.boss?.active ? 2 : model.time > 30 ? 1 : 0);
     if (model.killCount > previous.kills) audio.play("explode");
     if (model.damageCount > previous.hurt) {
       audio.play("hurt");
@@ -232,51 +233,27 @@ class FlightScene extends Phaser.Scene {
     this.draw();
   }
   draw() {
-    const splash =
-      model.mode === "menu" || model.mode === "won" || model.mode === "lost";
-    title.setVisible(splash);
-    subtitle.setVisible(splash);
-    title.setText(
-      model.mode === "menu"
-        ? "雲際航線"
-        : model.mode === "won"
-          ? "任務完成"
-          : "任務失敗",
-    );
-    title.setColor(model.mode === "lost" ? "#ffb18f" : "#f0f5dd");
-    subtitle.setText(
-      model.mode === "menu"
-        ? "COASTAL STRIKE / 01\nPRESS ENTER TO LAUNCH"
-        : model.mode === "won"
-          ? "COMMAND SHIP DESTROYED\nPRESS ENTER TO RETRY"
-          : "REGROUP AND RETURN\nPRESS ENTER TO RETRY",
-    );
     this.visualIndex = 0;
     for (const image of this.visuals) image.setVisible(false);
     graphics.clear();
     overlay.clear();
     graphics.fillStyle(0x092b3c);
     graphics.fillRect(0, 0, 360, 640);
-    for (let i = 0; i < 30; i++) {
-      const x = (i * 137) % 360,
-        y = ((i * 79 + model.time * 65) % 680) - 20;
-      graphics.fillStyle(i % 3 === 0 ? 0x38637d : 0x163a52, 0.8);
-      graphics.fillRect(x, y, 2, i % 3 === 0 ? 18 : 5);
+    // Original non-seamless terrain: bounded drift, never wrap its edges.
+    const travel = Math.min(1, model.time / stage01.duration);
+    this.sprite("coast", 180, 300 + travel * 40, 480, 720, 0.88).setDepth(-1);
+    graphics.clear();
+    // Surface wakes and sparse high-altitude cloud streaks move independently.
+    for (let i = 0; i < 20; i++) {
+      const x = 90 + ((i * 73) % 180);
+      const y = ((i * 89 + this.ambience * 38) % 700) - 30;
+      graphics.lineStyle(1, 0x8acbd1, 0.12);
+      graphics.lineBetween(x, y, x - 4, y + 12);
     }
-    // Original coastal silhouettes, breakwaters and foam scroll beneath combat.
-    for (let i = 0; i < 5; i++) {
-      const y = ((i * 190 + model.time * 48) % 1000) - 180;
-      const x = i % 2 ? 335 : 12;
-      graphics.fillStyle(0x174942);
-      graphics.fillEllipse(x, y, 125, 220);
-      graphics.fillStyle(0x226052, 0.6);
-      graphics.fillEllipse(x + (i % 2 ? 18 : -18), y - 15, 100, 170);
-      graphics.lineStyle(2, 0x5b9b96, 0.3);
-      graphics.strokeEllipse(x, y, 140, 232);
-      graphics.fillStyle(0x516269);
-      graphics.fillRect(x - 20, y - 30, 40, 65);
-      graphics.fillStyle(0x889083);
-      graphics.fillRect(x - 15, y - 25, 30, 50);
+    for (let i = 0; i < 4; i++) {
+      const y = ((i * 220 + this.ambience * 75) % 900) - 130;
+      graphics.fillStyle(0xd3edf0, 0.045);
+      graphics.fillEllipse(i % 2 ? 345 : 10, y, 150, 85);
     }
     if (model.mode !== "menu") {
       for (const b of model.bullets)
@@ -285,20 +262,32 @@ class FlightScene extends Phaser.Scene {
             "laserBlue01",
             b.x,
             b.y,
-            model.weaponLevel === 3 ? 8 : 6,
-            model.weaponLevel === 3 ? 34 : 26,
+            b.kind === "beam"
+              ? (b.width ?? 8)
+              : model.weaponLevel === 3
+                ? 8
+                : 6,
+            b.kind === "beam" ? 62 : model.weaponLevel === 3 ? 34 : 26,
             1,
             (Math.atan2(b.vx ?? 0, -(b.vy ?? -550)) * 180) / Math.PI,
-          ).setTint(model.weaponLevel === 3 ? 0xffed9e : 0xffffff);
+          ).setTint(
+            b.kind === "beam"
+              ? 0x90ffe9
+              : model.weaponLevel === 3
+                ? 0xffed9e
+                : 0xffffff,
+          );
         }
       for (const e of model.enemies)
         if (e.active) {
           this.sprite(
-            "enemyRed1",
+            e.behavior === "heavy" || e.behavior === "turret"
+              ? "heavy"
+              : "scout",
             e.x,
             e.y,
-            e.behavior === "turret" ? 58 : e.behavior === "weave" ? 34 : 42,
-            e.behavior === "turret" ? 52 : 38,
+            e.behavior === "heavy" ? 70 : e.behavior === "turret" ? 56 : 42,
+            e.behavior === "heavy" ? 61 : e.behavior === "turret" ? 49 : 36,
             1,
             e.behavior === "weave" ? Math.sin((e.age ?? 0) * 2.6) * 18 : 0,
           ).setTint(
@@ -355,23 +344,22 @@ class FlightScene extends Phaser.Scene {
           }
         }
       if (model.boss?.active) {
-        this.sprite("enemyRed1", model.boss.x, model.boss.y, 100, 74).setTint(
-          0xff89bb,
+        this.sprite(
+          "boss",
+          model.boss.x,
+          model.boss.y,
+          154,
+          108,
+          1,
+          Math.sin(model.time * 1.8) * 2,
         );
-        this.sprite(
-          "enemyRed1",
-          model.boss.x - 49,
-          model.boss.y + 8,
-          37,
-          51,
-        ).setTint(0x8b83cf);
-        this.sprite(
-          "enemyRed1",
-          model.boss.x + 49,
-          model.boss.y + 8,
-          37,
-          51,
-        ).setTint(0x8b83cf);
+        // Reactor pulses convey phase escalation without altering collision bounds.
+        overlay.fillStyle(model.boss.phase === 3 ? 0xff805a : 0xffbf73, 0.6);
+        overlay.fillCircle(
+          model.boss.x,
+          model.boss.y + 24,
+          3 + Math.sin(model.time * 12),
+        );
         if (model.boss.telegraph > 0) {
           overlay.lineStyle(3, 0xffd179, 0.8);
           overlay.strokeCircle(
@@ -392,28 +380,43 @@ class FlightScene extends Phaser.Scene {
       }
       const p = model.player;
       if (model.invincible <= 0 || Math.floor(model.time * 14) % 2 === 0) {
-        this.sprite("playerShip1_blue", p.x, p.y, 36, 28);
+        this.sprite(
+          "player",
+          p.x + 5,
+          p.y + 7,
+          44,
+          44,
+          0.22,
+          this.bank,
+        ).setTint(0x001321);
+        this.sprite("player", p.x, p.y, 44, 44, 1, this.bank);
         this.sprite(
           "fire03",
           p.x,
-          p.y + 21,
+          p.y + 25,
           9,
           16 + Math.sin(model.time * 45) * 3,
           0.85,
           180,
         );
-        // The original collision rules stay in FlightModel, independent of art.
+        if (model.focus) {
+          overlay.lineStyle(1, 0xa6ffee, 0.9);
+          overlay.strokeCircle(p.x, p.y, 7);
+          overlay.fillStyle(0xffffff);
+          overlay.fillCircle(p.x, p.y, 2);
+        }
+        // Collision bounds stay independent of decorative sprite size.
       }
       for (const e of model.effects) {
         const progress = 1 - e.life / 0.45;
-        graphics.lineStyle(3 * (1 - progress) + 1, 0xffd58a, 1 - progress);
-        graphics.strokeCircle(e.x, e.y, 4 + progress * 29);
-        graphics.fillStyle(0xfff5cb, Math.max(0, 1 - progress * 2));
-        graphics.fillCircle(e.x, e.y, 11 * (1 - progress));
+        overlay.lineStyle(3 * (1 - progress) + 1, 0xffd58a, 1 - progress);
+        overlay.strokeCircle(e.x, e.y, 4 + progress * 29);
+        overlay.fillStyle(0xfff5cb, Math.max(0, 1 - progress * 2));
+        overlay.fillCircle(e.x, e.y, 11 * (1 - progress));
         for (let i = 0; i < 8; i++) {
           const angle = (i * Math.PI) / 4;
-          graphics.lineStyle(2, i % 2 ? 0xffa54c : 0xffecaa, 1 - progress);
-          graphics.lineBetween(
+          overlay.lineStyle(2, i % 2 ? 0xffa54c : 0xffecaa, 1 - progress);
+          overlay.lineBetween(
             e.x + Math.cos(angle) * progress * 15,
             e.y + Math.sin(angle) * progress * 15,
             e.x + Math.cos(angle) * (8 + progress * 35),
@@ -427,8 +430,16 @@ class FlightScene extends Phaser.Scene {
       graphics.strokeCircle(180, 390, 115);
       graphics.lineBetween(180, 265, 180, 520);
       graphics.lineBetween(55, 390, 305, 390);
-      this.sprite("playerShip1_blue", 180, 390, 104, 79);
-      this.sprite("fire03", 180, 445, 18, 36, 0.9, 180);
+      this.sprite(
+        "player",
+        180,
+        475,
+        130,
+        130,
+        0.85,
+        Math.sin(this.ambience) * 3,
+      );
+      this.sprite("fire03", 180, 545, 18, 36, 0.9, 180);
     }
     if (model.mode !== "menu") {
       overlay.fillStyle(0x0c2133, 0.96);
@@ -437,7 +448,7 @@ class FlightScene extends Phaser.Scene {
     label.setText(
       model.mode === "menu"
         ? "P01 / COASTAL STRIKE\nFLIGHT SYSTEM ONLINE"
-        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 50 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\nPOWER ${model.weaponLevel}/3    BOMB ${model.bombs} [X]`,
+        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "beam" ? "BEAM" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs} [X]`,
     );
     if (model.bombFlash > 0) {
       overlay.fillStyle(0xb8f8ff, Math.min(0.25, model.bombFlash * 0.25));
@@ -462,7 +473,7 @@ new Phaser.Game({
   parent: "game",
   backgroundColor: "#0c2035",
   scene: [FlightScene],
-  render: { pixelArt: true },
+  render: { pixelArt: false, antialias: true },
   fps: { target: 60 },
 });
 document.addEventListener("visibilitychange", () => {
@@ -490,6 +501,8 @@ Object.defineProperty(window, "__P01__", {
     bossDefeated: model.bossDefeated,
     weaponTime: model.weaponTime,
     weaponLevel: model.weaponLevel,
+    weaponMode: model.weaponMode,
+    focus: model.focus,
     bombs: model.bombs,
     audio: audio.diagnostics(),
     lostReason: model.lostReason,

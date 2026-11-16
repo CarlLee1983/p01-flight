@@ -12,14 +12,18 @@ const run = (m: FlightModel, seconds: number, fire = false, fps = 60) => {
 };
 describe("combat increment", () => {
   it.each([30, 60, 120])(
-    "normal center continuous fire clears actual Stage01 at %i FPS",
+    "normal centered fire and two bombs clear actual Stage01 at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
       let sawBoss = false,
         sawEnemyBullet = false,
         sawDouble = false;
-      for (let i = 0; i < 76 * fps; i++) {
+      let bomb1 = false,
+        bomb2 = false;
+      for (let i = 0; i < 116 * fps; i++) {
+        if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
+        if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
         m.update(1 / fps, 0, 0, true);
         sawBoss ||= !!m.boss?.active;
         sawEnemyBullet ||= m.enemyBullets.some((b) => b.active);
@@ -29,7 +33,7 @@ describe("combat increment", () => {
       expect(m.mode).toBe("won");
       expect(m.bossDefeated).toBe(true);
       expect(m.time).toBeGreaterThan(60);
-      expect(m.time).toBeLessThan(75);
+      expect(m.time).toBeLessThan(115);
       expect(m.score).toBeGreaterThanOrEqual(2500);
       expect(m.hp).toBeGreaterThan(0);
       console.log(
@@ -54,6 +58,7 @@ describe("combat increment", () => {
       ],
     });
     m.start();
+    m.invincible = 100; // Isolate pool cleanup from lethal aimed shots.
     run(m, 3);
     expect(m.enemies[0].y).toBeGreaterThanOrEqual(150);
     expect(m.enemies[0].y).toBeLessThan(153);
@@ -286,27 +291,29 @@ describe("weapon and encounter progression", () => {
         .every((w) => w.behavior === "weave"),
     ).toBe(true);
     expect(
-      stage01.waves.some((w) => w.behavior === "turret" && w.hp >= 10),
+      stage01.waves.some((w) => w.behavior === "turret" && w.hp >= 5),
     ).toBe(true);
-    expect(stage01.waves.every((w) => w.at < 45)).toBe(true);
-    expect(stage01.pickups!.some((p) => p.at === 46 && p.kind === "heal")).toBe(
+    expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
+    expect(stage01.pickups!.some((p) => p.at === 60 && p.kind === "heal")).toBe(
       true,
     );
   });
   it.each([30, 60, 120])(
-    "normal keyboard fire with two timed bombs wins at %i FPS",
+    "beam switch with two timed bombs wins at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
       let bomb1 = false,
         bomb2 = false;
       const phases = new Set<number>();
-      for (let i = 0; i < 76 * fps; i++) {
+      let switched = false;
+      for (let i = 0; i < 116 * fps; i++) {
         if (m.boss?.phase) phases.add(m.boss.phase);
-        if (!bomb1 && m.time >= 62) {
+        if (!switched && m.time >= 70) switched = m.switchWeapon();
+        if (!bomb1 && m.time >= 85) {
           bomb1 = m.useBomb();
         }
-        if (!bomb2 && m.time >= 65) {
+        if (!bomb2 && m.time >= 91) {
           bomb2 = m.useBomb();
         }
         m.update(1 / fps, 0, 0, true);
@@ -337,3 +344,121 @@ describe("weapon and encounter progression", () => {
     expect(m.useBomb()).toBe(false);
   });
 });
+
+describe("focused dual weapons", () => {
+  it("focus lowers diagonal speed without changing input bounds, and pause freezes it", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.update(0.05, 1, -1, false, true);
+    expect(Math.hypot(m.player.x - 180, m.player.y - 540)).toBeCloseTo(5);
+    expect(m.focus).toBe(true);
+    m.pause();
+    m.update(0.05, 1, 0, false, false);
+    expect(m.focus).toBe(true);
+    m.pause();
+    m.update(0.05, 1, 0, false, false);
+    expect(m.focus).toBe(false);
+    expect(m.player.x).toBeCloseTo(180 + 5 / Math.sqrt(2) + 12);
+    m.start();
+    expect(m.focus).toBe(false);
+  });
+  it.each([1, 2, 3])(
+    "beam level %i emits one straight concentrated projectile with render metadata",
+    (level) => {
+      const m = new FlightModel(empty);
+      expect(m.switchWeapon()).toBe(false);
+      m.start();
+      m.weaponLevel = level;
+      expect(m.switchWeapon()).toBe(true);
+      m.update(0, 0, 0, true);
+      const b = m.bullets[0];
+      expect(m.bullets).toHaveLength(1);
+      expect(b).toMatchObject({
+        kind: "beam",
+        vx: 0,
+        vy: -850,
+        width: [5, 8, 12][level - 1],
+        damage: [2, 3, 4][level - 1],
+      });
+      m.pause();
+      expect(m.switchWeapon()).toBe(false);
+      m.pause();
+      m.switchWeapon();
+      expect(m.weaponLevel).toBe(level);
+      expect(m.weaponMode).toBe("spread");
+      m.start();
+      expect(m.weaponMode).toBe("spread");
+      expect(m.weaponLevel).toBe(1);
+    },
+  );
+  it("aimed turret locks target during warning instead of tracking at release", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 80,
+          speed: 100,
+          hp: 20,
+          points: 1,
+          behavior: "turret",
+          fireEvery: 1,
+        },
+      ],
+    });
+    m.start();
+    for (let i = 0; i < 120 && !m.enemies[0]?.telegraph; i++) m.update(1 / 60);
+    const e = m.enemies[0];
+    expect(e.telegraph).toBeGreaterThan(0);
+    const angle = e.aimAngle!;
+    for (let i = 0; i < 60; i++) m.update(1 / 60, 1, 0);
+    const b = m.enemyBullets.find((b) => b.active)!;
+    expect(b).toBeDefined();
+    expect(Math.atan2(b.vx, b.vy)).toBeCloseTo(angle);
+  });
+  it("heavy fighter holds longer and projects a three-lane pattern", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 180,
+          speed: 100,
+          hp: 9,
+          points: 1,
+          behavior: "heavy",
+          fireEvery: 2,
+        },
+      ],
+    });
+    m.start();
+    m.invincible = 100;
+    run(m, 3);
+    expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(3);
+    expect(m.enemies[0].y).toBeLessThan(153);
+    run(m, 4);
+    expect(m.enemies[0].y).toBeLessThan(153);
+    run(m, 2);
+    expect(m.enemies[0].y).toBeGreaterThan(200);
+  });
+});
+
+it.each([30, 60, 120])(
+  "focused six-second dodge sweep can clear at %i FPS",
+  (fps) => {
+    const m = new FlightModel(stage01);
+    m.start();
+    let bomb1 = false,
+      bomb2 = false;
+    for (let i = 0; i < 116 * fps; i++) {
+      if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
+      if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
+      const cycle = (m.time - 70) % 6;
+      const dx = m.time < 70 ? 0 : cycle < 1.5 ? -1 : cycle < 4.5 ? 1 : -1;
+      m.update(1 / fps, dx, 0, true, true);
+    }
+    expect(m.mode).toBe("won");
+    expect(m.hp).toBeGreaterThan(0);
+    expect(m.time).toBeLessThan(115);
+  },
+);

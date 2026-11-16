@@ -1,4 +1,4 @@
-export type Behavior = "straight" | "weave" | "turret";
+export type Behavior = "straight" | "weave" | "turret" | "heavy";
 export type PickupKind = "heal" | "double" | "power";
 export interface Wave {
   at: number;
@@ -29,7 +29,7 @@ export interface StageConfig {
 export const stage01: StageConfig = {
   id: "stage-01",
   title: "雲際航線",
-  duration: 75,
+  duration: 115,
   width: 360,
   height: 640,
   // Small opening formations, alternating flank squadrons, armored batteries,
@@ -56,31 +56,32 @@ export const stage01: StageConfig = {
         fireEvery: 2.4,
       })),
     ),
-    ...[32, 38].flatMap((at) =>
+    ...[32, 40, 49].flatMap((at) =>
       [80, 280].map((x) => ({
         at,
         x,
         speed: 110,
-        hp: 10,
+        hp: 5,
         points: 350,
         behavior: "turret" as const,
         fireEvery: 2.2,
       })),
     ),
-    ...[34, 40].map((at) => ({
+    ...[36, 45, 54].map((at) => ({
       at,
       x: 180,
-      speed: 125,
-      hp: 3,
+      speed: 95,
+      hp: 9,
       points: 150,
-      behavior: "straight" as const,
+      behavior: "heavy" as const,
+      fireEvery: 2.8,
     })),
   ].sort((a, b) => a.at - b.at),
   pickups: [
     { at: 5, x: 180, kind: "power" },
     { at: 18, x: 180, kind: "power" },
     { at: 29, x: 180, kind: "heal" },
-    { at: 46, x: 180, kind: "heal" },
+    { at: 60, x: 180, kind: "heal" },
   ],
-  boss: { at: 55, hp: 180, fireEvery: 2.5, bulletSpeed: 140, points: 3000 },
+  boss: { at: 70, hp: 400, fireEvery: 2.7, bulletSpeed: 140, points: 3000 },
 };
