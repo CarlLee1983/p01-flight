@@ -269,10 +269,14 @@ class FlightScene extends Phaser.Scene {
       this.sprite("playerShip1_blue", 180, 310, 104, 79);
       this.sprite("fire03", 180, 365, 18, 36, 0.9, 180);
     }
+    if (model.mode !== "menu") {
+      overlay.fillStyle(0x0c2133, 0.96);
+      overlay.fillRect(0, 0, 360, 58);
+    }
     label.setText(
       model.mode === "menu"
         ? "P01  /  FLIGHT LAB\n\nREADY FOR TAKEOFF"
-        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.boss?.active ? "BOSS" : model.time > 50 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s${model.weaponTime > 0 ? `  DOUBLE ${Math.ceil(model.weaponTime)}s` : ""}`,
+        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS" : model.time > 50 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s${model.weaponTime > 0 ? `  DOUBLE ${Math.ceil(model.weaponTime)}s` : ""}`,
     );
     if (model.mode === "paused") {
       overlay.fillStyle(0x000000, 0.65);
