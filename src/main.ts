@@ -229,6 +229,8 @@ class FlightScene extends Phaser.Scene {
     else this.input.keyboard!.disableGlobalCapture();
     const on = (...names: string[]) =>
       names.some((k) => this.keys[k].isDown) ? 1 : 0;
+    if (model.mode === "playing" && model.time === 0)
+      this.pickupNoticeUntil = 0;
     model.update(
       delta / 1000,
       on("D", "RIGHT") - on("A", "LEFT"),
