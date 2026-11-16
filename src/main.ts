@@ -199,10 +199,13 @@ class FlightScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(5);
     this.bossAdvice = this.add
-      .text(180, 96, "", {
-        fontSize: "11px",
+      .text(180, 600, "", {
+        fontSize: "10px",
         color: "#ffc69f",
         align: "center",
+        backgroundColor: "#102935dd",
+        padding: { x: 5, y: 3 },
+        wordWrap: { width: 320 },
       })
       .setOrigin(0.5)
       .setDepth(5);
