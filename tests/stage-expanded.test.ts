@@ -16,6 +16,7 @@ it.each([30, 60, 120])(
       let maxE = 0,
         maxB = 0,
         midDamage = 0;
+      const seenAir = new Set<number>();
       const hits: unknown[] = [];
       let hp = 3;
       for (let i = 0; i < 171 * fps; i++) {
@@ -52,6 +53,17 @@ it.each([30, 60, 120])(
         if (!b2 && m.time >= 146) b2 = m.useBomb();
         if (weapon === "missile" && m.time >= 150 && m.time < 150.3) dx = 1;
         m.update(1 / fps, dx, 0, true, weapon === "missile" && m.time >= 125);
+        for (const e of m.enemies)
+          if (
+            e.active &&
+            !["groundBattery", "groundDepot", "gatekeeper"].includes(
+              e.behavior ?? "",
+            ) &&
+            e.y >= 80 &&
+            e.x >= 0 &&
+            e.x <= 360
+          )
+            seenAir.add(e.id);
         maxE = Math.max(maxE, m.enemies.filter((e) => e.active).length);
         maxB = Math.max(maxB, m.enemyBullets.filter((e) => e.active).length);
         if (m.hp !== hp) {
@@ -63,6 +75,9 @@ it.each([30, 60, 120])(
         JSON.stringify({
           fps,
           weapon,
+          entered: seenAir.size,
+          countedEntered: m.enteredAir,
+          spawned: m.spawnedAir,
           mode: m.mode,
           time: m.time,
           hp: m.hp,
@@ -73,12 +88,19 @@ it.each([30, 60, 120])(
         }),
       );
       expect(m.mode).toBe("won");
+      expect(m.spawnedAir).toBe(405);
+      expect(m.enteredAir).toBe(405);
+      expect(
+        m.enteredAir -
+          stage01.waves.filter((w) => w.behavior === "carrier").length,
+      ).toBeGreaterThanOrEqual(396);
+      expect(seenAir.size).toBeGreaterThanOrEqual(396);
       expect(m.time).toBeGreaterThan(145);
       expect(m.time).toBeLessThan(155);
       expect(phase).toBe("done");
       expect(m.damageCount).toBeGreaterThan(0);
       expect(midDamage).toBeGreaterThan(0);
-      expect(maxE).toBeLessThanOrEqual(12);
+      expect(maxE).toBeLessThanOrEqual(18);
       expect(maxB).toBeLessThanOrEqual(24);
     }
   },
@@ -92,21 +114,30 @@ it.each([30, 60, 120])(
     // Isolate density/exit timing, not a normal-play victory claim.
     m.invincible = 200;
     let maxE = 0,
-      maxB = 0,
-      midDamage = 0;
+      maxB = 0;
     for (let i = 0; i < 125 * fps; i++) {
       m.update(1 / fps);
       maxE = Math.max(maxE, m.enemies.filter((e) => e.active).length);
       maxB = Math.max(maxB, m.enemyBullets.filter((e) => e.active).length);
     }
-    console.log("schedule peaks", fps, maxE, maxB);
-    expect(maxE).toBeLessThanOrEqual(16);
+    console.log(
+      "schedule peaks",
+      fps,
+      maxE,
+      maxB,
+      "pooled",
+      m.enemies.length,
+      m.enemyBullets.length,
+    );
+    expect(m.enemies.length).toBeLessThanOrEqual(32);
+    expect(m.enemyBullets.length).toBeLessThanOrEqual(32);
+    expect(maxE).toBeLessThanOrEqual(32);
     expect(maxB).toBeLessThanOrEqual(32);
   },
 );
 it("new route uses distinct roles and fixed-time supplies instead of extending Boss health", () => {
   const added = stage01.waves.filter((w) => w.at >= 62);
-  expect(added.length).toBe(48);
+  expect(added.length).toBe(228);
   expect(new Set(added.map((w) => w.behavior))).toEqual(
     new Set([
       "weave",
@@ -130,4 +161,65 @@ it("new route uses distinct roles and fixed-time supplies instead of extending B
       .filter((w) => w.behavior === "groundBattery")
       .map((w) => w.at),
   ).toEqual([32, 32, 70, 71.2]);
+});
+
+it("provides 405 airborne opponents with bounded firing roles, not phantom ground/boss counts", () => {
+  const counts: Record<string, number> = {};
+  for (const wave of stage01.waves) {
+    counts[wave.behavior ?? "straight"] =
+      (counts[wave.behavior ?? "straight"] ?? 0) + 1;
+  }
+  expect(counts).toEqual({
+    straight: 120,
+    weave: 132,
+    cross: 125,
+    escort: 12,
+    carrier: 6,
+    dive: 8,
+    heavy: 2,
+    groundBattery: 4,
+    groundDepot: 1,
+    gatekeeper: 1,
+  });
+  // Even excluding non-combat supply aircraft there are 399 airborne opponents.
+  expect(
+    stage01.waves.filter(
+      (w) =>
+        !["groundBattery", "groundDepot", "gatekeeper", "carrier"].includes(
+          w.behavior ?? "",
+        ),
+    ).length,
+  ).toBe(399);
+  expect(
+    stage01.waves.filter((w) => w.points === 80).every((w) => !w.fireEvery),
+  ).toBe(true);
+});
+
+it("aircraft must enter the playfield before bullets, missiles or bombs can hit them", () => {
+  const m = new FlightModel({
+    ...stage01,
+    waves: [{ at: 0, x: 180, speed: 100, hp: 1, points: 80 }],
+    pickups: [],
+    boss: undefined,
+  });
+  m.start();
+  m.update(1 / 60);
+  const e = m.enemies[0];
+  const id = e.id;
+  m.bullets.push({ id: 999, x: e.x, y: e.y + 9, active: true, damage: 10 });
+  m.update(1 / 60);
+  expect(e.active).toBe(true);
+  m.useBomb();
+  expect(e.active).toBe(true);
+  m.weaponMode = "missile";
+  for (let i = 0; i < 20; i++) m.update(1 / 60, 0, 0, true);
+  expect(m.bullets.some((b) => b.targetId === id)).toBe(false);
+  expect(m.spawnedAir).toBe(1);
+  expect(m.enteredAir).toBe(0);
+  for (let i = 0; i < 65; i++) m.update(1 / 60, 0, 0, true);
+  expect(m.enteredAir).toBe(1);
+  expect(e.active).toBe(false);
+  m.start();
+  expect(m.enteredAir).toBe(0);
+  expect(m.spawnedAir).toBe(0);
 });

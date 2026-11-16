@@ -7,6 +7,7 @@ import { advanceFrame } from "./game/frame-step";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
 import { TouchInput } from "./game/touch-input";
+import { RenderMetrics } from "./game/render-metrics";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -23,7 +24,8 @@ let recorded = false;
 let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
-let backgroundInfo: Record<string, unknown> = {};
+let readBackgroundInfo: () => Record<string, unknown> = () => ({});
+const renderMetrics = new RenderMetrics();
 let frameCount = 0,
   frameTime = 0;
 // pointerdown supports a second finger while the first one is captured on canvas.
@@ -45,6 +47,7 @@ function start() {
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
   model.start();
+  renderMetrics.reset();
   recorded = false;
   renderPanel();
 }
@@ -192,14 +195,13 @@ class FlightScene extends Phaser.Scene {
   ) {
     let image = this.visuals[this.visualIndex++];
     if (!image) {
-      image = this.add.image(x, y, key).setDepth(1);
+      image = this.add.image(x, y, key).setDepth(1).setOrigin(0.5);
       this.visuals.push(image);
     }
+    if (image.texture.key !== key) image.setTexture(key);
     image
-      .setTexture(key)
       .setPosition(x, y)
       .setDisplaySize(width, height)
-      .setOrigin(0.5)
       .setAlpha(alpha)
       .setAngle(angle)
       .setVisible(true)
@@ -209,6 +211,7 @@ class FlightScene extends Phaser.Scene {
   }
   create() {
     this.background = new CoastalBackground(this);
+    readBackgroundInfo = () => this.background.diagnostics();
     createPickupTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
@@ -445,14 +448,12 @@ class FlightScene extends Phaser.Scene {
         model.time > 0.1,
     );
     if ((model.boss?.phase ?? 0) > previous.phase) audio.play("phase");
-    previous = {
-      shots: model.shots,
-      kills: model.killCount,
-      hurt: model.damageCount,
-      pickup: model.pickupCount,
-      phase: model.boss?.phase ?? 0,
-      parts: model.partsDestroyed,
-    };
+    previous.shots = model.shots;
+    previous.kills = model.killCount;
+    previous.hurt = model.damageCount;
+    previous.pickup = model.pickupCount;
+    previous.phase = model.boss?.phase ?? 0;
+    previous.parts = model.partsDestroyed;
     audio.update(delta / 1000);
     if ((model.mode === "won" || model.mode === "lost") && !recorded) {
       recorded = true;
@@ -463,7 +464,15 @@ class FlightScene extends Phaser.Scene {
       if (model.mode === "won") panel.style.visibility = "hidden";
       if (model.mode === "won" || model.mode === "lost") audio.play(model.mode);
     }
+    const drawStarted = performance.now();
     this.draw();
+    if (model.mode === "playing")
+      renderMetrics.sample(
+        model,
+        this.visualIndex,
+        this.visuals.length,
+        performance.now() - drawStarted,
+      );
   }
   draw() {
     this.visualIndex = 0;
@@ -502,7 +511,7 @@ class FlightScene extends Phaser.Scene {
           : "側炮全毀 · 集中攻擊核心",
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
-    for (const image of this.visuals) image.setVisible(false);
+
     graphics.clear();
     overlay.clear();
     this.background.update(
@@ -510,7 +519,7 @@ class FlightScene extends Phaser.Scene {
         ? this.ambience
         : model.time + (model.mode === "won" ? this.endingAge : 0),
     );
-    backgroundInfo = this.background.diagnostics();
+
     if (model.mode !== "menu") {
       for (const b of model.bullets)
         if (b.active) {
@@ -1002,6 +1011,10 @@ class FlightScene extends Phaser.Scene {
         (1 - Math.min(1, model.bombFlash)) * 700,
       );
     }
+    // Reused slots stay visible; hide only surplus sprites left by the last frame.
+    for (let i = this.visualIndex; i < this.visuals.length; i++) {
+      if (this.visuals[i].visible) this.visuals[i].setVisible(false);
+    }
     if (model.mode === "paused") {
       overlay.fillStyle(0x000000, 0.65);
       overlay.fillRect(0, 70, 360, 570);
@@ -1064,6 +1077,8 @@ Object.defineProperty(window, "__P01__", {
         visibleSince: e.visibleSince,
         shotsFired: e.shotsFired,
       })),
+    spawnedAir: model.spawnedAir,
+    enteredAir: model.enteredAir,
     shots: model.shots,
     groundShotCount: model.groundShotCount,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
@@ -1087,7 +1102,8 @@ Object.defineProperty(window, "__P01__", {
     audio: audio.diagnostics(),
     lostReason: model.lostReason,
     save: saves.data,
-    background: backgroundInfo,
+    background: readBackgroundInfo(),
+    renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,
   }),
 });

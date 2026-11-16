@@ -125,6 +125,23 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect(won.time).toBeGreaterThanOrEqual(BOSS_AT);
   expect(won.time).toBeLessThanOrEqual(stage01.duration);
   expect(won.bossDefeated).toBe(true);
+  expect(won.spawnedAir).toBeGreaterThanOrEqual(396);
+  expect(
+    won.enteredAir -
+      stage01.waves.filter((w) => w.behavior === "carrier").length,
+  ).toBeGreaterThanOrEqual(396);
+  expect(won.renderMetrics.peakAirEnemies).toBeGreaterThanOrEqual(8);
+  expect(won.renderMetrics.peakEnemies).toBeLessThanOrEqual(64);
+  expect(won.renderMetrics.peakEnemyBullets).toBeLessThanOrEqual(80);
+  expect(won.renderMetrics.spritePool).toBeLessThanOrEqual(500);
+  console.log(
+    "FULL_SORTIE_DENSITY",
+    JSON.stringify({
+      spawned: won.spawnedAir,
+      entered: won.enteredAir,
+      performance: won.renderMetrics,
+    }),
+  );
   expect(won.score).toBeGreaterThan(0);
   expect(won.save.stages["stage-01"].clearCount).toBe(1);
   await expect(

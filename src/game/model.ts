@@ -17,6 +17,7 @@ export interface Body {
   hitIds?: number[];
 }
 export interface Enemy extends Body {
+  enteredPlayfield?: boolean;
   maxHp?: number;
   speed: number;
   hp: number;
@@ -84,6 +85,8 @@ export class FlightModel {
   bossDefeated = false;
   partsDestroyed = 0;
   groundShotCount = 0;
+  spawnedAir = 0;
+  enteredAir = 0;
   weaponTime = 0; // Compatibility field: 1 while permanently upgraded.
   weaponLevel = 1;
   weaponMode: "spread" | "beam" | "missile" = "spread";
@@ -120,6 +123,8 @@ export class FlightModel {
     this.bossDefeated = false;
     this.partsDestroyed = 0;
     this.groundShotCount = 0;
+    this.spawnedAir = 0;
+    this.enteredAir = 0;
     this.weaponTime = 0;
     this.weaponLevel = 1;
     this.weaponMode = "spread";
@@ -199,10 +204,15 @@ export class FlightModel {
     return true;
   }
   private interactable(e: Enemy): boolean {
+    const ground =
+      e.behavior === "groundBattery" || e.behavior === "groundDepot";
+    // Let an aircraft enter below the HUD / inside the side edge before it can
+    // be hit or missile-locked. This also makes entrances observable at low FPS.
     return (
       e.active &&
-      (!(e.behavior === "groundBattery" || e.behavior === "groundDepot") ||
-        (e.y >= GROUND_VISIBLE_Y && e.y <= this.stage.height + 26))
+      e.y >= GROUND_VISIBLE_Y &&
+      e.y <= this.stage.height + 26 &&
+      (ground || (e.x >= 18 && e.x <= this.stage.width - 18))
     );
   }
   private destroyEnemy(e: Enemy) {
@@ -391,6 +401,12 @@ export class FlightModel {
       this.stage.waves[this.nextWave].at <= this.time
     ) {
       const w = this.stage.waves[this.nextWave++];
+      if (
+        !["groundBattery", "groundDepot", "gatekeeper"].includes(
+          w.behavior ?? "straight",
+        )
+      )
+        this.spawnedAir++;
       let e = this.enemies.find((e) => !e.active);
       if (!e) {
         e = {
@@ -423,6 +439,7 @@ export class FlightModel {
           aimAngle: undefined,
           shotsFired: 0,
           visibleSince: undefined,
+          enteredPlayfield: false,
           formationPhase: w.formationPhase ?? 0,
           volleyFired: false,
           holdFor: w.holdFor,
@@ -634,6 +651,18 @@ export class FlightModel {
         )
           e.y += e.speed * dt;
         if (
+          !ground &&
+          e.behavior !== "gatekeeper" &&
+          !e.enteredPlayfield &&
+          e.x >= 0 &&
+          e.x <= this.stage.width &&
+          e.y >= 80 &&
+          e.y <= this.stage.height
+        ) {
+          e.enteredPlayfield = true;
+          this.enteredAir++;
+        }
+        if (
           e.fireEvery &&
           this.interactable(e) &&
           e.behavior !== "gatekeeper" &&
@@ -779,10 +808,7 @@ export class FlightModel {
           if (
             e.active &&
             !b.hitIds?.includes(e.id) &&
-            (!(
-              e.behavior === "groundBattery" || e.behavior === "groundDepot"
-            ) ||
-              this.interactable(e)) &&
+            this.interactable(e) &&
             Math.abs(b.x - e.x) < 22 + (b.width ?? 0) / 2 &&
             Math.abs(b.y - e.y) < 25
           ) {

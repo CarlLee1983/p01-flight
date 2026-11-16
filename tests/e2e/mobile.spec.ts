@@ -252,6 +252,24 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
   await expect(
     page.getByRole("heading", { name: "Stage 01 通關" }),
   ).toBeVisible();
+  const density = await state(page);
+  expect(density.spawnedAir).toBeGreaterThanOrEqual(396);
+  expect(
+    density.enteredAir -
+      stage01.waves.filter((w) => w.behavior === "carrier").length,
+  ).toBeGreaterThanOrEqual(396);
+  expect(density.renderMetrics.peakAirEnemies).toBeGreaterThanOrEqual(8);
+  expect(density.renderMetrics.peakEnemies).toBeLessThanOrEqual(64);
+  expect(density.renderMetrics.peakEnemyBullets).toBeLessThanOrEqual(80);
+  expect(density.renderMetrics.spritePool).toBeLessThanOrEqual(500);
+  console.log(
+    "TOUCH_SORTIE_DENSITY",
+    JSON.stringify({
+      spawned: density.spawnedAir,
+      entered: density.enteredAir,
+      performance: density.renderMetrics,
+    }),
+  );
   await page.screenshot({ path: "docs/mobile-won.png" });
   await page.reload();
   await expect(page.getByText("已通關 · 通關 1 次")).toBeVisible();

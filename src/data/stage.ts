@@ -61,6 +61,38 @@ export interface StageConfig {
     points: number;
   };
 }
+// Twelve-aircraft flights alternate sweep direction and silhouette rhythm.
+// Their threat is interception/body positioning; gunships retain the bullet budget.
+const reinforcementTimes = [
+  13, 17, 21, 25, 29, 33, 37, 43, 47, 51, 55, 63, 67, 71, 75, 79, 83, 87, 91,
+  99, 103, 107, 111, 113, 115, 116.5,
+];
+const reinforcements: Wave[] = reinforcementTimes.flatMap((at, group) =>
+  Array.from({ length: 12 }, (_, i): Wave => {
+    const side = group % 2 ? -1 : 1;
+    const row = Math.floor(i / 3);
+    const lane = i % 3;
+    if (group % 3 === 2)
+      return {
+        at: at + i * 0.12,
+        x: side === 1 ? -30 : 390,
+        spawnY: 130 + lane * 44,
+        direction: side,
+        speed: 220,
+        hp: 1,
+        points: 80,
+        behavior: "cross",
+      };
+    return {
+      at: at + row * 0.32 + lane * 0.08,
+      x: side === 1 ? 48 + lane * 42 : 312 - lane * 42,
+      speed: 225,
+      hp: 1,
+      points: 80,
+      behavior: group % 3 === 0 ? "straight" : "weave",
+    };
+  }),
+);
 export const stage01: StageConfig = {
   id: "stage-01",
   title: "雲際航線",
@@ -145,6 +177,7 @@ export const stage01: StageConfig = {
   // Small opening formations, alternating flank squadrons, armored batteries,
   // then a quiet resupply lane before the final encounter.
   waves: [
+    ...reinforcements,
     ...[2, 6, 10].flatMap((at, group) =>
       [
         [120, 180, 240],

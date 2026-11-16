@@ -17,6 +17,7 @@ it.each([10, 15, 20, 30, 60])(
       let maxE = 0,
         maxB = 0,
         midDamage = 0;
+      const seenAir = new Set<number>();
       const hits: unknown[] = [];
       let hp = 3;
       for (let i = 0; i < 171 * fps; i++) {
@@ -60,6 +61,17 @@ it.each([10, 15, 20, 30, 60])(
           true,
           weapon === "missile" && m.time >= 125,
         );
+        for (const e of m.enemies)
+          if (
+            e.active &&
+            !["groundBattery", "groundDepot", "gatekeeper"].includes(
+              e.behavior ?? "",
+            ) &&
+            e.y >= 80 &&
+            e.x >= 0 &&
+            e.x <= 360
+          )
+            seenAir.add(e.id);
         maxE = Math.max(maxE, m.enemies.filter((e) => e.active).length);
         maxB = Math.max(maxB, m.enemyBullets.filter((e) => e.active).length);
         if (m.hp !== hp) {
@@ -71,6 +83,7 @@ it.each([10, 15, 20, 30, 60])(
         JSON.stringify({
           fps,
           weapon,
+          seen: seenAir.size,
           mode: m.mode,
           time: m.time,
           hp: m.hp,
@@ -81,12 +94,15 @@ it.each([10, 15, 20, 30, 60])(
         }),
       );
       expect(m.mode).toBe("won");
+      expect(m.spawnedAir).toBe(405);
+      expect(m.enteredAir).toBe(405);
+      expect(seenAir.size).toBeGreaterThanOrEqual(396);
       expect(m.time).toBeGreaterThan(145);
       expect(m.time).toBeLessThan(155);
       expect(phase).toBe("done");
       expect(m.damageCount).toBeGreaterThan(0);
       expect(midDamage).toBeGreaterThan(0);
-      expect(maxE).toBeLessThanOrEqual(12);
+      expect(maxE).toBeLessThanOrEqual(18);
       expect(maxB).toBeLessThanOrEqual(24);
     }
   },

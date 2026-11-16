@@ -291,7 +291,9 @@ describe("weapon and encounter progression", () => {
     expect(
       stage01.waves
         .filter((w) => w.at >= 15 && w.at < 30)
-        .every((w) => w.behavior === "weave" || w.behavior === "cross"),
+        .every((w) =>
+          ["straight", "weave", "cross"].includes(w.behavior ?? ""),
+        ),
     ).toBe(true);
     expect(
       stage01.waves.some((w) => w.behavior === "gatekeeper" && w.hp >= 5),
@@ -438,7 +440,7 @@ describe("focused dual weapons", () => {
     });
     m.start();
     m.invincible = 100;
-    run(m, 3);
+    run(m, 3.5);
     expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(3);
     expect(m.enemies[0].y).toBeLessThan(153);
     run(m, 4);
@@ -1187,12 +1189,12 @@ it("gatekeeper aim locks during warning while strafing remains a trackable targe
 
 describe("escort formation density", () => {
   it("keeps the expanded first-stage density bounded and preserves the boss rest", () => {
-    expect(stage01.waves).toHaveLength(99);
+    expect(stage01.waves).toHaveLength(411);
     expect(stage01.waves.filter((w) => w.behavior === "escort")).toHaveLength(
       12,
     );
     expect(stage01.waves.filter((w) => w.behavior === "cross")).toHaveLength(
-      29,
+      125,
     );
     expect(stage01.duration).toBe(170);
     expect(stage01.boss!.at).toBe(125);
@@ -1293,7 +1295,7 @@ describe("ground readability under real continuous fire", () => {
         shot = false,
         deadAt = 0,
         watchId = 0;
-      for (let i = 0; i < 42 * fps; i++) {
+      for (let i = 0; i < 58 * fps; i++) {
         m.update(1 / fps, 0, 0, true);
         const e = m.enemies.find(
           (e) =>
@@ -1306,6 +1308,9 @@ describe("ground readability under real continuous fire", () => {
           warning ||= e.active && (e.telegraph ?? 0) > 0;
           shot ||= (e.shotsFired ?? 0) > 0;
           if (!e.active && !deadAt) deadAt = m.time;
+        } else if (watchId && visible && !deadAt) {
+          // The dead slot can be reused within the next update in a dense flight.
+          deadAt = m.time;
         }
       }
       expect(visible).toBeGreaterThan(32);
