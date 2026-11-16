@@ -61,6 +61,10 @@ function renderPanel() {
   if (pause) {
     pause.disabled = !["playing", "paused"].includes(model.mode);
     pause.textContent = model.mode === "paused" ? "繼續" : "暫停";
+    pause.setAttribute(
+      "aria-label",
+      model.mode === "paused" ? "繼續遊戲" : "暫停遊戲",
+    );
   }
   const record = saves.data.stages[stage01.id];
   const warning = saves.warning

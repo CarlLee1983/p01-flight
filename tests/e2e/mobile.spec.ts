@@ -109,9 +109,9 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
   const stopped = (await state(page)).shots;
   await page.waitForTimeout(300);
   expect((await state(page)).shots).toBe(stopped);
-  await tapButton(page, "換武器");
+  await tapButton(page, "切換武器");
   expect((await state(page)).weaponMode).toBe("beam");
-  await tapButton(page, "暫停");
+  await tapButton(page, "暫停遊戲");
   const paused = (await state(page)).time;
   await page.waitForTimeout(300);
   expect((await state(page)).time).toBe(paused);
@@ -203,7 +203,7 @@ test("WebKit mobile viewport boots and touch controls unlock audio", async () =>
   await expect
     .poll(async () => (await state(page)).audio.state)
     .toBe("running");
-  await tapButton(page, "換武器");
+  await tapButton(page, "切換武器");
   expect((await state(page)).weaponMode).toBe("beam");
   await page.locator("#touch-pause").tap();
   expect((await state(page)).mode).toBe("paused");
