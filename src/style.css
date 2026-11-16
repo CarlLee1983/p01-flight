@@ -1,0 +1,118 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #07111d;
+  color: #d7e5f2;
+  font:
+    15px system-ui,
+    sans-serif;
+}
+main {
+  max-width: 900px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+  padding: 24px;
+}
+header {
+  grid-column: 1/-1;
+}
+header span {
+  color: #5ce1e6;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+}
+h1 {
+  margin: 5px 0;
+  font-size: 30px;
+}
+header p {
+  color: #8fa4bd;
+  margin: 0;
+}
+#game {
+  width: 360px;
+  height: 640px;
+  box-shadow: 0 10px 60px #0009;
+  border: 1px solid #29455f;
+  grid-row: 2/4;
+}
+#panel {
+  padding: 25px;
+  background: #102236;
+  border: 1px solid #29455f;
+  border-radius: 8px;
+  align-self: start;
+}
+button {
+  background: #6de5de;
+  color: #08222c;
+  border: 0;
+  border-radius: 5px;
+  padding: 13px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 8px 8px 8px 0;
+}
+button.secondary {
+  background: #29455f;
+  color: #eaf4ff;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #ffd581;
+  outline-offset: 3px;
+}
+label {
+  display: block;
+  margin: 16px 0;
+}
+input {
+  width: 100%;
+}
+.help {
+  line-height: 1.7;
+  color: #8fa4bd;
+  font-size: 13px;
+}
+.notice {
+  color: #ffd581;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.stat {
+  font-size: 27px;
+  color: #6de5de;
+}
+h2 {
+  margin-top: 0;
+}
+progress {
+  width: 100%;
+  accent-color: #6de5de;
+}
+@media (max-width: 760px) {
+  main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px;
+  }
+  header,
+  #panel,
+  .help {
+    width: min(360px, 100%);
+  }
+  #game {
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 9/16;
+  }
+  canvas {
+    max-width: 100%;
+    height: auto !important;
+  }
+}
