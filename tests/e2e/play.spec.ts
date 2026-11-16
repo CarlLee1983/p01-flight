@@ -8,6 +8,7 @@ const waitGameTime = (page: any, seconds: number) =>
       intervals: [50],
     })
     .toBeGreaterThanOrEqual(seconds);
+test.use({ video: "on" });
 test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   test.setTimeout(180000);
   const errors: string[] = [];
@@ -49,7 +50,23 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await waitGameTime(page, 21.5);
   await page.screenshot({ path: "docs/cross-formation.png" });
   await waitGameTime(page, 35);
+  expect((await state(page)).section.at).toBe(32);
   await page.screenshot({ path: "docs/dive-attack.png" });
+  const groundBefore = (await state(page)).activeEnemies.find(
+    (e: any) => e.behavior === "groundBattery",
+  );
+  expect(groundBefore).toBeTruthy();
+  const groundAt = (await state(page)).time;
+  await waitGameTime(page, groundAt + 1);
+  const groundAfter = (await state(page)).activeEnemies.find(
+    (e: any) => e.id === groundBefore.id,
+  );
+  expect(groundAfter).toBeTruthy();
+  const groundNow = (await state(page)).time;
+  expect(
+    Math.abs((groundAfter.y - groundBefore.y) / (groundNow - groundAt) - 32),
+  ).toBeLessThan(2);
+  await page.screenshot({ path: "docs/harbor-ground-targets.png" });
   await waitGameTime(page, 45);
   await expect
     .poll(async () => (await state(page)).supportTime)
@@ -59,10 +76,16 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .toBeGreaterThan(0);
   expect((await state(page)).supportDrones).toHaveLength(2);
   await page.screenshot({ path: "docs/wingman-support.png" });
+  await waitGameTime(page, 58);
+  expect((await state(page)).section.at).toBe(56);
+  await page.screenshot({ path: "docs/resupply-approach.png" });
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
   await page.screenshot({ path: "docs/boss.png" });
+  await waitGameTime(page, 77);
+  await expect.poll(async () => (await state(page)).partsDestroyed).toBe(2);
+  await page.screenshot({ path: "docs/boss-cannons-destroyed.png" });
   await waitGameTime(page, 85);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(1);
@@ -76,6 +99,9 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
       intervals: [50],
     })
     .toBe(3);
+  await expect
+    .poll(async () => (await state(page)).partsDestroyed, { timeout: 10000 })
+    .toBe(2);
   await page.screenshot({ path: "docs/boss-phase3.png" });
   await expect
     .poll(async () => (await state(page)).mode, { timeout: 90000 })
@@ -103,6 +129,8 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     expect(reset.supportDrones).toHaveLength(0);
     expect(reset.focus).toBe(false);
     expect(reset.boss).toBeNull();
+    expect(reset.partsDestroyed).toBe(0);
+    expect(reset.section.at).toBe(0);
     await page.getByRole("button", { name: "返回標題" }).click();
   }
   expect((await state(page)).bulletPool).toBe(0);

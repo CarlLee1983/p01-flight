@@ -5,6 +5,7 @@ import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
+import { createGroundTextures } from "./game/ground-art";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -13,7 +14,7 @@ try {
 const saves = new BrowserSaveRepository(storage);
 const model = new FlightModel(stage01);
 const audio = new FlightAudio();
-let previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0 };
+let previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
 const panel = document.querySelector<HTMLElement>("#panel")!;
 let lastMode: Mode | null = null;
 let recorded = false;
@@ -25,7 +26,7 @@ let frameCount = 0,
   frameTime = 0;
 function start() {
   void audio.unlock();
-  previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0 };
+  previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
   model.start();
   recorded = false;
   renderPanel();
@@ -39,7 +40,7 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">C 切換散射／貫穿／追蹤 · Shift 精準移動</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>按住 Space／Z 射擊。留意蓄力光圈，側移躲開瞄準彈。</p><p>金色能量永久升級主炮；青色十字補血。<br><b>X：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>按住 Space／Z 射擊。留意編隊進場與蓄力光圈，側移躲開瞄準彈。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${stage01.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
   document.querySelector("#start")?.addEventListener("click", start);
@@ -106,6 +107,8 @@ class FlightScene extends Phaser.Scene {
   pickupGuide: Phaser.GameObjects.Text[] = [];
   pickupNotice!: Phaser.GameObjects.Text;
   pickupNoticeUntil = 0;
+  sectionNotice!: Phaser.GameObjects.Text;
+  bossAdvice!: Phaser.GameObjects.Text;
   bank = 0;
   lastPlayerX = 180;
   ambience = 0;
@@ -166,6 +169,7 @@ class FlightScene extends Phaser.Scene {
   create() {
     this.background = new CoastalBackground(this);
     createPickupTextures(this);
+    createGroundTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
         this.add
@@ -184,6 +188,24 @@ class FlightScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(6)
       .setVisible(false);
+    this.sectionNotice = this.add
+      .text(180, 116, "", {
+        fontSize: "13px",
+        color: "#d1f5ef",
+        align: "center",
+        backgroundColor: "#102935dd",
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setDepth(5);
+    this.bossAdvice = this.add
+      .text(180, 96, "", {
+        fontSize: "11px",
+        color: "#ffc69f",
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setDepth(5);
     graphics = this.add.graphics();
     overlay = this.add.graphics().setDepth(3);
     label = this.add
@@ -254,7 +276,11 @@ class FlightScene extends Phaser.Scene {
             : "shot",
       );
     audio.setIntensity(model.boss?.active ? 2 : model.time > 30 ? 1 : 0);
-    if (model.killCount > previous.kills) audio.play("explode");
+    if (
+      model.killCount > previous.kills ||
+      model.partsDestroyed > previous.parts
+    )
+      audio.play("explode");
     if (model.damageCount > previous.hurt) {
       audio.play("hurt");
       this.cameras.main.shake(140, 0.006);
@@ -284,6 +310,7 @@ class FlightScene extends Phaser.Scene {
       hurt: model.damageCount,
       pickup: model.pickupCount,
       phase: model.boss?.phase ?? 0,
+      parts: model.partsDestroyed,
     };
     audio.update(delta / 1000);
     if ((model.mode === "won" || model.mode === "lost") && !recorded) {
@@ -298,6 +325,20 @@ class FlightScene extends Phaser.Scene {
   }
   draw() {
     this.visualIndex = 0;
+    const section = model.section;
+    this.sectionNotice.setVisible(
+      model.mode === "playing" && !!section && model.time - section.at < 3.2,
+    );
+    if (section)
+      this.sectionNotice.setText(`${section.title}\n${section.hint}`);
+    this.bossAdvice.setVisible(
+      model.mode === "playing" && !!model.boss?.active,
+    );
+    this.bossAdvice.setText(
+      model.boss?.cannons.some((c) => c.active)
+        ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
+        : "側炮全毀 · 集中攻擊核心",
+    );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
     for (const image of this.visuals) image.setVisible(false);
     graphics.clear();
@@ -353,6 +394,18 @@ class FlightScene extends Phaser.Scene {
         }
       for (const e of model.enemies)
         if (e.active) {
+          if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
+            this.sprite(e.behavior, e.x, e.y, 52, 52).setDepth(0);
+            if ((e.telegraph ?? 0) > 0) {
+              overlay.lineStyle(2, 0xffbc73, 0.9);
+              overlay.strokeCircle(
+                e.x,
+                e.y + 16,
+                10 + Math.sin(model.time * 20) * 3,
+              );
+            }
+            continue;
+          }
           this.sprite(
             e.behavior === "carrier"
               ? "carrier"
@@ -448,6 +501,39 @@ class FlightScene extends Phaser.Scene {
           1,
           Math.sin(model.time * 1.8) * 2,
         );
+        for (const cannon of model.boss.cannons) {
+          overlay.fillStyle(cannon.active ? 0x513745 : 0x16222c);
+          overlay.fillRoundedRect(cannon.x - 13, cannon.y - 14, 26, 30, 4);
+          overlay.lineStyle(1.5, cannon.active ? 0xffce83 : 0x526676);
+          overlay.strokeRoundedRect(cannon.x - 13, cannon.y - 14, 26, 30, 4);
+          if (cannon.active) {
+            overlay.fillStyle(0xffd98b);
+            overlay.fillRect(cannon.x - 3, cannon.y + 4, 6, 18);
+            overlay.fillStyle(0x28343e);
+            overlay.fillRect(cannon.x - 14, cannon.y - 20, 28, 3);
+            overlay.fillStyle(0xffc779);
+            overlay.fillRect(
+              cannon.x - 14,
+              cannon.y - 20,
+              (28 * cannon.hp) / cannon.maxHp,
+              3,
+            );
+          } else {
+            overlay.lineStyle(2, 0x8a6c60);
+            overlay.lineBetween(
+              cannon.x - 8,
+              cannon.y - 8,
+              cannon.x + 8,
+              cannon.y + 8,
+            );
+            overlay.lineBetween(
+              cannon.x + 8,
+              cannon.y - 8,
+              cannon.x - 8,
+              cannon.y + 8,
+            );
+          }
+        }
         // Reactor pulses convey phase escalation without altering collision bounds.
         overlay.fillStyle(model.boss.phase === 3 ? 0xff805a : 0xffbf73, 0.6);
         overlay.fillCircle(
@@ -556,7 +642,7 @@ class FlightScene extends Phaser.Scene {
     label.setText(
       model.mode === "menu"
         ? ""
-        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "missile" ? "HOMING" : model.weaponMode === "beam" ? "PIERCE" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs}${model.supportTime > 0 ? "  W:" + Math.ceil(model.supportTime) : " [X]"}`,
+        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : (model.section?.title ?? "STAGE 01")}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "missile" ? "HOMING" : model.weaponMode === "beam" ? "PIERCE" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs}${model.supportTime > 0 ? "  W:" + Math.ceil(model.supportTime) : " [X]"}`,
     );
     if (model.bombFlash > 0) {
       overlay.fillStyle(0xb8f8ff, Math.min(0.25, model.bombFlash * 0.25));
@@ -612,6 +698,15 @@ Object.defineProperty(window, "__P01__", {
     enemies: model.enemies.filter((e) => e.active).length,
     bulletPool: model.bullets.length,
     enemyPool: model.enemies.length,
+    activeEnemies: model.enemies
+      .filter((e) => e.active)
+      .map((e) => ({
+        id: e.id,
+        x: e.x,
+        y: e.y,
+        behavior: e.behavior,
+        hp: e.hp,
+      })),
     shots: model.shots,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
     pickups: model.pickups.filter((p) => p.active).length,
@@ -624,6 +719,8 @@ Object.defineProperty(window, "__P01__", {
     supportDrones: model.supportDrones,
     boss: model.boss ? { ...model.boss } : null,
     bossDefeated: model.bossDefeated,
+    section: model.section,
+    partsDestroyed: model.partsDestroyed,
     weaponTime: model.weaponTime,
     weaponLevel: model.weaponLevel,
     weaponMode: model.weaponMode,

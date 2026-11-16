@@ -3,6 +3,9 @@ import {
   CoastalBackground,
   COAST_SCROLL,
   coastalScrollState,
+  coastalAreaState,
+  COAST_AREAS,
+  type CoastalAreaConfig,
 } from "../src/game/background";
 
 describe("continuous coastal background", () => {
@@ -35,6 +38,80 @@ describe("continuous coastal background", () => {
     expect(coastalScrollState(-1)).toEqual(coastalScrollState(0));
     expect(coastalScrollState(NaN)).toEqual(coastalScrollState(0));
   });
+  it("progresses through configured areas without resetting scroll distance", () => {
+    expect(COAST_AREAS.map((a) => a.at)).toEqual([0, 15, 32, 56, 70]);
+    expect(coastalAreaState(14).area).toBe("offshore");
+    expect(coastalAreaState(20).area).toBe("channel");
+    expect(coastalAreaState(40).area).toBe("harbor");
+    expect(coastalAreaState(62).area).toBe("approach");
+    expect(coastalAreaState(76).area).toBe("command");
+    for (const area of COAST_AREAS.slice(1)) {
+      expect(coastalAreaState(area.at).transition).toBe(0);
+      expect(coastalAreaState(area.at + area.fade / 2).transition).toBeCloseTo(
+        0.5,
+      );
+      expect(coastalAreaState(area.at + area.fade).transition).toBe(1);
+      expect(
+        coastalScrollState(area.at + 0.01).distance -
+          coastalScrollState(area.at - 0.01).distance,
+      ).toBeCloseTo(0.64);
+    }
+    expect(coastalAreaState(NaN)).toEqual(coastalAreaState(0));
+  });
+  it("allows the same scenery components to be retimed, reordered and repeated", () => {
+    const areas: CoastalAreaConfig[] = [
+      {
+        id: "dock-start",
+        label: "碼頭起飛",
+        at: 0,
+        fade: 0,
+        scenery: "harbor",
+      },
+      { id: "open-sea", label: "外海", at: 10, fade: 2, scenery: "offshore" },
+      {
+        id: "return-dock",
+        label: "返回港區",
+        at: 20,
+        fade: 4,
+        scenery: "harbor",
+      },
+      { id: "flagship", label: "警戒區", at: 40, fade: 3, scenery: "command" },
+      { id: "exit", label: "離港航道", at: 60, fade: 2, scenery: "channel" },
+    ];
+    expect(coastalAreaState(0, areas).area).toBe("dock-start");
+    expect(coastalAreaState(11, areas).transition).toBeCloseTo(0.5);
+    expect(coastalAreaState(24, areas).area).toBe("return-dock");
+    expect(coastalAreaState(61, areas).areaLabel).toBe("離港航道");
+    expect(coastalAreaState(61, areas).transition).toBeCloseTo(0.5);
+    const object: any = new Proxy({}, { get: () => () => object });
+    const scene: any = {
+      add: { graphics: () => object, image: () => object },
+      textures: { exists: () => true },
+    };
+    const background = new CoastalBackground(scene, areas);
+    expect(background.diagnostics().layerAlphas).toEqual([0, 1, 0]);
+    background.update(11);
+    expect(background.diagnostics().layerAlphas).toEqual([0.175, 0.5, 0]);
+    background.update(45);
+    expect(background.diagnostics().layerAlphas).toEqual([0, 0, 1]);
+    background.update(62);
+    expect(background.diagnostics().layerAlphas).toEqual([1, 0, 0]);
+    expect(background.diagnostics().distance).toBe(62 * 32);
+    background.update(0);
+    expect(background.diagnostics().layerAlphas).toEqual([0, 1, 0]);
+  });
+  it("rejects invalid area ordering instead of silently resetting scenery", () => {
+    expect(() => coastalAreaState(0, [])).toThrow(RangeError);
+    expect(() => coastalAreaState(0, [{ ...COAST_AREAS[0], at: 2 }])).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      coastalAreaState(0, [COAST_AREAS[0], { ...COAST_AREAS[1], fade: -1 }]),
+    ).toThrow(RangeError);
+    expect(() =>
+      coastalAreaState(0, [COAST_AREAS[0], COAST_AREAS[2], COAST_AREAS[1]]),
+    ).toThrow(RangeError);
+  });
   it("reuses objects and positions, including after wrapped time", () => {
     const objects: any[] = [];
     const object = () => {
@@ -64,14 +141,25 @@ describe("continuous coastal background", () => {
       textures: { exists: () => true },
     };
     const background = new CoastalBackground(scene);
-    expect(objects).toHaveLength(10);
+    expect(objects).toHaveLength(17);
     for (let i = 0; i < 1000; i++) background.update(i / 60);
-    expect(objects).toHaveLength(10);
+    expect(objects).toHaveLength(17);
     background.update(42);
     const frozen = JSON.stringify(objects.map(({ x, y }) => ({ x, y })));
     background.update(42);
     expect(JSON.stringify(objects.map(({ x, y }) => ({ x, y })))).toBe(frozen);
     expect(background.diagnostics().coastImages).toBe(4);
     expect(background.diagnostics().coastReady).toBe(true);
+    background.update(72.5);
+    expect(background.diagnostics().area).toBe("command");
+    expect(background.diagnostics().sceneryWeights).toEqual([
+      0, 0, 0, 0.5, 0.5,
+    ]);
+    expect(background.diagnostics().sceneryObjects).toBe(7);
+    const paused = background.diagnostics();
+    background.update(72.5);
+    expect(background.diagnostics()).toEqual(paused);
+    background.update(0);
+    expect(background.diagnostics().sceneryWeights).toEqual([1, 0, 0, 0, 0]);
   });
 });

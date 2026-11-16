@@ -1,3 +1,4 @@
+import { GROUND_SCROLL_SPEED } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
 export type Mode = "menu" | "playing" | "paused" | "won" | "lost";
 export interface Body {
@@ -37,7 +38,17 @@ export interface EnemyBullet extends Body {
 export interface Pickup extends Body {
   kind: PickupKind;
 }
+export interface BossPart {
+  id: number;
+  side: -1 | 1;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  active: boolean;
+}
 export interface Boss {
+  cannons: BossPart[];
   phase: 1 | 2 | 3;
   telegraph: number;
   active: boolean;
@@ -61,6 +72,7 @@ export class FlightModel {
   pickups: Pickup[] = [];
   boss: Boss | null = null;
   bossDefeated = false;
+  partsDestroyed = 0;
   weaponTime = 0; // Compatibility field: 1 while permanently upgraded.
   weaponLevel = 1;
   weaponMode: "spread" | "beam" | "missile" = "spread";
@@ -95,6 +107,7 @@ export class FlightModel {
     this.pickups = [];
     this.boss = null;
     this.bossDefeated = false;
+    this.partsDestroyed = 0;
     this.weaponTime = 0;
     this.weaponLevel = 1;
     this.weaponMode = "spread";
@@ -115,6 +128,18 @@ export class FlightModel {
     this.nextPickup = 0;
     this.cooldown = 0;
     this.serial = 0;
+  }
+  get section() {
+    return (
+      [...(this.stage.sections ?? [])]
+        .reverse()
+        .find((section) => section.at <= this.time) ?? {
+        id: "stage",
+        title: this.stage.title,
+        at: 0,
+        hint: "擊破敵機，保持生存",
+      }
+    );
   }
   get supportDrones(): { x: number; y: number }[] {
     if (this.supportTime <= 0) return [];
@@ -152,6 +177,11 @@ export class FlightModel {
       }
     if (this.boss?.active) {
       this.boss.hp -= 18;
+      for (const part of this.boss.cannons)
+        if (part.active) {
+          part.hp -= 6;
+          this.finishPart(part);
+        }
       this.finishBoss();
     }
     return true;
@@ -163,6 +193,18 @@ export class FlightModel {
     this.score += e.points;
     this.effects.push({ x: e.x, y: e.y, life: 0.45 });
     if (e.drop) this.drop(e.x, e.y, e.drop);
+  }
+  private finishPart(part: BossPart) {
+    if (!part.active || part.hp > 0) return;
+    part.hp = 0;
+    part.active = false;
+    this.partsDestroyed++;
+    if (this.boss?.active) {
+      this.boss.hp -= 12;
+      this.finishBoss();
+    }
+    this.score += 250;
+    this.effects.push({ x: part.x, y: part.y, life: 0.45 });
   }
   private finishBoss() {
     if (!this.boss?.active || this.boss.hp > 0) return;
@@ -349,6 +391,17 @@ export class FlightModel {
     }
     if (this.stage.boss && !this.boss && this.time >= this.stage.boss.at)
       this.boss = {
+        cannons: this.stage.boss.sideCannonHp
+          ? ([-1, 1] as const).map((side) => ({
+              id: side === -1 ? -2 : -3,
+              side,
+              x: this.stage.width / 2 + side * 68,
+              y: -40,
+              hp: this.stage.boss!.sideCannonHp!,
+              maxHp: this.stage.boss!.sideCannonHp!,
+              active: true,
+            }))
+          : [],
         phase: 1,
         telegraph: 1.2,
         x: this.stage.width / 2,
@@ -367,6 +420,11 @@ export class FlightModel {
             (e) => e.active && e.y < b.y + 60,
           );
           const candidates = [
+            ...(this.boss?.active
+              ? this.boss.cannons
+                  .filter((p) => p.active && p.y < b.y + 60)
+                  .map((p) => ({ id: p.id, x: p.x, y: p.y }))
+              : []),
             ...targets.map((e) => ({ id: e.id, x: e.x, y: e.y })),
             ...(this.boss?.active && this.boss.y < b.y + 60
               ? [{ id: -1, x: this.boss.x, y: this.boss.y }]
@@ -406,6 +464,9 @@ export class FlightModel {
     for (const e of this.enemies)
       if (e.active) {
         e.age = (e.age ?? 0) + dt;
+        const ground =
+          e.behavior === "groundBattery" || e.behavior === "groundDepot";
+        if (ground) e.y += (this.stage.groundSpeed ?? GROUND_SCROLL_SPEED) * dt;
         if (e.behavior === "cross" || e.behavior === "carrier") {
           e.x += (e.direction ?? 1) * e.speed * dt;
         }
@@ -429,6 +490,7 @@ export class FlightModel {
             ),
           );
         if (
+          !ground &&
           e.behavior !== "dive" &&
           e.behavior !== "cross" &&
           e.behavior !== "carrier" &&
@@ -439,7 +501,12 @@ export class FlightModel {
           )
         )
           e.y += e.speed * dt;
-        if (e.fireEvery && e.y > 40 && e.y < 400) {
+        if (
+          e.fireEvery &&
+          e.behavior !== "groundDepot" &&
+          e.y > 40 &&
+          e.y < 400
+        ) {
           e.fireCooldown = (e.fireCooldown ?? e.fireEvery) - dt;
           if (e.fireCooldown <= 0.6 && e.aimAngle === undefined)
             e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
@@ -447,7 +514,7 @@ export class FlightModel {
             e.fireCooldown > 0 && e.fireCooldown <= 0.6 ? e.fireCooldown : 0;
           if (e.fireCooldown <= 0) {
             const aim = e.aimAngle ?? 0;
-            if (e.behavior === "turret") {
+            if (e.behavior === "turret" || e.behavior === "groundBattery") {
               for (const a of [0])
                 this.shootEnemy(
                   e.x,
@@ -494,6 +561,10 @@ export class FlightModel {
         this.stage.width / 2 +
         Math.sin(boss.age * (phase === 3 ? 1.3 : 0.7)) *
           (phase === 1 ? 12 : phase === 2 ? 45 : 65);
+      for (const part of boss.cannons) {
+        part.x = boss.x + part.side * 68;
+        part.y = boss.y + 20;
+      }
       if (boss.telegraph <= 0) boss.fireCooldown -= dt;
       if (boss.y >= 105 && boss.telegraph <= 0 && boss.fireCooldown <= 0) {
         const aim = Math.atan2(this.player.x - boss.x, this.player.y - boss.y);
@@ -503,13 +574,17 @@ export class FlightModel {
             : phase === 2
               ? [-0.5, -0.25, 0, 0.25, 0.5]
               : [-0.3, 0, 0.3].map((a) => a + aim);
-        for (const a of angles)
+        for (const [index, a] of angles.entries()) {
+          const side = index === 0 ? -1 : index === angles.length - 1 ? 1 : 0;
+          const cannon = boss.cannons.find((p) => p.side === side);
+          if (cannon && !cannon.active) continue;
           this.shootEnemy(
             boss.x,
             boss.y + 28,
             Math.sin(a) * this.stage.boss.bulletSpeed,
             Math.cos(a) * this.stage.boss.bulletSpeed,
           );
+        }
         boss.fireCooldown = this.stage.boss.fireEvery * (phase === 3 ? 0.7 : 1);
       }
     }
@@ -567,6 +642,10 @@ export class FlightModel {
           if (
             e.active &&
             !b.hitIds?.includes(e.id) &&
+            (!(
+              e.behavior === "groundBattery" || e.behavior === "groundDepot"
+            ) ||
+              e.y >= 72) &&
             Math.abs(b.x - e.x) < 22 + (b.width ?? 0) / 2 &&
             Math.abs(b.y - e.y) < 25
           ) {
@@ -579,6 +658,23 @@ export class FlightModel {
             if (!b.active) break;
           }
         const boss = this.boss;
+        if (b.active && boss?.active)
+          for (const part of boss.cannons) {
+            if (!b.active) break;
+            if (
+              !part.active ||
+              b.hitIds?.includes(part.id) ||
+              Math.abs(b.x - part.x) >= 14 + (b.width ?? 0) / 2 ||
+              Math.abs(b.y - part.y) >= 20
+            )
+              continue;
+            (b.hitIds ??= []).push(part.id);
+            b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
+            if (b.pierceRemaining <= 0) b.active = false;
+            part.hp -= b.damage ?? 1;
+            this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+            this.finishPart(part);
+          }
         if (
           b.active &&
           boss?.active &&
@@ -596,6 +692,8 @@ export class FlightModel {
     for (const e of this.enemies)
       if (
         e.active &&
+        e.behavior !== "groundBattery" &&
+        e.behavior !== "groundDepot" &&
         Math.hypot(e.x - this.player.x, e.y - this.player.y) < 25 &&
         this.invincible <= 0
       ) {

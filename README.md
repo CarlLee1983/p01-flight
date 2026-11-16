@@ -65,7 +65,7 @@ Phaser 負責 Canvas/WebGL 呈現、生命週期及鍵盤；小型幾何碰撞�
 
 ## 最新製作增量
 
-目前功能與驗證限制以 [weapon-capsules.md](docs/weapon-capsules.md) 為準；捲動與三武器版見 [scrolling-combat.md](docs/scrolling-combat.md)，前版見 [coastal-production.md](docs/coastal-production.md)。上述 PR #2 結果是前版歷史紀錄，不代表本版已通過瀏覽器驗收。
+目前功能與驗證限制以 [stage-one-encounters.md](docs/stage-one-encounters.md) 為準；武器包版見 [weapon-capsules.md](docs/weapon-capsules.md)；捲動與三武器版見 [scrolling-combat.md](docs/scrolling-combat.md)，前版見 [coastal-production.md](docs/coastal-production.md)。上述 PR #2 結果是前版歷史紀錄，不代表本版已通過瀏覽器驗收。
 
 連續地景以 32px/s 向下捲動，海流與雲層使用不同速度；C 三種武器有覆蓋、貫穿和追蹤取捨。PR #4 的 CI artifact 包含動態錄影與連續截圖，不將模型通關或靜態畫面等同玩家手感驗收。
 
