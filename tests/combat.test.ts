@@ -22,9 +22,9 @@ describe("combat increment", () => {
         sawDouble = false;
       let bomb1 = false,
         bomb2 = false;
-      for (let i = 0; i < 116 * fps; i++) {
-        if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
-        if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
+      for (let i = 0; i < 171 * fps; i++) {
+        if (!bomb1 && m.time >= 140) bomb1 = m.useBomb();
+        if (!bomb2 && m.time >= 146) bomb2 = m.useBomb();
         m.update(1 / fps, 0, 0, true);
         if (m.partsDestroyed > cannonTimes.length) cannonTimes.push(m.time);
         sawBoss ||= !!m.boss?.active;
@@ -36,7 +36,7 @@ describe("combat increment", () => {
       expect(m.bossDefeated).toBe(true);
       expect(m.partsDestroyed).toBe(2);
       expect(m.time).toBeGreaterThan(60);
-      expect(m.time).toBeLessThan(115);
+      expect(m.time).toBeLessThan(stage01.duration);
       expect(m.score).toBeGreaterThanOrEqual(2500);
       expect(m.hp).toBeGreaterThan(0);
       console.log(
@@ -296,7 +296,7 @@ describe("weapon and encounter progression", () => {
     expect(
       stage01.waves.some((w) => w.behavior === "gatekeeper" && w.hp >= 5),
     ).toBe(true);
-    expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
+    expect(stage01.waves.every((w) => w.at < 121)).toBe(true);
     expect(stage01.pickups!.some((p) => p.at === 60 && p.kind === "heal")).toBe(
       true,
     );
@@ -310,13 +310,13 @@ describe("weapon and encounter progression", () => {
         bomb2 = false;
       const phases = new Set<number>();
       let switched = false;
-      for (let i = 0; i < 116 * fps; i++) {
+      for (let i = 0; i < 171 * fps; i++) {
         if (m.boss?.phase) phases.add(m.boss.phase);
-        if (!switched && m.time >= 70) switched = m.switchWeapon();
-        if (!bomb1 && m.time >= 85) {
+        if (!switched && m.time >= 125) switched = m.switchWeapon();
+        if (!bomb1 && m.time >= 140) {
           bomb1 = m.useBomb();
         }
-        if (!bomb2 && m.time >= 91) {
+        if (!bomb2 && m.time >= 146) {
           bomb2 = m.useBomb();
         }
         m.update(1 / fps, 0, 0, true);
@@ -455,16 +455,16 @@ it.each([30, 60, 120])(
     m.start();
     let bomb1 = false,
       bomb2 = false;
-    for (let i = 0; i < 116 * fps; i++) {
-      if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
-      if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
-      const cycle = (m.time - 70) % 6;
-      const dx = m.time < 70 ? 0 : cycle < 1.5 ? -1 : cycle < 4.5 ? 1 : -1;
+    for (let i = 0; i < 171 * fps; i++) {
+      if (!bomb1 && m.time >= 140) bomb1 = m.useBomb();
+      if (!bomb2 && m.time >= 146) bomb2 = m.useBomb();
+      const cycle = (m.time - 125) % 6;
+      const dx = m.time < 125 ? 0 : cycle < 1.5 ? -1 : cycle < 4.5 ? 1 : -1;
       m.update(1 / fps, dx, 0, true, true);
     }
     expect(m.mode).toBe("won");
     expect(m.hp).toBeGreaterThan(0);
-    expect(m.time).toBeLessThan(115);
+    expect(m.time).toBeLessThan(stage01.duration);
   },
 );
 
@@ -604,15 +604,15 @@ it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
   let switched = false,
     b1 = false,
     b2 = false;
-  for (let i = 0; i < 116 * fps; i++) {
-    if (!switched && m.time >= 70) {
+  for (let i = 0; i < 171 * fps; i++) {
+    if (!switched && m.time >= 125) {
       m.switchWeapon();
       m.switchWeapon();
       switched = true;
     }
-    if (!b1 && m.time >= 85) b1 = m.useBomb();
-    if (!b2 && m.time >= 91) b2 = m.useBomb();
-    m.update(1 / fps, m.time >= 95 && m.time < 95.3 ? 1 : 0, 0, true, true);
+    if (!b1 && m.time >= 140) b1 = m.useBomb();
+    if (!b2 && m.time >= 146) b2 = m.useBomb();
+    m.update(1 / fps, m.time >= 150 && m.time < 150.3 ? 1 : 0, 0, true, true);
   }
   console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
   expect(m.mode).toBe("won");
@@ -762,14 +762,14 @@ describe("encounter sections and breakable cannons", () => {
       [15, "crossing"],
       [32, "harbor"],
       [56, "resupply"],
-      [70, "commander"],
+      [125, "commander"],
     ] as const) {
       m.time = at - 0.01;
       expect(m.section.id).not.toBe(id);
       m.time = at;
       expect(m.section.id).toBe(id);
     }
-    expect(stage01.waves.some((w) => w.at >= 66 && w.at < 70)).toBe(false);
+    expect(stage01.waves.some((w) => w.at >= 121 && w.at < 125)).toBe(false);
     expect(stage01.pickups!.some((p) => p.kind === "heal" && p.at === 60)).toBe(
       true,
     );
@@ -986,7 +986,7 @@ describe("Stage01 pacing pass", () => {
     ]);
     expect(
       stage01.waves.filter((w) => w.behavior === "carrier").map((w) => w.at),
-    ).toEqual([12, 30, 48]);
+    ).toEqual([12, 30, 48, 73, 93, 114]);
     expect(
       stage01.waves.some((w) => w.behavior === "heavy" && w.at === 54),
     ).toBe(false);
@@ -995,16 +995,16 @@ describe("Stage01 pacing pass", () => {
     ).toEqual([40]);
     expect(
       stage01.waves.filter((w) => w.behavior === "dive").map((w) => w.at),
-    ).toEqual([34, 35.2, 50, 51.2]);
+    ).toEqual([34, 35.2, 50, 51.2, 90, 91.1, 102, 103.1]);
   });
   it.each([30, 60, 120])(
-    "schedule clears residual enemies before the 66–70 second rest at %i FPS",
+    "schedule clears residual enemies before the 121–125 second rest at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
       // Isolate exit timing even when enemies survive. Not a gameplay victory fixture.
-      m.invincible = 120;
-      run(m, 66, false, fps);
+      m.invincible = 200;
+      run(m, 121, false, fps);
       for (let i = 0; i < 3.8 * fps; i++) {
         expect(m.enemies.some((e) => e.active)).toBe(false);
         expect(m.enemyBullets.some((b) => b.active)).toBe(false);
@@ -1186,17 +1186,17 @@ it("gatekeeper aim locks during warning while strafing remains a trackable targe
 });
 
 describe("escort formation density", () => {
-  it("adds ten purposeful wave entries without extending stage or crowding the rest", () => {
-    expect(stage01.waves).toHaveLength(51);
+  it("keeps the expanded first-stage density bounded and preserves the boss rest", () => {
+    expect(stage01.waves).toHaveLength(99);
     expect(stage01.waves.filter((w) => w.behavior === "escort")).toHaveLength(
-      6,
+      12,
     );
     expect(stage01.waves.filter((w) => w.behavior === "cross")).toHaveLength(
-      13,
+      29,
     );
-    expect(stage01.duration).toBe(115);
-    expect(stage01.boss!.at).toBe(70);
-    expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
+    expect(stage01.duration).toBe(170);
+    expect(stage01.boss!.at).toBe(125);
+    expect(stage01.waves.every((w) => w.at < 121)).toBe(true);
   });
   it.each([30, 60, 120])(
     "escort wings share formation phase, warn then fire only one fan at %i FPS",

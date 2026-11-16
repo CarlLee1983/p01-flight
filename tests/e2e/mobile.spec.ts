@@ -1,6 +1,8 @@
 import { test, expect, webkit } from "@playwright/test";
 test.setTimeout(30000);
-const state = (page: any) => page.evaluate(() => (window as any).__P01__());
+import { state, waitGameTime } from "./gameplay";
+import { stage01 } from "../../src/data/stage";
+const BOSS_AT = stage01.boss!.at;
 const point = (x: number, y: number, id = 1) => ({
   x,
   y,
@@ -162,7 +164,7 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
 test("Stage 01 can clear entirely through touch and preserves the record", async ({
   browser,
 }) => {
-  test.setTimeout(180000);
+  test.setTimeout(600000);
   const context = await browser.newContext({
     viewport: { width: 390, height: 667 },
     isMobile: true,
@@ -182,13 +184,48 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     type: "touchStart",
     touchPoints: [first],
   });
-  for (const time of [85, 91]) {
+  await waitGameTime(page, 70);
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some(
+          (e: any) =>
+            e.behavior === "groundBattery" &&
+            e.visibleSince >= 70 &&
+            e.telegraph > 0,
+        ),
+      { timeout: 25000, intervals: [30] },
+    )
+    .toBe(true);
+  const shore = (await state(page)).activeEnemies.find(
+    (e: any) =>
+      e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
+  );
+  const moveTo = async (x: number) => {
+    const s = await state(page);
+    first.x += ((x - s.player.x) * box.width) / 360;
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [first],
+    });
     await expect
-      .poll(async () => (await state(page)).time, {
-        timeout: 125000,
-        intervals: [100],
+      .poll(async () => Math.abs((await state(page)).player.x - x), {
+        intervals: [20],
       })
-      .toBeGreaterThanOrEqual(time);
+      .toBeLessThan(12);
+  };
+  await moveTo(shore.x);
+  await page.screenshot({ path: "docs/mobile-second-shore.png" });
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some((e: any) => e.id === shore.id),
+      { timeout: 15000 },
+    )
+    .toBe(false);
+  await moveTo(180);
+  for (const time of [BOSS_AT + 15, BOSS_AT + 21]) {
+    await waitGameTime(page, time);
     const b = (await page.locator("#touch-bomb").boundingBox())!;
     const second = point(b.x + b.width / 2, b.y + b.height / 2, 2);
     await cdp.send("Input.dispatchTouchEvent", {
@@ -201,7 +238,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     });
     await expect
       .poll(async () => (await state(page)).bombs)
-      .toBe(time === 85 ? 1 : 0);
+      .toBe(time === BOSS_AT + 15 ? 1 : 0);
     expect((await state(page)).touchTarget).toBeTruthy();
   }
   await expect

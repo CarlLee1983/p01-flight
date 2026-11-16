@@ -3,6 +3,7 @@ import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
+import { advanceFrame } from "./game/frame-step";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
 import { TouchInput } from "./game/touch-input";
@@ -161,6 +162,7 @@ class FlightScene extends Phaser.Scene {
       "carrier",
       "harbor-battlefield",
       "harbor-exit",
+      "harbor-refinery",
       "ground-battery",
       "ground-depot",
     ])
@@ -347,8 +349,8 @@ class FlightScene extends Phaser.Scene {
       model.mode === "won" && this.endingAge < 1.2 ? "hidden" : "visible";
     if (
       model.mode === "playing" &&
-      model.time >= 65 &&
-      model.time < 70 &&
+      model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
+      model.time < (stage01.boss?.at ?? Infinity) &&
       !this.bossWarningPlayed
     ) {
       this.bossWarningPlayed = true;
@@ -381,7 +383,8 @@ class FlightScene extends Phaser.Scene {
       this.pickupNoticeUntil = 0;
     if (model.mode !== "playing") touch.cancel();
     const touchFrame = touch.sample(model.player, delta / 1000);
-    model.update(
+    advanceFrame(
+      model,
       delta / 1000,
       on("D", "RIGHT") - on("A", "LEFT"),
       on("S", "DOWN") - on("W", "UP"),
@@ -408,7 +411,7 @@ class FlightScene extends Phaser.Scene {
       model.boss?.active ||
         model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
         ? 2
-        : model.time >= 56
+        : ["recovery", "regroup"].includes(model.section.id)
           ? 0
           : model.time > 15
             ? 1
@@ -477,11 +480,15 @@ class FlightScene extends Phaser.Scene {
     );
     if (section)
       this.sectionNotice.setText(`${section.title}\n${section.hint}`);
-    if (model.mode === "playing" && model.time >= 65 && model.time < 70) {
+    if (
+      model.mode === "playing" &&
+      model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
+      model.time < (stage01.boss?.at ?? Infinity)
+    ) {
       this.sectionNotice
         .setVisible(true)
         .setText(
-          `指揮艦接近 · ${Math.ceil(70 - model.time)}\n保留炸彈，留意兩側砲座`,
+          `指揮艦接近 · ${Math.ceil((stage01.boss?.at ?? 0) - model.time)}\n保留炸彈，留意兩側砲座`,
         );
     }
     this.bossAdvice.setVisible(

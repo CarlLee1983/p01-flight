@@ -1,4 +1,10 @@
 import type Phaser from "phaser";
+import {
+  STAGE01_SCENERY,
+  type SceneryTimeline,
+  type CoastalScenery,
+  type CoastalAreaConfig,
+} from "../data/scenery";
 import { GROUND_SCROLL_SPEED } from "../data/stage";
 
 /** Coast source is 720×1080; display at half size, blending 180 source pixels. */
@@ -14,32 +20,8 @@ export const COAST_SCROLL = {
   cloudSpeed: 85,
 } as const;
 
-export type CoastalScenery =
-  | "offshore"
-  | "channel"
-  | "harbor"
-  | "arena"
-  | "exit"
-  | "approach"
-  | "command";
-export interface CoastalAreaConfig {
-  readonly id: string;
-  readonly label: string;
-  readonly at: number;
-  readonly fade: number;
-  readonly scenery: CoastalScenery;
-}
-
-/** Pure timing/composition data; profiles can be reordered or repeated. */
-export const COAST_AREAS: readonly CoastalAreaConfig[] = [
-  { id: "offshore", label: "外海試探", at: 0, fade: 0, scenery: "offshore" },
-  { id: "channel", label: "狹港入口", at: 15, fade: 4, scenery: "channel" },
-  { id: "harbor", label: "港區火力", at: 32, fade: 5, scenery: "harbor" },
-  { id: "elite-basin", label: "港池攔截", at: 40, fade: 3, scenery: "arena" },
-  { id: "harbor-exit", label: "突破港區", at: 50, fade: 3, scenery: "exit" },
-  { id: "approach", label: "補給水域", at: 56, fade: 4, scenery: "approach" },
-  { id: "command", label: "指揮艦區", at: 70, fade: 5, scenery: "command" },
-];
+export { type CoastalScenery, type CoastalAreaConfig } from "../data/scenery";
+export const COAST_AREAS = STAGE01_SCENERY.areas;
 
 export type CoastalLandmarkKind = "tanks" | "warehouse" | "crane" | "emptyDock";
 export interface CoastalLandmarkConfig {
@@ -173,10 +155,15 @@ export function harborArtState(
   return target;
 }
 
-/** Exit is a single world block: its southern warehouses enter at 53s. */
-export function harborExitY(time: number, height = 720) {
+/** Exit is a single world block: its southern warehouses enter at the configured world distance. */
+export function harborExitY(
+  time: number,
+  height = 720,
+  exitAt = STAGE01_SCENERY.exitAt,
+) {
   return (
-    (Math.max(0, Number.isFinite(time) ? time : 0) - 53) * COAST_SCROLL.speed -
+    (Math.max(0, Number.isFinite(time) ? time : 0) - exitAt) *
+      COAST_SCROLL.speed -
     height
   );
 }
@@ -188,6 +175,13 @@ export class CoastalBackground {
   private harborArtHeight = 720;
   private harborArtScroll = harborArtState(0, 720);
   private harborArtAlpha = 0;
+  private artworkBlocks: {
+    id: string;
+    enterAt: number;
+    height: number;
+    image: Phaser.GameObjects.Image;
+    y: number;
+  }[] = [];
   private exitArt?: Phaser.GameObjects.Image;
   private exitNorthExtension = 1320;
   private exitHeight = 720;
@@ -207,12 +201,23 @@ export class CoastalBackground {
   private weights: number[];
   private layers = [0.35, 0, 0];
   readonly coastReady: boolean;
+  private readonly areas: readonly CoastalAreaConfig[];
 
   constructor(
     scene: Phaser.Scene,
-    private readonly areas: readonly CoastalAreaConfig[] = COAST_AREAS,
+    areas: readonly CoastalAreaConfig[] | undefined = undefined,
     private readonly landmarkConfig: readonly CoastalLandmarkConfig[] = COAST_LANDMARKS,
+    private readonly timeline: SceneryTimeline = STAGE01_SCENERY,
   ) {
+    areas = areas ?? timeline.areas;
+    this.areas = areas;
+    if (
+      !Number.isFinite(timeline.exitAt) ||
+      timeline.exitAt < 0 ||
+      !Number.isFinite(timeline.duration) ||
+      timeline.duration < timeline.exitAt
+    )
+      throw new RangeError("Invalid scenery timeline");
     validateAreas(areas);
     const ids = new Set<string>();
     for (const landmark of landmarkConfig) {
@@ -315,6 +320,48 @@ export class CoastalBackground {
               .setDepth(-10.9),
           );
       }
+    }
+
+    for (const block of timeline.artworkBlocks ?? []) {
+      if (!scene.textures.exists(block.texture)) continue;
+      const source = scene.textures
+        .get(block.texture)
+        .getSourceImage() as HTMLImageElement;
+      const height = (source.height * 360) / source.width;
+      const key = `p01-world-block-${block.id}`;
+      if (!scene.textures.exists(key)) {
+        const canvas = scene.textures.createCanvas(
+          key,
+          source.width,
+          source.height,
+        );
+        if (canvas) {
+          const c = canvas.getContext();
+          c.drawImage(source, 0, 0);
+          c.globalCompositeOperation = "destination-in";
+          const mask = c.createLinearGradient(0, 0, 0, source.height);
+          mask.addColorStop(0, "rgba(255,255,255,0)");
+          mask.addColorStop(90 / height, "white");
+          mask.addColorStop(1 - 90 / height, "white");
+          mask.addColorStop(1, "rgba(255,255,255,0)");
+          c.fillStyle = mask;
+          c.fillRect(0, 0, source.width, source.height);
+          c.globalCompositeOperation = "source-over";
+          canvas.refresh();
+        }
+      }
+      if (scene.textures.exists(key))
+        this.artworkBlocks.push({
+          id: block.id,
+          enterAt: block.enterAt,
+          height,
+          image: scene.add
+            .image(0, 0, key)
+            .setOrigin(0, 0)
+            .setDisplaySize(360, height)
+            .setDepth(-10.88),
+          y: -height,
+        });
     }
 
     if (scene.textures.exists("harbor-exit")) {
@@ -690,7 +737,16 @@ export class CoastalBackground {
       this.harborArt[i]
         .setPosition(0, this.harborArtScroll.y[i])
         .setAlpha(this.harborArtAlpha);
-    this.exitY = harborExitY(time, this.exitHeight);
+    for (let i = 0; i < this.artworkBlocks.length; i++) {
+      const block = this.artworkBlocks[i];
+      block.y =
+        this.state.distance - block.enterAt * COAST_SCROLL.speed - block.height;
+      block.image
+        .setPosition(0, block.y)
+        .setAlpha(1)
+        .setVisible(block.y > -block.height && block.y < 640);
+    }
+    this.exitY = harborExitY(time, this.exitHeight, this.timeline.exitAt);
     const exitWorldY = this.exitY - this.exitNorthExtension;
     this.exitArt
       ?.setPosition(0, exitWorldY)
@@ -769,6 +825,13 @@ export class CoastalBackground {
       cloudSpeed: COAST_SCROLL.cloudSpeed,
       coastReady: this.coastReady,
       coastImages: this.coast.length,
+      artworkBlocks: this.artworkBlocks.map(({ id, y, height }) => ({
+        id,
+        y,
+        height,
+      })),
+      exitAt: this.timeline.exitAt,
+      sceneryDuration: this.timeline.duration,
       exitReady: !!this.exitArt,
       exitY: this.exitY,
       exitAlpha:
