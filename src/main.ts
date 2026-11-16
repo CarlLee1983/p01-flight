@@ -509,7 +509,16 @@ Object.defineProperty(window, "__P01__", {
     hp: model.hp,
     player: { ...model.player },
     bullets: model.bullets.filter((b) => b.active).length,
-    projectiles: model.bullets.filter((b) => b.active).map((b) => ({kind:b.kind,x:b.x,y:b.y,vx:b.vx,vy:b.vy,targetId:b.targetId})),
+    projectiles: model.bullets
+      .filter((b) => b.active)
+      .map((b) => ({
+        kind: b.kind,
+        x: b.x,
+        y: b.y,
+        vx: b.vx,
+        vy: b.vy,
+        targetId: b.targetId,
+      })),
     enemies: model.enemies.filter((e) => e.active).length,
     bulletPool: model.bullets.length,
     enemyPool: model.enemies.length,
