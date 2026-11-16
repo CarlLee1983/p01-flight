@@ -26,3 +26,5 @@ jobs:
             test-results/
             docs/*.png
             dist/
+            scripts/serve.mjs
+            README.md

@@ -78,6 +78,14 @@ class FlightScene extends Phaser.Scene {
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Z,ENTER,P",
     ) as typeof this.keys;
     this.input.keyboard!.disableGlobalCapture();
+    // Handle edge-triggered actions on keydown so a press released between
+    // render frames is not lost. Ignore OS key-repeat to avoid pause toggles.
+    this.input.keyboard!.on("keydown-P", (event: KeyboardEvent) => {
+      if (!event.repeat) {
+        model.pause();
+        renderPanel();
+      }
+    });
     renderPanel();
   }
   update(_time: number, delta: number) {
@@ -88,10 +96,6 @@ class FlightScene extends Phaser.Scene {
       ["menu", "won", "lost"].includes(model.mode)
     )
       start();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.P)) {
-      model.pause();
-      renderPanel();
-    }
     const on = (...names: string[]) =>
       names.some((k) => this.keys[k].isDown) ? 1 : 0;
     model.update(
