@@ -330,7 +330,10 @@ class FlightScene extends Phaser.Scene {
     this.visualIndex = 0;
     const section = model.section;
     this.sectionNotice.setVisible(
-      model.mode === "playing" && !!section && model.time - section.at < 3.2,
+      model.mode === "playing" &&
+        !model.boss?.active &&
+        !!section &&
+        model.time - section.at < 3.2,
     );
     if (section)
       this.sectionNotice.setText(`${section.title}\n${section.hint}`);
