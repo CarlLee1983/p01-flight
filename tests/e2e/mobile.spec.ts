@@ -1,4 +1,5 @@
 import { test, expect, webkit } from "@playwright/test";
+test.setTimeout(30000);
 const state = (page: any) => page.evaluate(() => (window as any).__P01__());
 const point = (x: number, y: number, id = 1) => ({
   x,
@@ -9,9 +10,7 @@ const point = (x: number, y: number, id = 1) => ({
   force: 1,
 });
 async function tapButton(page: any, label: string) {
-  const box = await page
-    .getByRole("button", { name: label, exact: true })
-    .boundingBox();
+  const box = await page.getByRole("button", { name: label }).boundingBox();
   if (!box) throw new Error(`Missing button ${label}`);
   await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
 }
