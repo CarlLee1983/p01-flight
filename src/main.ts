@@ -3,6 +3,7 @@ import { stage01 } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
+import { CoastalBackground } from "./game/background";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -18,6 +19,9 @@ let recorded = false;
 let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
+let backgroundInfo: Record<string, unknown> = {};
+let frameCount = 0,
+  frameTime = 0;
 function start() {
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0 };
@@ -32,7 +36,7 @@ function renderPanel() {
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">C 切換機炮／光束 · Shift 精準移動</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">C 切換散射／貫穿／追蹤 · Shift 精準移動</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
     panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>按住 Space／Z 射擊。留意蓄力光圈，側移躲開瞄準彈。</p><p>金色能量永久升級主炮；青色十字補血。<br><b>X：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
@@ -97,6 +101,7 @@ function renderPanel() {
   lastMode = model.mode;
 }
 class FlightScene extends Phaser.Scene {
+  background!: CoastalBackground;
   bank = 0;
   lastPlayerX = 180;
   ambience = 0;
@@ -147,6 +152,7 @@ class FlightScene extends Phaser.Scene {
     return image;
   }
   create() {
+    this.background = new CoastalBackground(this);
     graphics = this.add.graphics();
     overlay = this.add.graphics().setDepth(3);
     label = this.add
@@ -184,6 +190,8 @@ class FlightScene extends Phaser.Scene {
     renderPanel();
   }
   update(_time: number, delta: number) {
+    frameCount++;
+    frameTime += delta;
     if (model.mode === "playing" || model.mode === "menu")
       this.ambience += Math.min(delta / 1000, 0.05);
     if (model.mode === "playing") this.input.keyboard!.enableGlobalCapture();
@@ -205,7 +213,13 @@ class FlightScene extends Phaser.Scene {
     );
     this.lastPlayerX = model.player.x;
     if (model.shots > previous.shots)
-      audio.play(model.weaponMode === "beam" ? "beam" : "shot");
+      audio.play(
+        model.weaponMode === "missile"
+          ? "missile"
+          : model.weaponMode === "beam"
+            ? "beam"
+            : "shot",
+      );
     audio.setIntensity(model.boss?.active ? 2 : model.time > 30 ? 1 : 0);
     if (model.killCount > previous.kills) audio.play("explode");
     if (model.damageCount > previous.hurt) {
@@ -237,46 +251,54 @@ class FlightScene extends Phaser.Scene {
     for (const image of this.visuals) image.setVisible(false);
     graphics.clear();
     overlay.clear();
-    graphics.fillStyle(0x092b3c);
-    graphics.fillRect(0, 0, 360, 640);
-    // Original non-seamless terrain: bounded drift, never wrap its edges.
-    const travel = Math.min(1, model.time / stage01.duration);
-    this.sprite("coast", 180, 300 + travel * 40, 480, 720, 0.88).setDepth(-1);
-    graphics.clear();
-    // Surface wakes and sparse high-altitude cloud streaks move independently.
-    for (let i = 0; i < 20; i++) {
-      const x = 90 + ((i * 73) % 180);
-      const y = ((i * 89 + this.ambience * 38) % 700) - 30;
-      graphics.lineStyle(1, 0x8acbd1, 0.12);
-      graphics.lineBetween(x, y, x - 4, y + 12);
-    }
-    for (let i = 0; i < 4; i++) {
-      const y = ((i * 220 + this.ambience * 75) % 900) - 130;
-      graphics.fillStyle(0xd3edf0, 0.045);
-      graphics.fillEllipse(i % 2 ? 345 : 10, y, 150, 85);
-    }
+    this.background.update(model.mode === "menu" ? this.ambience : model.time);
+    backgroundInfo = this.background.diagnostics();
     if (model.mode !== "menu") {
       for (const b of model.bullets)
         if (b.active) {
           this.sprite(
-            "laserBlue01",
+            b.kind === "missile" ? "fire03" : "laserBlue01",
             b.x,
             b.y,
-            b.kind === "beam"
-              ? (b.width ?? 8)
-              : model.weaponLevel === 3
-                ? 8
-                : 6,
-            b.kind === "beam" ? 62 : model.weaponLevel === 3 ? 34 : 26,
+            b.kind === "missile"
+              ? 10
+              : b.kind === "beam"
+                ? (b.width ?? 8)
+                : model.weaponLevel === 3
+                  ? 8
+                  : 6,
+            b.kind === "missile"
+              ? 25
+              : b.kind === "beam"
+                ? 62
+                : model.weaponLevel === 3
+                  ? 34
+                  : 26,
             1,
             (Math.atan2(b.vx ?? 0, -(b.vy ?? -550)) * 180) / Math.PI,
           ).setTint(
-            b.kind === "beam"
-              ? 0x90ffe9
-              : model.weaponLevel === 3
-                ? 0xffed9e
-                : 0xffffff,
+            b.kind === "missile"
+              ? 0xffc869
+              : b.kind === "beam"
+                ? 0x90ffe9
+                : model.weaponLevel === 3
+                  ? 0xffed9e
+                  : 0xffffff,
           );
+          if (b.kind === "missile") {
+            const length = Math.hypot(b.vx ?? 0, b.vy ?? -330) || 1;
+            const dx = (b.vx ?? 0) / length,
+              dy = (b.vy ?? -330) / length;
+            overlay.lineStyle(4, 0xffb34f, 0.8);
+            overlay.lineBetween(b.x - dx * 18, b.y - dy * 18, b.x, b.y);
+            overlay.lineStyle(2, 0xfff4cf, 1);
+            overlay.lineBetween(
+              b.x - dx * 5,
+              b.y - dy * 5,
+              b.x + dx * 5,
+              b.y + dy * 5,
+            );
+          }
         }
       for (const e of model.enemies)
         if (e.active) {
@@ -286,10 +308,28 @@ class FlightScene extends Phaser.Scene {
               : "scout",
             e.x,
             e.y,
-            e.behavior === "heavy" ? 70 : e.behavior === "turret" ? 56 : 42,
-            e.behavior === "heavy" ? 61 : e.behavior === "turret" ? 49 : 36,
+            e.behavior === "heavy"
+              ? 70
+              : e.behavior === "turret"
+                ? 56
+                : e.behavior === "dive"
+                  ? 32
+                  : 42,
+            e.behavior === "heavy"
+              ? 61
+              : e.behavior === "turret"
+                ? 49
+                : e.behavior === "cross"
+                  ? 30
+                  : 36,
             1,
-            e.behavior === "weave" ? Math.sin((e.age ?? 0) * 2.6) * 18 : 0,
+            e.behavior === "cross"
+              ? -(e.direction ?? 1) * 72
+              : e.behavior === "dive"
+                ? (-(e.diveAngle ?? 0) * 180) / Math.PI
+                : e.behavior === "weave"
+                  ? Math.sin((e.age ?? 0) * 2.6) * 18
+                  : 0,
           ).setTint(
             e.behavior === "turret"
               ? 0xd890ff
@@ -440,7 +480,7 @@ class FlightScene extends Phaser.Scene {
     label.setText(
       model.mode === "menu"
         ? ""
-        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "beam" ? "BEAM" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs} [X]`,
+        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "missile" ? "HOMING" : model.weaponMode === "beam" ? "PIERCE" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs} [X]`,
     );
     if (model.bombFlash > 0) {
       overlay.fillStyle(0xb8f8ff, Math.min(0.25, model.bombFlash * 0.25));
@@ -483,6 +523,16 @@ Object.defineProperty(window, "__P01__", {
     hp: model.hp,
     player: { ...model.player },
     bullets: model.bullets.filter((b) => b.active).length,
+    projectiles: model.bullets
+      .filter((b) => b.active)
+      .map((b) => ({
+        kind: b.kind,
+        x: b.x,
+        y: b.y,
+        vx: b.vx,
+        vy: b.vy,
+        targetId: b.targetId,
+      })),
     enemies: model.enemies.filter((e) => e.active).length,
     bulletPool: model.bullets.length,
     enemyPool: model.enemies.length,
@@ -499,5 +549,7 @@ Object.defineProperty(window, "__P01__", {
     audio: audio.diagnostics(),
     lostReason: model.lostReason,
     save: saves.data,
+    background: backgroundInfo,
+    measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,
   }),
 });

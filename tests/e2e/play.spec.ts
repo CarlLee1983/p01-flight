@@ -38,6 +38,10 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
     .toBeGreaterThan(1);
   await page.screenshot({ path: "docs/playing.png" });
+  await waitGameTime(page, 21.5);
+  await page.screenshot({ path: "docs/cross-formation.png" });
+  await waitGameTime(page, 35);
+  await page.screenshot({ path: "docs/dive-attack.png" });
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
@@ -268,8 +272,9 @@ test("focus movement, weapon key edge and restart defaults", async ({
   expect((await state(page)).weaponMode).toBe("beam");
   await page.keyboard.up("c");
   await page.keyboard.press("c");
-  await expect.poll(async () => (await state(page)).weaponMode).toBe("spread");
+  await expect.poll(async () => (await state(page)).weaponMode).toBe("missile");
   await page.keyboard.press("c");
+  await expect.poll(async () => (await state(page)).weaponMode).toBe("spread");
   await page.keyboard.press("x");
   await page.getByRole("button", { name: "返回標題" }).click();
   await page.getByRole("button", { name: "開始飛行" }).click();
@@ -278,4 +283,72 @@ test("focus movement, weapon key edge and restart defaults", async ({
   expect(reset.weaponLevel).toBe(1);
   expect(reset.focus).toBe(false);
   expect(reset.bombs).toBe(2);
+});
+
+test("continuous coastal travel and parallax are visible, pause freezes them", async ({
+  browser,
+}) => {
+  test.setTimeout(60000);
+  const context = await browser.newContext({
+    viewport: { width: 1000, height: 900 },
+    recordVideo: {
+      dir: "test-results/scroll-video",
+      size: { width: 1000, height: 900 },
+    },
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto("http://127.0.0.1:4173/");
+    await page.getByRole("button", { name: "開始飛行" }).click();
+    await page.keyboard.down("Space");
+    const start = await state(page);
+    const before = await page
+      .locator("canvas")
+      .screenshot({ path: "docs/scroll-00.png" });
+    for (let i = 1; i <= 4; i++) {
+      await page.waitForTimeout(2000);
+      if (i === 2) {
+        await page.keyboard.press("c");
+        await page.keyboard.press("c");
+        await expect
+          .poll(async () => (await state(page)).weaponMode)
+          .toBe("missile");
+        await expect
+          .poll(async () =>
+            (await state(page)).projectiles.some(
+              (b: any) => b.kind === "missile",
+            ),
+          )
+          .toBe(true);
+      }
+      await page
+        .locator("canvas")
+        .screenshot({ path: `docs/scroll-0${i}.png` });
+    }
+    const end = await state(page);
+    const after = await page.locator("canvas").screenshot();
+    expect(before.equals(after)).toBe(false);
+    expect(end.background.distance - start.background.distance).toBeGreaterThan(
+      200,
+    );
+    expect(end.background.speed).toBe(32);
+    expect(end.background.cloudSpeed).toBeGreaterThan(end.background.speed);
+    expect(end.measuredFps).toBeGreaterThan(20);
+    await page.keyboard.press("p");
+    const paused = await state(page);
+    await page.waitForTimeout(500);
+    expect((await state(page)).background.distance).toBe(
+      paused.background.distance,
+    );
+    console.log(
+      "scroll proof",
+      JSON.stringify({
+        start: start.background,
+        end: end.background,
+        measuredFps: end.measuredFps,
+      }),
+    );
+  } finally {
+    await context.close();
+  }
 });
