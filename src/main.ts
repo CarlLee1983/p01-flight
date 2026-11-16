@@ -27,7 +27,7 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<h2>Stage 01</h2><p>在 75 秒航程中擊落敵機，保持存活。</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">音量偏好會保存；G1 尚無音樂／音效。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>躲避紅色敵機，按住 Space 或 Z 射擊。</p><p>戰機受擊區小於圖片；躲開敵機機身。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>躲避橘色敵機，按住 Space 或 Z 射擊。</p><p>戰機受擊區小於圖片；躲開敵機機身。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / 75 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
   document.querySelector("#start")?.addEventListener("click", start);
@@ -184,11 +184,11 @@ class FlightScene extends Phaser.Scene {
         }
       const p = model.player;
       if (model.invincible <= 0 || Math.floor(model.time * 14) % 2 === 0) {
-        this.sprite("playerShip1_blue", p.x, p.y, 48, 37);
+        this.sprite("playerShip1_blue", p.x, p.y, 36, 28);
         this.sprite(
           "fire03",
           p.x,
-          p.y + 25,
+          p.y + 21,
           9,
           16 + Math.sin(model.time * 45) * 3,
           0.85,
