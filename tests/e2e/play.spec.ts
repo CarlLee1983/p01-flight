@@ -21,13 +21,23 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await page.keyboard.down("Space");
   // Normal keyboard input only. Center route naturally collects stage pickups.
   await expect
-    .poll(async () => (await state(page)).weaponTime, { timeout: 25000 })
-    .toBeGreaterThan(0);
+    .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
+    .toBeGreaterThan(1);
   await page.screenshot({ path: "docs/playing.png" });
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 65000 })
     .toBeGreaterThanOrEqual(105);
   await page.screenshot({ path: "docs/boss.png" });
+  await expect
+    .poll(async () => (await state(page)).time, { timeout: 15000 })
+    .toBeGreaterThan(62);
+  await page.keyboard.press("x");
+  expect((await state(page)).bombs).toBe(1);
+  await page.screenshot({ path: "docs/bomb.png" });
+  await expect
+    .poll(async () => (await state(page)).boss?.phase, { timeout: 15000 })
+    .toBe(3);
+  await page.screenshot({ path: "docs/boss-phase3.png" });
   await expect
     .poll(async () => (await state(page)).mode, { timeout: 90000 })
     .toBe("won");
@@ -158,4 +168,30 @@ test("G1/G2 v1 saved records remain compatible", async ({ page }) => {
   await page.getByRole("button", { name: "返回標題" }).click();
   await page.reload();
   expect((await state(page)).save).toEqual(legacy);
+});
+
+test("audio unlock, mute persistence and bomb edge trigger", async ({
+  page,
+}) => {
+  await page.goto("/");
+  expect((await state(page)).audio.state).not.toBe("running");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await expect
+    .poll(async () => (await state(page)).audio.state)
+    .toBe("running");
+  await page.keyboard.down("x");
+  await page.waitForTimeout(1000);
+  expect((await state(page)).bombs).toBe(1);
+  await page.keyboard.up("x");
+  await page.getByRole("button", { name: "全部靜音" }).click();
+  expect((await state(page)).audio.musicVolume).toBe(0);
+  expect((await state(page)).audio.sfxVolume).toBe(0);
+  await page.keyboard.press("p");
+  expect((await state(page)).audio.activeVoices).toBe(0);
+  await page.reload();
+  expect((await state(page)).save.settings).toEqual({
+    musicVolume: 0,
+    sfxVolume: 0,
+  });
+  await expect(page.getByRole("button", { name: "開啟聲音" })).toBeVisible();
 });
