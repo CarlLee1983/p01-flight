@@ -243,9 +243,16 @@ export class FlightModel {
       this.lostReason = "damage";
     }
   }
-  update(dt: number, dx = 0, dy = 0, fire = false, focus = false) {
+  update(
+    dt: number,
+    dx = 0,
+    dy = 0,
+    fire = false,
+    focus = false,
+    moveTarget?: { x: number; y: number },
+  ) {
     if (this.mode !== "playing") return;
-    dt = Math.min(Math.max(dt, 0), 0.05);
+    dt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.05) : 0;
     this.focus = focus;
     this.time += dt;
     this.invincible = Math.max(0, this.invincible - dt);
@@ -253,10 +260,25 @@ export class FlightModel {
     this.cooldown -= dt;
     this.supportTime = Math.max(0, this.supportTime - dt);
     this.supportCooldown = Math.max(0, this.supportCooldown - dt);
+    const target =
+      moveTarget &&
+      Number.isFinite(moveTarget.x) &&
+      Number.isFinite(moveTarget.y)
+        ? {
+            x: Math.max(18, Math.min(this.stage.width - 18, moveTarget.x)),
+            y: Math.max(70, Math.min(this.stage.height - 24, moveTarget.y)),
+          }
+        : undefined;
+    if (target) {
+      dx = target.x - this.player.x;
+      dy = target.y - this.player.y;
+    }
     const length = Math.hypot(dx, dy);
-    if (length) {
-      this.player.x += (dx / length) * (focus ? 100 : 240) * dt;
-      this.player.y += (dy / length) * (focus ? 100 : 240) * dt;
+    if (length && Number.isFinite(length)) {
+      const step = (focus ? 100 : 240) * dt;
+      const travel = target ? Math.min(length, step) : step;
+      this.player.x += (dx / length) * travel;
+      this.player.y += (dy / length) * travel;
     }
     this.player.x = Math.max(
       18,

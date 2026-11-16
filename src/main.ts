@@ -6,6 +6,7 @@ import { FlightAudio } from "./game/audio";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
 import { createGroundTextures } from "./game/ground-art";
+import { TouchInput } from "./game/touch-input";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -14,6 +15,7 @@ try {
 const saves = new BrowserSaveRepository(storage);
 const model = new FlightModel(stage01);
 const audio = new FlightAudio();
+const touch = new TouchInput();
 let previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
 const panel = document.querySelector<HTMLElement>("#panel")!;
 let lastMode: Mode | null = null;
@@ -25,6 +27,7 @@ let backgroundInfo: Record<string, unknown> = {};
 let frameCount = 0,
   frameTime = 0;
 function start() {
+  touch.cancel();
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
   model.start();
@@ -33,6 +36,18 @@ function start() {
 }
 function renderPanel() {
   panel.dataset.mode = model.mode;
+  if (model.mode !== "playing") touch.cancel();
+  for (const id of ["touch-bomb", "touch-weapon"]) {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    if (button) button.disabled = model.mode !== "playing";
+  }
+  const pause = document.getElementById(
+    "touch-pause",
+  ) as HTMLButtonElement | null;
+  if (pause) {
+    pause.disabled = !["playing", "paused"].includes(model.mode);
+    pause.textContent = model.mode === "paused" ? "繼續" : "暫停";
+  }
   const record = saves.data.stages[stage01.id];
   const warning = saves.warning
     ? `<p class="notice" role="status">${saves.warning}</p>`
@@ -243,6 +258,58 @@ class FlightScene extends Phaser.Scene {
         this.cameras.main.shake(180, 0.008);
       }
     });
+    const canvas = this.game.canvas;
+    const clearTouch = () => touch.cancel();
+    canvas.addEventListener("pointerdown", (event) => {
+      if (
+        model.mode !== "playing" ||
+        !["touch", "pen"].includes(event.pointerType)
+      )
+        return;
+      const rect = canvas.getBoundingClientRect();
+      if (
+        touch.begin(
+          event.pointerId,
+          event.clientX,
+          event.clientY,
+          model.player.x,
+          model.player.y,
+          { x: rect.width / stage01.width, y: rect.height / stage01.height },
+        )
+      ) {
+        canvas.setPointerCapture(event.pointerId);
+        void audio.unlock();
+        event.preventDefault();
+      }
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (touch.move(event.pointerId, event.clientX, event.clientY))
+        event.preventDefault();
+    });
+    canvas.addEventListener("pointerup", (event) => touch.end(event.pointerId));
+    canvas.addEventListener("pointercancel", (event) =>
+      touch.end(event.pointerId),
+    );
+    canvas.addEventListener("lostpointercapture", (event) =>
+      touch.end(event.pointerId),
+    );
+    window.addEventListener("blur", clearTouch);
+    window.addEventListener("resize", () => touch.resize());
+    document.getElementById("touch-bomb")?.addEventListener("click", () => {
+      void audio.unlock();
+      if (model.useBomb()) {
+        audio.play("bomb");
+        this.cameras.main.shake(180, 0.008);
+      }
+    });
+    document.getElementById("touch-weapon")?.addEventListener("click", () => {
+      void audio.unlock();
+      if (model.switchWeapon()) audio.play("power");
+    });
+    document.getElementById("touch-pause")?.addEventListener("click", () => {
+      model.pause();
+      renderPanel();
+    });
     renderPanel();
   }
   update(_time: number, delta: number) {
@@ -256,12 +323,15 @@ class FlightScene extends Phaser.Scene {
       names.some((k) => this.keys[k].isDown) ? 1 : 0;
     if (model.mode === "playing" && model.time === 0)
       this.pickupNoticeUntil = 0;
+    if (model.mode !== "playing") touch.cancel();
+    const touchFrame = touch.sample(model.player, delta / 1000);
     model.update(
       delta / 1000,
       on("D", "RIGHT") - on("A", "LEFT"),
       on("S", "DOWN") - on("W", "UP"),
-      !!on("SPACE", "Z"),
+      !!on("SPACE", "Z") || touchFrame.fire,
       !!on("SHIFT"),
+      touchFrame.target,
     );
     const move = model.player.x - this.lastPlayerX;
     this.bank = Phaser.Math.Linear(
@@ -677,6 +747,7 @@ new Phaser.Game({
   fps: { target: 60 },
 });
 document.addEventListener("visibilitychange", () => {
+  if (document.hidden) touch.cancel();
   if (document.hidden && model.mode === "playing") {
     model.pause();
     renderPanel();
@@ -686,6 +757,7 @@ document.addEventListener("visibilitychange", () => {
 Object.defineProperty(window, "__P01__", {
   value: () => ({
     mode: model.mode,
+    touchTarget: touch.target,
     time: model.time,
     score: model.score,
     hp: model.hp,
