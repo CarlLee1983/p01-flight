@@ -26,6 +26,20 @@ let overlay: Phaser.GameObjects.Graphics;
 let backgroundInfo: Record<string, unknown> = {};
 let frameCount = 0,
   frameTime = 0;
+// pointerdown supports a second finger while the first one is captured on canvas.
+// Keyboard/screen-reader generated clicks (detail=0) remain accessible, without
+// executing the following synthetic touch click a second time.
+function bindTouchAction(id: string, action: () => void) {
+  const button = document.getElementById(id) as HTMLButtonElement | null;
+  button?.addEventListener("pointerdown", (event) => {
+    if (button.disabled) return;
+    event.preventDefault();
+    action();
+  });
+  button?.addEventListener("click", (event) => {
+    if (event.detail === 0 && !button.disabled) action();
+  });
+}
 function start() {
   touch.cancel();
   void audio.unlock();
@@ -295,18 +309,18 @@ class FlightScene extends Phaser.Scene {
     );
     window.addEventListener("blur", clearTouch);
     window.addEventListener("resize", () => touch.resize());
-    document.getElementById("touch-bomb")?.addEventListener("click", () => {
+    bindTouchAction("touch-bomb", () => {
       void audio.unlock();
       if (model.useBomb()) {
         audio.play("bomb");
         this.cameras.main.shake(180, 0.008);
       }
     });
-    document.getElementById("touch-weapon")?.addEventListener("click", () => {
+    bindTouchAction("touch-weapon", () => {
       void audio.unlock();
       if (model.switchWeapon()) audio.play("power");
     });
-    document.getElementById("touch-pause")?.addEventListener("click", () => {
+    bindTouchAction("touch-pause", () => {
       model.pause();
       renderPanel();
     });
