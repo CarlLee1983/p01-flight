@@ -303,6 +303,20 @@ test("continuous coastal travel and parallax are visible, pause freezes them", a
       .screenshot({ path: "docs/scroll-00.png" });
     for (let i = 1; i <= 4; i++) {
       await page.waitForTimeout(2000);
+      if (i === 2) {
+        await page.keyboard.press("c");
+        await page.keyboard.press("c");
+        await expect
+          .poll(async () => (await state(page)).weaponMode)
+          .toBe("missile");
+        await expect
+          .poll(async () =>
+            (await state(page)).projectiles.some(
+              (b: any) => b.kind === "missile",
+            ),
+          )
+          .toBe(true);
+      }
       await page
         .locator("canvas")
         .screenshot({ path: `docs/scroll-0${i}.png` });
