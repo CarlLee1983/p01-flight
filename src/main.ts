@@ -348,8 +348,8 @@ class FlightScene extends Phaser.Scene {
           "boss",
           model.boss.x,
           model.boss.y,
-          154,
-          108,
+          120,
+          81,
           1,
           Math.sin(model.time * 1.8) * 2,
         );
@@ -430,16 +430,8 @@ class FlightScene extends Phaser.Scene {
       graphics.strokeCircle(180, 390, 115);
       graphics.lineBetween(180, 265, 180, 520);
       graphics.lineBetween(55, 390, 305, 390);
-      this.sprite(
-        "player",
-        180,
-        475,
-        130,
-        130,
-        0.85,
-        Math.sin(this.ambience) * 3,
-      );
-      this.sprite("fire03", 180, 545, 18, 36, 0.9, 180);
+      this.sprite("player", 180, 82, 80, 80, 0.85, Math.sin(this.ambience) * 3);
+      this.sprite("fire03", 180, 127, 10, 20, 0.9, 180);
     }
     if (model.mode !== "menu") {
       overlay.fillStyle(0x0c2133, 0.96);
@@ -447,7 +439,7 @@ class FlightScene extends Phaser.Scene {
     }
     label.setText(
       model.mode === "menu"
-        ? "P01 / COASTAL STRIKE\nFLIGHT SYSTEM ONLINE"
+        ? ""
         : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "beam" ? "BEAM" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs} [X]`,
     );
     if (model.bombFlash > 0) {

@@ -25,6 +25,11 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     expect(response.status()).toBe(200);
     expect(response.headers()["content-type"]).toContain("image/png");
   }
+  for (const name of ["player", "scout", "heavy", "boss", "coast"]) {
+    const response = await page.request.get(`/assets/original/${name}.png`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("image/png");
+  }
   await page.screenshot({ path: "docs/menu.png" });
   await page.getByRole("button", { name: "開始飛行" }).click();
   await page.keyboard.down("Space");
