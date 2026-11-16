@@ -463,9 +463,13 @@ class FlightScene extends Phaser.Scene {
   draw() {
     this.visualIndex = 0;
     const section = model.section;
+    const patrol = model.enemies.find(
+      (e) => e.active && e.behavior === "gatekeeper",
+    );
     this.sectionNotice.setVisible(
       model.mode === "playing" &&
         !model.boss?.active &&
+        !patrol &&
         !!section &&
         model.time - section.at < 3.2,
     );
@@ -479,12 +483,14 @@ class FlightScene extends Phaser.Scene {
         );
     }
     this.bossAdvice.setVisible(
-      model.mode === "playing" && !!model.boss?.active,
+      model.mode === "playing" && (!!model.boss?.active || !!patrol),
     );
     this.bossAdvice.setText(
-      model.boss?.cannons.some((c) => c.active)
-        ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
-        : "側炮全毀 · 集中攻擊核心",
+      patrol
+        ? "避開金色預告線 · 移位後追擊巡邏艦"
+        : model.boss?.cannons.some((c) => c.active)
+          ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
+          : "側炮全毀 · 集中攻擊核心",
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
     for (const image of this.visuals) image.setVisible(false);
@@ -551,13 +557,20 @@ class FlightScene extends Phaser.Scene {
             overlay.fillRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
             overlay.lineStyle(2, 0xdcb878, 0.95);
             overlay.strokeRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
-            this.sprite("heavy", e.x, e.y, 68, 70);
+            this.sprite("heavy", e.x, e.y, 68, 70).setDepth(4);
             for (const side of [-1, 1]) {
               overlay.fillStyle(0x354f60);
               overlay.fillRect(e.x + side * 39 - 7, e.y - 17, 14, 45);
               overlay.fillStyle(0xffd08a);
               overlay.fillRect(e.x + side * 39 - 3, e.y + 18, 6, 18);
-              this.sprite("fire03", e.x + side * 31, e.y - 35, 8, 15, 0.75);
+              this.sprite(
+                "fire03",
+                e.x + side * 31,
+                e.y - 35,
+                8,
+                15,
+                0.75,
+              ).setDepth(4);
             }
             overlay.fillStyle(0x1c2830);
             overlay.fillRect(e.x - 44, e.y - 39, 88, 4);
