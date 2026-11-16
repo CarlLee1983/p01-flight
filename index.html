@@ -3,72 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#07191e" />
+    <meta name="theme-color" content="#06151b" />
     <title>雲際航線 · COASTLINE ASSAULT</title>
   </head>
   <body>
     <main class="flight-deck">
       <header class="masthead">
-        <div class="wordmark">
-          <span class="emblem" aria-hidden="true">◇</span>
-          <div>
-            <p class="eyebrow">P01 / ORIGINAL ARCADE SHOOTER</p>
-            <h1>雲際航線</h1>
-          </div>
-        </div>
-        <p class="edition">COASTLINE ASSAULT<span>STAGE 01 · 沿岸突擊</span></p>
+        <h1>雲際航線</h1>
+        <p>COASTLINE ASSAULT <span>STAGE 01</span></p>
       </header>
-      <section class="stage-shell" aria-label="第一關遊戲舞台">
-        <div class="stage-topline">
-          <span><i aria-hidden="true"></i> FLIGHT DISPLAY</span
-          ><span>01 / COASTLINE</span>
+      <div id="game" aria-label="第一關遊戲畫面">
+        <section id="panel" aria-label="遊戲選單與操作"></section>
+      </div>
+      <footer class="pilot-guide">
+        <div class="keys" aria-label="鍵盤操作指南">
+          <span><kbd>WASD</kbd> / <kbd>↑↓←→</kbd> 移動</span>
+          <span><kbd>Space</kbd> / <kbd>Z</kbd> 射擊</span>
+          <span><kbd>C</kbd> 武器</span>
+          <span><kbd>Shift</kbd> 精準</span>
+          <span><kbd>X</kbd> 炸彈</span>
+          <span><kbd>P</kbd> 暫停</span>
         </div>
-        <div class="screen-bezel">
-          <div id="game" aria-label="遊戲畫面"></div>
-        </div>
-        <div class="stage-bottomline">
-          <span>移動・射擊・突破防線</span><span>P01</span>
-        </div>
-      </section>
-      <aside class="command-deck" aria-label="任務與控制">
-        <div class="deck-heading">
-          <span>MISSION CONTROL</span><span>01</span>
-        </div>
-        <section id="panel" aria-label="遊戲狀態與操作"></section>
-        <section class="pilot-guide" aria-label="鍵盤操作指南">
-          <h3><span>操控面板</span><small>KEYBOARD</small></h3>
-          <dl>
-            <div>
-              <dt><kbd>WASD</kbd><span class="or">/</span><kbd>↑↓←→</kbd></dt>
-              <dd>八方向移動</dd>
-            </div>
-            <div>
-              <dt><kbd>SPACE</kbd><span class="or">/</span><kbd>Z</kbd></dt>
-              <dd>按住連續射擊</dd>
-            </div>
-            <div>
-              <dt><kbd>X</kbd></dt>
-              <dd>衝擊炸彈</dd>
-            </div>
-            <div>
-              <dt><kbd>P</kbd></dt>
-              <dd>暫停 / 繼續</dd>
-            </div>
-          </dl>
-          <p class="tactical-note">
-            <span aria-hidden="true">◆</span>
-            收集能量升級火力。留意敵機蓄力，保留炸彈突破彈幕。
-          </p>
-        </section>
-        <footer class="local-note">
-          <span class="local-mark" aria-hidden="true">◈</span>
-          <p>
-            桌機鍵盤遊玩 · 本機存檔<br /><small
-              >紀錄只保存在此瀏覽器，清除網站資料將遺失。手機版僅供查看，尚無觸控操作。</small
-            >
-          </p>
-        </footer>
-      </aside>
+        <p class="local-note">
+          桌機鍵盤遊玩 · 紀錄僅存於此瀏覽器，清除網站資料將遺失。
+        </p>
+        <p class="mobile-note">需要實體鍵盤操作；手機尚未支援觸控遊玩。</p>
+      </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

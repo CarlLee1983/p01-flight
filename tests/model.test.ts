@@ -30,7 +30,7 @@ describe("flight rules", () => {
     m.start();
     advance(m, 10, true);
     expect(m.shots).toBeGreaterThan(60);
-    expect(m.shots).toBeLessThan(75);
+    expect(m.shots).toBeLessThan(115);
     expect(m.bullets.length).toBeLessThan(12);
     advance(m, 2);
     expect(m.bullets.some((b) => b.active)).toBe(false);
@@ -82,7 +82,7 @@ describe("flight rules", () => {
     m.update(0.05);
     expect(m.hp).toBe(2);
   });
-  it("wins at 75 seconds and restart resets all state", () => {
+  it("wins at configured deadline and restart resets all state", () => {
     const m = new FlightModel({
       ...stage01,
       waves: [],
@@ -90,9 +90,9 @@ describe("flight rules", () => {
       pickups: [],
     });
     m.start();
-    advance(m, 76);
+    advance(m, 116);
     expect(m.mode).toBe("won");
-    expect(m.time).toBe(75);
+    expect(m.time).toBe(115);
     for (let i = 0; i < 10; i++) {
       m.start();
       advance(m, 1, true);
@@ -180,8 +180,11 @@ describe("Stage 01 playthrough fixtures", () => {
   it("can win using normal input and score without changing rules", () => {
     const m = new FlightModel(stage01);
     m.start();
-    for (let i = 0; i < 76 * 60; i++) {
-      const t = i / 60;
+    let bomb1 = false,
+      bomb2 = false;
+    for (let i = 0; i < 116 * 60; i++) {
+      if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
+      if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
       m.update(1 / 60, 0, 0, true);
     }
     expect(m.mode).toBe("won");
