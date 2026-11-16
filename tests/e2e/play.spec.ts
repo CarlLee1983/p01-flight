@@ -34,6 +34,9 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     "coast",
     "interceptor",
     "carrier",
+    "harbor-battlefield",
+    "ground-battery",
+    "ground-depot",
   ]) {
     const response = await page.request.get(`/assets/original/${name}.png`);
     expect(response.status()).toBe(200);
@@ -47,6 +50,11 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
     .toBeGreaterThan(1);
   await page.screenshot({ path: "docs/playing.png" });
+  await waitGameTime(page, 14);
+  expect(
+    (await state(page)).activeEnemies.some((e: any) => e.behavior === "escort"),
+  ).toBe(true);
+  await page.screenshot({ path: "docs/escort-formation.png" });
   await waitGameTime(page, 21.5);
   await page.screenshot({ path: "docs/cross-formation.png" });
   // Measure newly spawned ground travel before normal player fire can destroy it.

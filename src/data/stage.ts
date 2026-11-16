@@ -9,7 +9,8 @@ export type Behavior =
   | "carrier"
   | "groundBattery"
   | "groundDepot"
-  | "gatekeeper";
+  | "gatekeeper"
+  | "escort";
 export type PickupKind =
   | "heal"
   | "double"
@@ -31,6 +32,7 @@ export interface Wave {
   direction?: number;
   holdFor?: number;
   strafeWidth?: number;
+  formationPhase?: number;
 }
 export interface StageSection {
   id: string;
@@ -134,6 +136,31 @@ export const stage01: StageConfig = {
         points: 150,
         behavior: "weave" as const,
         fireEvery: 2.4,
+      })),
+    ),
+    // Two staggered escort flights: one telegraphed volley per aircraft.
+    ...[12, 52].flatMap((at) =>
+      [60, 180, 300].map((x, i) => ({
+        at: at + i * 0.8,
+        x,
+        speed: 140,
+        hp: 4,
+        points: 160,
+        behavior: "escort" as const,
+        formationPhase: i * 0.8,
+      })),
+    ),
+    // Opposing interception pairs add movement, not additional bullets.
+    ...[24, 37].flatMap((at) =>
+      [-1, 1].map((direction, i) => ({
+        at: at + i * 0.7,
+        x: direction === 1 ? -30 : 390,
+        spawnY: 230 + i * 45,
+        direction,
+        speed: 150,
+        hp: 2,
+        points: 180,
+        behavior: "cross" as const,
       })),
     ),
     // Optional supply craft: intercept away from the center to choose a weapon.

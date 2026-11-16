@@ -1183,3 +1183,100 @@ it("gatekeeper aim locks during warning while strafing remains a trackable targe
   ).toBe(true);
   expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(100);
 });
+
+describe("escort formation density", () => {
+  it("adds ten purposeful wave entries without extending stage or crowding the rest", () => {
+    expect(stage01.waves).toHaveLength(51);
+    expect(stage01.waves.filter((w) => w.behavior === "escort")).toHaveLength(
+      6,
+    );
+    expect(stage01.waves.filter((w) => w.behavior === "cross")).toHaveLength(
+      13,
+    );
+    expect(stage01.duration).toBe(115);
+    expect(stage01.boss!.at).toBe(70);
+    expect(stage01.waves.every((w) => w.at < 56)).toBe(true);
+  });
+  it.each([30, 60, 120])(
+    "escort wings share formation phase, warn then fire only one fan at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        waves: [100, 180, 260].map((x, i) => ({
+          at: i * 0.8,
+          x,
+          speed: 140,
+          hp: 100,
+          points: 160,
+          behavior: "escort" as const,
+          formationPhase: i * 0.8,
+        })),
+      });
+      m.start();
+      m.invincible = 100;
+      let warnings = 0;
+      const seen = new Set<number>();
+      for (let i = 0; i < 2.6 * fps; i++) {
+        m.update(1 / fps);
+        for (const e of m.enemies)
+          if ((e.telegraph ?? 0) > 0 && !seen.has(e.id)) {
+            seen.add(e.id);
+            warnings++;
+          }
+      }
+      expect(warnings).toBe(3);
+      const offsets = m.enemies.map((e) => e.x - e.originX!);
+      expect(Math.max(...offsets) - Math.min(...offsets)).toBeLessThan(1.1);
+      run(m, 1, false, fps);
+      expect(m.enemies.every((e) => e.volleyFired)).toBe(true);
+      expect(m.enemyBullets.length).toBeLessThanOrEqual(9);
+      // Expired bullets must not be replaced by a second volley.
+      run(m, 7, false, fps);
+      expect(m.enemies.some((e) => e.active)).toBe(false);
+      expect(m.enemyBullets.some((b) => b.active)).toBe(false);
+    },
+  );
+  it("escort aim locks at warning and a re-used pool slot resets one-shot flag", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        { at: 0, x: 80, speed: 140, hp: 100, points: 1, behavior: "escort" },
+        { at: 8, x: 80, speed: 140, hp: 100, points: 1, behavior: "escort" },
+      ],
+    });
+    m.start();
+    m.invincible = 100;
+    run(m, 1);
+    const aim = m.enemies[0].aimAngle!;
+    for (let i = 0; i < 45; i++) m.update(1 / 60, 1, 0);
+    expect(m.enemies[0].volleyFired).toBe(true);
+    expect(
+      m.enemyBullets.some(
+        (b) => Math.abs(Math.atan2(b.vx, b.vy) - aim) < 0.001,
+      ),
+    ).toBe(true);
+    run(m, 6.4);
+    expect(m.enemies).toHaveLength(1);
+    expect(m.enemies[0].active).toBe(true);
+    expect(m.enemies[0].volleyFired).toBe(false);
+  });
+  it.each([30, 60, 120])(
+    "center-fire route exposes escort warning and volley at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let warning = false,
+        volley = false;
+      for (let i = 0; i < 58 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        for (const e of m.enemies)
+          if (e.behavior === "escort") {
+            warning ||= !!e.active && (e.telegraph ?? 0) > 0;
+            volley ||= !!e.volleyFired;
+          }
+      }
+      expect(warning).toBe(true);
+      expect(volley).toBe(true);
+    },
+  );
+});

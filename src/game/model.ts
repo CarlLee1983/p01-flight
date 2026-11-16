@@ -33,6 +33,8 @@ export interface Enemy extends Body {
   diveAngle?: number;
   holdFor?: number;
   strafeWidth?: number;
+  formationPhase?: number;
+  volleyFired?: boolean;
   gateCycle?: number;
   attackPattern?: "left" | "right" | "aim";
   attackLanes?: number[];
@@ -406,6 +408,8 @@ export class FlightModel {
             w.behavior === "gatekeeper" ? 1.4 : (w.fireEvery ?? 999),
           telegraph: 0,
           aimAngle: undefined,
+          formationPhase: w.formationPhase ?? 0,
+          volleyFired: false,
           holdFor: w.holdFor,
           strafeWidth: w.strafeWidth,
           gateCycle: 0,
@@ -568,6 +572,27 @@ export class FlightModel {
             e.y += Math.cos(e.diveAngle) * 260 * dt;
           } else if (e.age < 1) e.y += e.speed * dt;
         }
+        if (e.behavior === "escort") {
+          e.x =
+            (e.originX ?? e.x) +
+            Math.sin((e.age + (e.formationPhase ?? 0)) * 1.2) * 24;
+          if (!e.volleyFired && e.age >= 0.9) {
+            if (e.aimAngle === undefined)
+              e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
+            e.telegraph = Math.max(0, 1.7 - e.age);
+            if (e.age >= 1.7) {
+              for (const spread of [-0.22, 0, 0.22])
+                this.shootEnemy(
+                  e.x,
+                  e.y + 20,
+                  Math.sin(e.aimAngle + spread) * 155,
+                  Math.cos(e.aimAngle + spread) * 155,
+                );
+              e.volleyFired = true;
+              e.telegraph = 0;
+            }
+          }
+        }
         if (e.behavior === "weave")
           e.x = Math.max(
             25,
@@ -592,6 +617,7 @@ export class FlightModel {
         if (
           e.fireEvery &&
           e.behavior !== "gatekeeper" &&
+          e.behavior !== "escort" &&
           e.behavior !== "groundDepot" &&
           e.y > 40 &&
           e.y < 400

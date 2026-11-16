@@ -159,9 +159,27 @@ export function coastalScrollState(
   return target;
 }
 
+/** Repeated art panels overlap only at softly masked edges, never hard-cut. */
+export function harborArtState(
+  distance: number,
+  height: number,
+  target = { stride: 0, y: [0, 0, 0, 0] },
+) {
+  const overlap = Math.min(90, height / 4);
+  target.stride = height - overlap;
+  const offset =
+    Math.max(0, Number.isFinite(distance) ? distance : 0) % target.stride;
+  for (let i = 0; i < 4; i++) target.y[i] = offset + (i - 2) * target.stride;
+  return target;
+}
+
 /** Four reused overlapping coast images above a permanent original ocean layer. */
 export class CoastalBackground {
   private coast: Phaser.GameObjects.Image[] = [];
+  private harborArt: Phaser.GameObjects.Image[] = [];
+  private harborArtHeight = 720;
+  private harborArtScroll = harborArtState(0, 720);
+  private harborArtAlpha = 0;
   private currents: Phaser.GameObjects.Graphics[] = [];
   private clouds: Phaser.GameObjects.Graphics[] = [];
   private state = coastalScrollState(0);
@@ -241,6 +259,49 @@ export class CoastalBackground {
             .setAlpha(0.84)
             .setDepth(-11),
         );
+      }
+    }
+
+    // New original illustration owns the port silhouette. Legacy geometry is only
+    // a fallback when the optional asset is unavailable, never an overlay on art.
+    const harborKey = "p01-harbor-soft-edge";
+    if (scene.textures.exists("harbor-battlefield")) {
+      const source = scene.textures
+        .get("harbor-battlefield")
+        .getSourceImage() as HTMLImageElement;
+      this.harborArtHeight = (source.height * 360) / source.width;
+      if (!scene.textures.exists(harborKey)) {
+        const canvas = scene.textures.createCanvas(
+          harborKey,
+          source.width,
+          source.height,
+        );
+        if (canvas) {
+          const context = canvas.getContext();
+          context.drawImage(source, 0, 0);
+          context.globalCompositeOperation = "destination-in";
+          const edge =
+            Math.min(90, this.harborArtHeight / 4) / this.harborArtHeight;
+          const mask = context.createLinearGradient(0, 0, 0, source.height);
+          mask.addColorStop(0, "rgba(255,255,255,0)");
+          mask.addColorStop(edge, "rgba(255,255,255,1)");
+          mask.addColorStop(1 - edge, "rgba(255,255,255,1)");
+          mask.addColorStop(1, "rgba(255,255,255,0)");
+          context.fillStyle = mask;
+          context.fillRect(0, 0, source.width, source.height);
+          context.globalCompositeOperation = "source-over";
+          canvas.refresh();
+        }
+      }
+      if (scene.textures.exists(harborKey)) {
+        for (let i = 0; i < 4; i++)
+          this.harborArt.push(
+            scene.add
+              .image(0, 0, harborKey)
+              .setOrigin(0, 0)
+              .setDisplaySize(360, this.harborArtHeight)
+              .setDepth(-10.9),
+          );
       }
     }
 
@@ -488,15 +549,35 @@ export class CoastalBackground {
     this.layers.fill(0);
     this.coastOpacity = 0;
     let atmosphere = 0;
+    this.harborArtAlpha = 0;
     for (let i = 0; i < this.areas.length; i++) {
       const scenery = this.areas[i].scenery;
       const profile = SCENERY_LAYERS[scenery];
+      const artWeight =
+        scenery === "offshore" || scenery === "approach"
+          ? 0
+          : scenery === "exit"
+            ? 0.5
+            : scenery === "command"
+              ? 0.55
+              : 1;
+      this.harborArtAlpha += artWeight * this.weights[i];
       this.coastOpacity += COAST_OPACITY[scenery] * this.weights[i];
       atmosphere += SCENERY_ATMOSPHERE[scenery] * this.weights[i];
       for (let layer = 0; layer < 3; layer++)
         this.layers[layer] += profile[layer] * this.weights[i];
     }
     const [navigationAlpha, harborAlpha, commandAlpha] = this.layers;
+    const legacyAlpha = this.harborArt.length ? 0 : 1;
+    harborArtState(
+      this.state.distance,
+      this.harborArtHeight,
+      this.harborArtScroll,
+    );
+    for (let i = 0; i < this.harborArt.length; i++)
+      this.harborArt[i]
+        .setPosition(0, this.harborArtScroll.y[i])
+        .setAlpha(this.harborArtAlpha);
     for (let i = 0; i < this.coast.length; i++) {
       this.coast[i]
         .setPosition(0, this.state.coastY[i])
@@ -506,15 +587,15 @@ export class CoastalBackground {
     for (let i = 0; i < 2; i++) {
       const y = groundOffset - i * 640;
       this.navigation[i].setPosition(0, y).setAlpha(navigationAlpha);
-      this.harbor[i].setPosition(0, y).setAlpha(harborAlpha);
-      this.command[i].setPosition(0, y).setAlpha(commandAlpha);
+      this.harbor[i].setPosition(0, y).setAlpha(harborAlpha * legacyAlpha);
+      this.command[i].setPosition(0, y).setAlpha(commandAlpha * legacyAlpha);
     }
     for (let i = 0; i < this.landmarks.length; i++) {
       const config = this.landmarkConfig[i];
       const y = coastalLandmarkY(this.state.distance, config);
       this.landmarks[i]
         .setPosition(config.side === "left" ? 4 : 288, y)
-        .setAlpha(harborAlpha)
+        .setAlpha(harborAlpha * legacyAlpha)
         .setVisible(y > -LANDMARK_HEIGHT && y < 640 && harborAlpha > 0);
     }
     for (let i = 0; i < this.passages.length; i++) {
@@ -523,7 +604,7 @@ export class CoastalBackground {
       const y = this.state.distance - area.at * COAST_SCROLL.speed - 180;
       passage.graphic
         .setPosition(0, y)
-        .setAlpha(this.weights[passage.index])
+        .setAlpha(this.weights[passage.index] * legacyAlpha)
         .setVisible(this.weights[passage.index] > 0 && y < 640 && y > -900);
     }
     this.shade.setAlpha(atmosphere);
@@ -570,6 +651,10 @@ export class CoastalBackground {
       cloudSpeed: COAST_SCROLL.cloudSpeed,
       coastReady: this.coastReady,
       coastImages: this.coast.length,
+      harborArtReady: this.harborArt.length > 0,
+      harborArtImages: this.harborArt.length,
+      harborArtAlpha: this.harborArtAlpha,
+      harborArtY: [...this.harborArtScroll.y],
     };
   }
 }

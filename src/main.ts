@@ -5,7 +5,6 @@ import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
-import { createGroundTextures } from "./game/ground-art";
 import { TouchInput } from "./game/touch-input";
 import "./style.css";
 let storage: Storage | null = null;
@@ -160,6 +159,9 @@ class FlightScene extends Phaser.Scene {
       "coast",
       "interceptor",
       "carrier",
+      "harbor-battlefield",
+      "ground-battery",
+      "ground-depot",
     ])
       this.load.image(
         file,
@@ -205,7 +207,6 @@ class FlightScene extends Phaser.Scene {
   create() {
     this.background = new CoastalBackground(this);
     createPickupTextures(this);
-    createGroundTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
         this.add
@@ -551,6 +552,15 @@ class FlightScene extends Phaser.Scene {
         }
       for (const e of model.enemies)
         if (e.active) {
+          const grounded =
+            e.behavior === "groundBattery" || e.behavior === "groundDepot";
+          graphics.fillStyle(0x04131e, grounded ? 0.35 : 0.22);
+          graphics.fillEllipse(
+            e.x + (grounded ? 5 : 12),
+            e.y + (grounded ? 7 : 22),
+            e.behavior === "gatekeeper" ? 96 : grounded ? 48 : 38,
+            grounded ? 40 : 20,
+          );
           if (e.behavior === "gatekeeper") {
             // A broad patrol corvette has a distinct silhouette and readable lane warning.
             overlay.fillStyle(0x182d3d);
@@ -611,7 +621,15 @@ class FlightScene extends Phaser.Scene {
             continue;
           }
           if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
-            this.sprite(e.behavior, e.x, e.y, 52, 52).setDepth(0);
+            this.sprite(
+              e.behavior === "groundBattery"
+                ? "ground-battery"
+                : "ground-depot",
+              e.x,
+              e.y,
+              60,
+              e.behavior === "groundBattery" ? 60 : 41,
+            ).setDepth(0);
             if ((e.telegraph ?? 0) > 0) {
               overlay.lineStyle(2, 0xffbc73, 0.9);
               overlay.strokeCircle(
@@ -619,6 +637,46 @@ class FlightScene extends Phaser.Scene {
                 e.y + 16,
                 10 + Math.sin(model.time * 20) * 3,
               );
+            }
+            continue;
+          }
+          if (e.behavior === "escort") {
+            this.sprite("scout", e.x, e.y, 47, 40).setDepth(4);
+            overlay.fillStyle(0x697b8c);
+            overlay.fillTriangle(
+              e.x - 35,
+              e.y + 15,
+              e.x - 17,
+              e.y - 15,
+              e.x - 13,
+              e.y + 20,
+            );
+            overlay.fillTriangle(
+              e.x + 35,
+              e.y + 15,
+              e.x + 17,
+              e.y - 15,
+              e.x + 13,
+              e.y + 20,
+            );
+            overlay.lineStyle(2, 0x9ee5dd, 0.9);
+            overlay.lineBetween(e.x - 34, e.y + 14, e.x - 19, e.y - 11);
+            overlay.lineBetween(e.x + 34, e.y + 14, e.x + 19, e.y - 11);
+            for (const side of [-1, 1]) {
+              overlay.fillStyle(e.volleyFired ? 0x4d7478 : 0xffd28a);
+              overlay.fillCircle(e.x + side * 23, e.y + 11, 3);
+            }
+            if ((e.telegraph ?? 0) > 0) {
+              overlay.lineStyle(1.5, 0xffcc80, 0.7);
+              for (const offset of [-0.28, 0, 0.28]) {
+                const angle = (e.aimAngle ?? 0) + offset;
+                overlay.lineBetween(
+                  e.x,
+                  e.y + 18,
+                  e.x + Math.sin(angle) * 40,
+                  e.y + 18 + Math.cos(angle) * 40,
+                );
+              }
             }
             continue;
           }
@@ -786,6 +844,8 @@ class FlightScene extends Phaser.Scene {
           drone.y,
         );
       }
+      graphics.fillStyle(0x04131e, 0.25);
+      graphics.fillEllipse(model.player.x + 10, model.player.y + 21, 30, 18);
       const p =
         model.mode === "won"
           ? {
@@ -962,6 +1022,7 @@ Object.defineProperty(window, "__P01__", {
         telegraph: e.telegraph,
         attackPattern: e.attackPattern,
         attackLanes: e.attackLanes,
+        volleyFired: e.volleyFired,
       })),
     shots: model.shots,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,

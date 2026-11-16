@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CoastalBackground,
+  harborArtState,
   COAST_SCROLL,
   coastalScrollState,
   coastalAreaState,
@@ -12,6 +13,77 @@ import {
 } from "../src/game/background";
 
 describe("continuous coastal background", () => {
+  it("overlaps original port artwork without uncovered top or bottom and reuses coordinates", () => {
+    for (const height of [640, 720, 768, 1024]) {
+      const state = harborArtState(0, height);
+      const positions = state.y;
+      for (let frame = 0; frame < 10000; frame++) {
+        expect(harborArtState((frame * 32) / 60, height, state)).toBe(state);
+        expect(state.y).toBe(positions);
+        for (const edge of [0, 640]) {
+          const coverage = state.y.reduce((sum, top) => {
+            const local = edge - top;
+            return (
+              sum + Math.max(0, Math.min(1, local / 90, (height - local) / 90))
+            );
+          }, 0);
+          expect(coverage).toBeCloseTo(1);
+        }
+      }
+    }
+    expect(harborArtState(1280, 720)).toEqual(harborArtState(1280, 720));
+  });
+  it("uses four reused original-art images and suppresses legacy port blocks", () => {
+    let created = 0,
+      drawn = 0;
+    const graphics: any[] = [];
+    const make = (graphic = false) => {
+      created++;
+      const data: any = { alpha: 1 };
+      const object: any = new Proxy(data, {
+        get(target, key) {
+          if (key === "alpha") return target.alpha;
+          return (...args: any[]) => {
+            if (key === "setAlpha") target.alpha = args[0];
+            if (
+              String(key).startsWith("fill") ||
+              String(key).startsWith("line") ||
+              String(key).startsWith("stroke")
+            )
+              drawn++;
+            return object;
+          };
+        },
+      });
+      if (graphic) graphics.push(object);
+      return object;
+    };
+    const scene: any = {
+      add: { graphics: () => make(true), image: () => make() },
+      textures: {
+        exists: () => true,
+        get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
+      },
+    };
+    const background = new CoastalBackground(scene);
+    expect(created).toBe(27);
+    background.update(44);
+    expect(background.diagnostics().harborArtImages).toBe(4);
+    expect(background.diagnostics().harborArtAlpha).toBe(1);
+    // Last two geometry Graphics before shade are the legacy channel/arena.
+    expect(graphics.at(-2).alpha).toBe(0);
+    expect(graphics.at(-3).alpha).toBe(0);
+    const initialDrawn = drawn;
+    for (let i = 0; i < 10000; i++) background.update(i / 60);
+    expect(created).toBe(27);
+    expect(drawn).toBe(initialDrawn);
+    background.update(62);
+    expect(background.diagnostics().harborArtAlpha).toBe(0);
+    background.update(44);
+    const paused = background.diagnostics().harborArtY;
+    background.update(44);
+    expect(background.diagnostics().harborArtY).toEqual(paused);
+  });
   it("moves at 32 pixels per second and returns to its overlap cycle", () => {
     expect(coastalScrollState(2).offset).toBe(64);
     expect(
@@ -91,7 +163,7 @@ describe("continuous coastal background", () => {
     const object: any = new Proxy({}, { get: () => () => object });
     const scene: any = {
       add: { graphics: () => object, image: () => object },
-      textures: { exists: () => true },
+      textures: { exists: (key: string) => key !== "harbor-battlefield" },
     };
     const background = new CoastalBackground(scene, areas);
     expect(background.diagnostics().layerAlphas).toEqual([0, 1, 0]);
@@ -145,6 +217,11 @@ describe("continuous coastal background", () => {
       for (const method of [
         "fillStyle",
         "fillRect",
+        "beginPath",
+        "moveTo",
+        "lineTo",
+        "closePath",
+        "fillPath",
         "lineStyle",
         "lineBetween",
         "fillEllipse",
@@ -165,7 +242,7 @@ describe("continuous coastal background", () => {
     };
     const scene: any = {
       add: { graphics: object, image: object },
-      textures: { exists: () => true },
+      textures: { exists: (key: string) => key !== "harbor-battlefield" },
     };
     const landmarks: CoastalLandmarkConfig[] = [
       { id: "single-crane", kind: "crane", side: "right", distance: 900 },
@@ -218,6 +295,11 @@ describe("continuous coastal background", () => {
         "setDepth",
         "fillStyle",
         "fillRect",
+        "beginPath",
+        "moveTo",
+        "lineTo",
+        "closePath",
+        "fillPath",
         "lineStyle",
         "lineBetween",
         "fillEllipse",
@@ -238,7 +320,7 @@ describe("continuous coastal background", () => {
     };
     const scene: any = {
       add: { graphics: object, image: object },
-      textures: { exists: () => true },
+      textures: { exists: (key: string) => key !== "harbor-battlefield" },
     };
     const background = new CoastalBackground(scene);
     expect(objects).toHaveLength(23);
