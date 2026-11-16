@@ -65,6 +65,28 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
   const page = await context.newPage();
   await page.goto("http://127.0.0.1:4173/");
   await tapButton(page, "開始飛行");
+  await page.evaluate(() => {
+    const log: unknown[] = [];
+    (window as any).__touchEventLog = log;
+    for (const name of [
+      "pointerdown",
+      "pointerup",
+      "pointercancel",
+      "lostpointercapture",
+    ])
+      document.addEventListener(
+        name,
+        (event: any) => {
+          log.push({
+            type: event.type,
+            id: event.pointerId,
+            target: event.target.id || event.target.tagName,
+          });
+          if (log.length > 24) log.shift();
+        },
+        true,
+      );
+  });
   const cdp = await context.newCDPSession(page);
   const box = (await page.locator("canvas").boundingBox())!;
   const first = point(box.x + box.width / 2, box.y + box.height * 0.78);
@@ -95,10 +117,17 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
     touchPoints: [moved, second],
   });
   await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchEnd",
+    type: "touchMove",
     touchPoints: [moved],
   });
   await expect.poll(async () => (await state(page)).bombs).toBe(1);
+  console.log(
+    "secondary touch retained",
+    JSON.stringify({
+      state: await state(page),
+      events: await page.evaluate(() => (window as any).__touchEventLog),
+    }),
+  );
   expect((await state(page)).touchTarget).toBeTruthy();
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchCancel",
@@ -167,7 +196,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       touchPoints: [first, second],
     });
     await cdp.send("Input.dispatchTouchEvent", {
-      type: "touchEnd",
+      type: "touchMove",
       touchPoints: [first],
     });
   }
