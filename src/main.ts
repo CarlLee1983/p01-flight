@@ -27,7 +27,7 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<h2>Stage 01</h2><p>在 75 秒航程中擊落敵機，保持存活。</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">音量偏好會保存；G1 尚無音樂／音效。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>躲避紅色敵機，按住 Space 或 Z 射擊。</p><p>藍色戰機中央亮點是受擊區。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>躲避紅色敵機，按住 Space 或 Z 射擊。</p><p>戰機受擊區小於圖片；躲開敵機機身。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / 75 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
   document.querySelector("#start")?.addEventListener("click", start);
@@ -65,6 +65,45 @@ function renderPanel() {
 }
 class FlightScene extends Phaser.Scene {
   keys!: Record<string, Phaser.Input.Keyboard.Key>;
+  visuals: Phaser.GameObjects.Image[] = [];
+  visualIndex = 0;
+  preload() {
+    for (const file of [
+      "playerShip1_blue",
+      "enemyRed1",
+      "laserBlue01",
+      "fire03",
+    ])
+      this.load.image(
+        file,
+        `${import.meta.env.BASE_URL}assets/kenney/${file}.png`,
+      );
+  }
+  sprite(
+    key: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    alpha = 1,
+    angle = 0,
+  ) {
+    let image = this.visuals[this.visualIndex++];
+    if (!image) {
+      image = this.add.image(x, y, key).setDepth(1);
+      this.visuals.push(image);
+    }
+    image
+      .setTexture(key)
+      .setPosition(x, y)
+      .setDisplaySize(width, height)
+      .setOrigin(0.5)
+      .setAlpha(alpha)
+      .setAngle(angle)
+      .setVisible(true)
+      .clearTint();
+    return image;
+  }
   create() {
     graphics = this.add.graphics();
     label = this.add
@@ -112,6 +151,8 @@ class FlightScene extends Phaser.Scene {
     this.draw();
   }
   draw() {
+    this.visualIndex = 0;
+    for (const image of this.visuals) image.setVisible(false);
     graphics.clear();
     graphics.fillStyle(0x0c2035);
     graphics.fillRect(0, 0, 360, 640);
@@ -133,55 +174,48 @@ class FlightScene extends Phaser.Scene {
     if (model.mode !== "menu") {
       for (const b of model.bullets)
         if (b.active) {
-          graphics.fillStyle(0x9ffff1);
-          graphics.fillRoundedRect(b.x - 3, b.y - 10, 6, 20, 2);
+          this.sprite("laserBlue01", b.x, b.y, 6, 26);
         }
       for (const e of model.enemies)
         if (e.active) {
-          graphics.fillStyle(e.hp > 1 ? 0xffb36b : 0xf36f83);
-          graphics.fillTriangle(
-            e.x,
-            e.y + 22,
-            e.x - 20,
-            e.y - 13,
-            e.x + 20,
-            e.y - 13,
+          this.sprite("enemyRed1", e.x, e.y, 42, 38).setTint(
+            e.hp > 1 ? 0xffd18c : 0xffffff,
           );
-          graphics.fillStyle(0x742b48);
-          graphics.fillRect(e.x - 5, e.y - 12, 10, 19);
         }
       const p = model.player;
       if (model.invincible <= 0 || Math.floor(model.time * 14) % 2 === 0) {
-        graphics.fillStyle(0x66ddd8);
-        graphics.fillTriangle(
+        this.sprite("playerShip1_blue", p.x, p.y, 48, 37);
+        this.sprite(
+          "fire03",
           p.x,
-          p.y - 25,
-          p.x - 20,
-          p.y + 18,
-          p.x + 20,
-          p.y + 18,
+          p.y + 25,
+          9,
+          16 + Math.sin(model.time * 45) * 3,
+          0.85,
+          180,
         );
-        graphics.fillStyle(0xefffff);
-        graphics.fillCircle(p.x, p.y, 5);
-        graphics.fillStyle(0xffc36e);
-        graphics.fillTriangle(
-          p.x - 5,
-          p.y + 17,
-          p.x + 5,
-          p.y + 17,
-          p.x,
-          p.y + 27,
-        );
+        // The original collision rules stay in FlightModel, independent of art.
       }
       for (const e of model.effects) {
-        graphics.lineStyle(3, 0xffd58a, Math.min(1, e.life * 4));
-        graphics.strokeCircle(e.x, e.y, (0.45 - e.life) * 60);
+        const progress = 1 - e.life / 0.45;
+        graphics.lineStyle(3 * (1 - progress) + 1, 0xffd58a, 1 - progress);
+        graphics.strokeCircle(e.x, e.y, 4 + progress * 29);
+        graphics.fillStyle(0xfff5cb, Math.max(0, 1 - progress * 2));
+        graphics.fillCircle(e.x, e.y, 11 * (1 - progress));
+        for (let i = 0; i < 8; i++) {
+          const angle = (i * Math.PI) / 4;
+          graphics.lineStyle(2, i % 2 ? 0xffa54c : 0xffecaa, 1 - progress);
+          graphics.lineBetween(
+            e.x + Math.cos(angle) * progress * 15,
+            e.y + Math.sin(angle) * progress * 15,
+            e.x + Math.cos(angle) * (8 + progress * 35),
+            e.y + Math.sin(angle) * (8 + progress * 35),
+          );
+        }
       }
     } else {
-      graphics.fillStyle(0x66ddd8);
-      graphics.fillTriangle(180, 260, 140, 345, 220, 345);
-      graphics.fillStyle(0xeaffff);
-      graphics.fillCircle(180, 310, 10);
+      this.sprite("playerShip1_blue", 180, 310, 104, 79);
+      this.sprite("fire03", 180, 365, 18, 36, 0.9, 180);
     }
     label.setText(
       model.mode === "menu"

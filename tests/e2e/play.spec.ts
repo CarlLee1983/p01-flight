@@ -7,6 +7,17 @@ test("real 75-second stage, score, result, retry and reload", async ({
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(page.getByRole("button", { name: "開始飛行" })).toBeVisible();
+  // Verify the actual loader resources, not only successful canvas creation.
+  for (const name of [
+    "playerShip1_blue",
+    "enemyRed1",
+    "laserBlue01",
+    "fire03",
+  ]) {
+    const response = await page.request.get(`/assets/kenney/${name}.png`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("image/png");
+  }
   await page.screenshot({ path: "docs/menu.png" });
   await page.getByRole("button", { name: "開始飛行" }).click();
   await page.keyboard.down("Space");
