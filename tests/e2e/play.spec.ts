@@ -89,7 +89,7 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect((await state(page)).section.at).toBe(56);
   await page.screenshot({ path: "docs/resupply-approach.png" });
   await keyboardShoreCounterattack(page);
-  for (const t of [88, 100, 112, 123]) {
+  for (const t of [78, 88, 100, 105, 112, 123]) {
     await waitGameTime(page, t);
     await page.screenshot({ path: `docs/sortie-${t}.png` });
   }

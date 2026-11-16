@@ -178,6 +178,7 @@ export class CoastalBackground {
   private artworkBlocks: {
     id: string;
     enterAt: number;
+    north: number;
     height: number;
     image: Phaser.GameObjects.Image;
     y: number;
@@ -328,24 +329,111 @@ export class CoastalBackground {
         .get(block.texture)
         .getSourceImage() as HTMLImageElement;
       const height = (source.height * 360) / source.width;
-      const key = `p01-world-block-${block.id}`;
+      const north = Math.min(source.width * 4, 4080 - source.height);
+      const worldHeight = north + source.height;
+      const key = `p01-world-block-opaque-v2-${block.id}`;
       if (!scene.textures.exists(key)) {
         const canvas = scene.textures.createCanvas(
           key,
           source.width,
-          source.height,
+          worldHeight,
         );
         if (canvas) {
           const c = canvas.getContext();
-          c.drawImage(source, 0, 0);
+          // The refinery's observed centre (x=240..480,y=0..240) is water.
+          // Tile at original pixel scale onto an opaque base, then blend seams
+          // into that base. Never layer transparent water over the old port.
+          const tile = 240,
+            seam = 40,
+            sampleX = (source.width - tile) / 2;
+          for (let y = 0; y < worldHeight; y += tile) {
+            for (let x = 0; x < source.width; x += tile) {
+              const w = Math.min(tile, source.width - x),
+                h = Math.min(tile, worldHeight - y);
+              c.drawImage(source, sampleX, 0, w, h, x, y, w, h);
+            }
+          }
+          for (let boundary = tile; boundary < source.width; boundary += tile) {
+            for (
+              let col = 0;
+              col < seam && boundary + col < source.width;
+              col++
+            ) {
+              c.globalAlpha = 1 - col / seam;
+              for (let y = 0; y < worldHeight; y += tile) {
+                const h = Math.min(tile, worldHeight - y);
+                c.drawImage(
+                  source,
+                  sampleX + tile - seam + col,
+                  0,
+                  1,
+                  h,
+                  boundary + col,
+                  y,
+                  1,
+                  h,
+                );
+              }
+            }
+          }
+          for (let y = tile; y < worldHeight; y += tile) {
+            for (let row = 0; row < seam && y + row < worldHeight; row++) {
+              c.globalAlpha = 1 - row / seam;
+              for (let x = 0; x < source.width; x += tile) {
+                const w = Math.min(tile, source.width - x);
+                c.drawImage(
+                  source,
+                  sampleX,
+                  tile - seam + row,
+                  w,
+                  1,
+                  x,
+                  y + row,
+                  w,
+                  1,
+                );
+              }
+            }
+          }
+          c.globalAlpha = 1;
+          const edge = Math.round((90 * source.width) / 360);
+          for (let row = 0; row < edge; row++) {
+            c.globalAlpha = row / edge;
+            c.drawImage(
+              source,
+              0,
+              row,
+              source.width,
+              1,
+              0,
+              north + row,
+              source.width,
+              1,
+            );
+          }
+          c.globalAlpha = 1;
+          c.drawImage(
+            source,
+            0,
+            edge,
+            source.width,
+            source.height - edge,
+            0,
+            north + edge,
+            source.width,
+            source.height - edge,
+          );
           c.globalCompositeOperation = "destination-in";
-          const mask = c.createLinearGradient(0, 0, 0, source.height);
-          mask.addColorStop(0, "rgba(255,255,255,0)");
-          mask.addColorStop(90 / height, "white");
-          mask.addColorStop(1 - 90 / height, "white");
+          const mask = c.createLinearGradient(
+            0,
+            worldHeight - edge,
+            0,
+            worldHeight,
+          );
+          mask.addColorStop(0, "white");
           mask.addColorStop(1, "rgba(255,255,255,0)");
           c.fillStyle = mask;
-          c.fillRect(0, 0, source.width, source.height);
+          c.fillRect(0, 0, source.width, worldHeight);
           c.globalCompositeOperation = "source-over";
           canvas.refresh();
         }
@@ -354,11 +442,12 @@ export class CoastalBackground {
         this.artworkBlocks.push({
           id: block.id,
           enterAt: block.enterAt,
+          north: (north * 360) / source.width,
           height,
           image: scene.add
             .image(0, 0, key)
             .setOrigin(0, 0)
-            .setDisplaySize(360, height)
+            .setDisplaySize(360, (worldHeight * 360) / source.width)
             .setDepth(-10.88),
           y: -height,
         });
@@ -742,9 +831,9 @@ export class CoastalBackground {
       block.y =
         this.state.distance - block.enterAt * COAST_SCROLL.speed - block.height;
       block.image
-        .setPosition(0, block.y)
+        .setPosition(0, block.y - block.north)
         .setAlpha(1)
-        .setVisible(block.y > -block.height && block.y < 640);
+        .setVisible(block.y > -block.height && block.y - block.north < 640);
     }
     this.exitY = harborExitY(time, this.exitHeight, this.timeline.exitAt);
     const exitWorldY = this.exitY - this.exitNorthExtension;
@@ -825,10 +914,13 @@ export class CoastalBackground {
       cloudSpeed: COAST_SCROLL.cloudSpeed,
       coastReady: this.coastReady,
       coastImages: this.coast.length,
-      artworkBlocks: this.artworkBlocks.map(({ id, y, height }) => ({
+      artworkBlocks: this.artworkBlocks.map(({ id, y, height, north }) => ({
         id,
         y,
         height,
+        worldY: y - north,
+        worldHeight: height + north,
+        opaqueNorth: true,
       })),
       exitAt: this.timeline.exitAt,
       sceneryDuration: this.timeline.duration,

@@ -204,53 +204,67 @@ describe("continuous coastal background", () => {
     background.update(0);
     expect(background.diagnostics().exitAlpha).toBe(0);
   });
-  it("precomposes an opaque <=4096px exit strip without stretching water samples", () => {
-    const textures = new Set(["harbor-exit"]);
-    const draws: any[][] = [],
-      gradients: number[][] = [],
-      sizes: number[][] = [];
-    const object: any = new Proxy({}, { get: () => () => object });
-    const context: any = {
-      globalAlpha: 1,
-      globalCompositeOperation: "source-over",
-      drawImage: (...args: any[]) => draws.push(args),
-      fillRect: () => {},
-      createLinearGradient: (...args: number[]) => {
-        gradients.push(args);
-        return { addColorStop: () => {} };
-      },
-    };
-    const scene: any = {
-      add: { graphics: () => object, image: () => object },
-      textures: {
-        exists: (key: string) => textures.has(key),
-        get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
-        createCanvas: (key: string, width: number, height: number) => {
-          sizes.push([width, height]);
-          textures.add(key);
-          return { getContext: () => context, refresh: () => {} };
+  it.each(["harbor-exit", "harbor-refinery"])(
+    "precomposes opaque <=4096px %s without stretching water samples",
+    (texture) => {
+      const textures = new Set([texture]);
+      const draws: any[][] = [],
+        gradients: number[][] = [],
+        sizes: number[][] = [];
+      const object: any = new Proxy({}, { get: () => () => object });
+      const context: any = {
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over",
+        drawImage: (...args: any[]) => draws.push(args),
+        fillRect: () => {},
+        createLinearGradient: (...args: number[]) => {
+          gradients.push(args);
+          return { addColorStop: () => {} };
         },
-      },
-    };
-    const background = new CoastalBackground(
-      scene,
-      COAST_AREAS,
-      undefined,
-      SHORT_TIMELINE,
-    );
-    expect(sizes).toEqual([[720, 4080]]);
-    // Every sampled strip is copied at natural pixel scale before the whole world
-    // is uniformly scaled to logical width 360. Only its south edge gets a mask.
-    for (const draw of draws) {
-      expect(draw[3]).toBe(draw[7]);
-      expect(draw[4]).toBe(draw[8]);
-    }
-    expect(gradients).toEqual([[0, 3900, 0, 4080]]);
-    expect(context.globalAlpha).toBe(1);
-    expect(context.globalCompositeOperation).toBe("source-over");
-    background.update(115);
-    expect(background.diagnostics().exitWorldY).toBe(-56);
-  });
+      };
+      const scene: any = {
+        add: { graphics: () => object, image: () => object },
+        textures: {
+          exists: (key: string) => textures.has(key),
+          get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
+          createCanvas: (key: string, width: number, height: number) => {
+            sizes.push([width, height]);
+            textures.add(key);
+            return { getContext: () => context, refresh: () => {} };
+          },
+        },
+      };
+      const background = new CoastalBackground(
+        scene,
+        COAST_AREAS,
+        undefined,
+        texture === "harbor-exit" ? SHORT_TIMELINE : STAGE01_SCENERY,
+      );
+      expect(sizes).toEqual([[720, 4080]]);
+      // Every sampled strip is copied at natural pixel scale before the whole world
+      // is uniformly scaled to logical width 360. Only its south edge gets a mask.
+      for (const draw of draws) {
+        expect(draw[3]).toBe(draw[7]);
+        expect(draw[4]).toBe(draw[8]);
+      }
+      expect(gradients).toEqual([[0, 3900, 0, 4080]]);
+      expect(context.globalAlpha).toBe(1);
+      expect(context.globalCompositeOperation).toBe("source-over");
+      background.update(115);
+      if (texture === "harbor-exit")
+        expect(background.diagnostics().exitWorldY).toBe(-56);
+      else {
+        for (const time of [88, 95, 100, 105, 108, 112, 123]) {
+          background.update(time);
+          const block = background.diagnostics().artworkBlocks[0];
+          expect(block.worldY).toBe((time - 60) * 32 - 2040);
+          expect(block.worldY).toBeLessThan(0);
+          expect(block.worldY + block.worldHeight - 90).toBeGreaterThan(640);
+          expect(block.opaqueNorth).toBe(true);
+        }
+      }
+    },
+  );
   it("introduces the exit warehouses spatially, not as a whole-screen fade", () => {
     expect(shortExitY(53)).toBe(-720);
     expect(shortExitY(64)).toBe(-368);
