@@ -41,3 +41,20 @@ Shared sprite specification: “Production game asset for original top-down vert
   e48606d1c6e5dfcf7249721a46f2476b07c268e72e68cb359308b95f9b14cdc6 p01-flight/public/assets/original/heavy.png
   b86af286efe6e855893fe80d3f265a3cff4af31c9c0f95dd0834baa72a3340d4 p01-flight/public/assets/original/player.png
   a0767662073dfc305b48256c65bda943b01eae91f815451dff6a13c7811465c7 p01-flight/public/assets/original/scout.png
+
+## Additional distinct enemy silhouettes (2026-11-16)
+
+Created with the same built-in OpenAI image generation tool, no external reference imagery. The original five assets were not changed.
+
+| Asset           | Runtime PNG size | Silhouette / role                                                                                                            |
+| --------------- | ---------------: | ---------------------------------------------------------------------------------------------------------------------------- |
+| interceptor.png |   252 × 376 RGBA | Down-facing elongated violet spearhead with narrow fuselage and dagger wings, intended for dive/cross behavior               |
+| carrier.png     |   376 × 328 RGBA | Down-facing bronze-gray box drone with two broad cargo pods and four rear engines, intended for slow supply-carrier behavior |
+
+Prompts: interceptor requested strict orthographic top view, nose down, narrow elongated spearhead, swept dagger wings, long dark cockpit, twin slim rear thrusters, violet/charcoal armor, upper-left light, original mechanical 2D arcade style, real transparent alpha, no text/exhaust/exterior shadow. Carrier requested the same view/style/light, a broad rectangular blunt industrial hull with two armored cargo boxes, four rear engine blocks, small forward robotic sensor, bronze/warm gray/gunmetal palette and amber running lights; no fighter-like wings.
+
+Both mechanically trimmed/scaled and padded for runtime use. Both visually checked after compositing RGBA over a solid teal background: no rectangular matte or ambient glow outside the hull. They are single-frame hull art, not authored animation frames. Keep aspect ratio so the interceptor remains narrow/long and the carrier broad/blunt; collision extents should be independently tuned to visible silhouettes. Integration behavior, movement and bullet readability remain the developer's runtime checks.
+
+Hashes:
+3e4f76187863fd8986cc17ce4b994a0cd347cf70341325ae0ad04a7f75b59b42 p01-flight/public/assets/original/interceptor.png
+ac02a1efca41b742c9def19bca47566a7110d5d160f8d29db90652364e85ab0c p01-flight/public/assets/original/carrier.png

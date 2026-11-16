@@ -4,6 +4,7 @@ import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
 import { CoastalBackground } from "./game/background";
+import { createPickupTextures, pickupVisual } from "./game/pickup-art";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -102,6 +103,9 @@ function renderPanel() {
 }
 class FlightScene extends Phaser.Scene {
   background!: CoastalBackground;
+  pickupGuide: Phaser.GameObjects.Text[] = [];
+  pickupNotice!: Phaser.GameObjects.Text;
+  pickupNoticeUntil = 0;
   bank = 0;
   lastPlayerX = 180;
   ambience = 0;
@@ -109,7 +113,15 @@ class FlightScene extends Phaser.Scene {
   visuals: Phaser.GameObjects.Image[] = [];
   visualIndex = 0;
   preload() {
-    for (const file of ["player", "scout", "heavy", "boss", "coast"])
+    for (const file of [
+      "player",
+      "scout",
+      "heavy",
+      "boss",
+      "coast",
+      "interceptor",
+      "carrier",
+    ])
       this.load.image(
         file,
         import.meta.env.BASE_URL + "assets/original/" + file + ".png",
@@ -153,6 +165,25 @@ class FlightScene extends Phaser.Scene {
   }
   create() {
     this.background = new CoastalBackground(this);
+    createPickupTextures(this);
+    this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
+      (text, i) =>
+        this.add
+          .text(55 + i * 50, 602, text, { fontSize: "10px", color: "#e2eefa" })
+          .setOrigin(0.5)
+          .setDepth(5),
+    );
+    this.pickupNotice = this.add
+      .text(180, 90, "", {
+        fontFamily: "monospace",
+        fontSize: "13px",
+        color: "#fff3c5",
+        backgroundColor: "#122c3bdd",
+        padding: { x: 8, y: 5 },
+      })
+      .setOrigin(0.5)
+      .setDepth(6)
+      .setVisible(false);
     graphics = this.add.graphics();
     overlay = this.add.graphics().setDepth(3);
     label = this.add
@@ -226,7 +257,24 @@ class FlightScene extends Phaser.Scene {
       audio.play("hurt");
       this.cameras.main.shake(140, 0.006);
     }
-    if (model.pickupCount > previous.pickup) audio.play("power");
+    if (model.pickupCount > previous.pickup) {
+      audio.play("power");
+      const picked = pickupVisual(model.lastPickup ?? "power");
+      this.pickupNotice.setText(
+        picked.label +
+          (model.lastPickup === "support"
+            ? " 8s"
+            : model.lastPickup === "heal"
+              ? ""
+              : ` LV${model.weaponLevel}`),
+      );
+      this.pickupNoticeUntil = model.time + 1.6;
+    }
+    this.pickupNotice.setVisible(
+      model.mode === "playing" &&
+        model.time < this.pickupNoticeUntil &&
+        model.time > 0.1,
+    );
     if ((model.boss?.phase ?? 0) > previous.phase) audio.play("phase");
     previous = {
       shots: model.shots,
@@ -248,6 +296,7 @@ class FlightScene extends Phaser.Scene {
   }
   draw() {
     this.visualIndex = 0;
+    this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
     for (const image of this.visuals) image.setVisible(false);
     graphics.clear();
     overlay.clear();
@@ -303,33 +352,43 @@ class FlightScene extends Phaser.Scene {
       for (const e of model.enemies)
         if (e.active) {
           this.sprite(
-            e.behavior === "heavy" || e.behavior === "turret"
-              ? "heavy"
-              : "scout",
+            e.behavior === "carrier"
+              ? "carrier"
+              : e.behavior === "dive" || e.behavior === "cross"
+                ? "interceptor"
+                : e.behavior === "heavy" || e.behavior === "turret"
+                  ? "heavy"
+                  : "scout",
             e.x,
             e.y,
-            e.behavior === "heavy"
-              ? 70
-              : e.behavior === "turret"
-                ? 56
-                : e.behavior === "dive"
-                  ? 32
-                  : 42,
-            e.behavior === "heavy"
-              ? 61
-              : e.behavior === "turret"
-                ? 49
-                : e.behavior === "cross"
-                  ? 30
-                  : 36,
+            e.behavior === "carrier"
+              ? 64
+              : e.behavior === "heavy"
+                ? 70
+                : e.behavior === "turret"
+                  ? 56
+                  : e.behavior === "dive" || e.behavior === "cross"
+                    ? 28
+                    : 42,
+            e.behavior === "carrier"
+              ? 56
+              : e.behavior === "heavy"
+                ? 61
+                : e.behavior === "turret"
+                  ? 49
+                  : e.behavior === "cross" || e.behavior === "dive"
+                    ? 42
+                    : 36,
             1,
-            e.behavior === "cross"
-              ? -(e.direction ?? 1) * 72
-              : e.behavior === "dive"
-                ? (-(e.diveAngle ?? 0) * 180) / Math.PI
-                : e.behavior === "weave"
-                  ? Math.sin((e.age ?? 0) * 2.6) * 18
-                  : 0,
+            e.behavior === "carrier"
+              ? -(e.direction ?? 1) * 90
+              : e.behavior === "cross"
+                ? -(e.direction ?? 1) * 72
+                : e.behavior === "dive"
+                  ? (-(e.diveAngle ?? 0) * 180) / Math.PI
+                  : e.behavior === "weave"
+                    ? Math.sin((e.age ?? 0) * 2.6) * 18
+                    : 0,
           ).setTint(
             e.behavior === "turret"
               ? 0xd890ff
@@ -360,28 +419,22 @@ class FlightScene extends Phaser.Scene {
         }
       for (const pickup of model.pickups)
         if (pickup.active) {
-          const heal = pickup.kind === "heal";
-          overlay.fillStyle(heal ? 0x164d50 : 0x715624, 0.9);
-          overlay.fillRoundedRect(pickup.x - 12, pickup.y - 12, 24, 24, 5);
-          overlay.lineStyle(2, heal ? 0x72ffe2 : 0xffd66e);
-          overlay.strokeRoundedRect(pickup.x - 12, pickup.y - 12, 24, 24, 5);
-          if (heal) {
-            overlay.lineBetween(pickup.x - 6, pickup.y, pickup.x + 6, pickup.y);
-            overlay.lineBetween(pickup.x, pickup.y - 6, pickup.x, pickup.y + 6);
-          } else {
-            overlay.lineBetween(
-              pickup.x - 4,
-              pickup.y - 6,
-              pickup.x - 4,
-              pickup.y + 6,
-            );
-            overlay.lineBetween(
-              pickup.x + 4,
-              pickup.y - 6,
-              pickup.x + 4,
-              pickup.y + 6,
-            );
-          }
+          const art = pickupVisual(pickup.kind);
+          overlay.lineStyle(
+            1,
+            art.color,
+            0.25 + Math.sin(model.time * 4) * 0.1,
+          );
+          overlay.strokeCircle(pickup.x, pickup.y, 20);
+          this.sprite(
+            art.key,
+            pickup.x,
+            pickup.y,
+            32,
+            32,
+            1,
+            Math.sin(model.time * 3) * 4,
+          ).setDepth(4);
         }
       if (model.boss?.active) {
         this.sprite(
@@ -416,6 +469,17 @@ class FlightScene extends Phaser.Scene {
           76,
           328 * Math.max(0, model.boss.hp / model.boss.maxHp),
           7,
+        );
+      }
+      for (const drone of model.supportDrones) {
+        this.sprite("player", drone.x, drone.y, 22, 22, 0.95);
+        this.sprite("fire03", drone.x, drone.y + 16, 5, 11, 0.85, 180);
+        overlay.lineStyle(1, 0x9fffe1, 0.25);
+        overlay.lineBetween(
+          model.player.x,
+          model.player.y + 10,
+          drone.x,
+          drone.y,
         );
       }
       const p = model.player;
@@ -470,6 +534,16 @@ class FlightScene extends Phaser.Scene {
       graphics.strokeCircle(180, 390, 115);
       graphics.lineBetween(180, 265, 180, 520);
       graphics.lineBetween(55, 390, 305, 390);
+      ["heal", "power", "spread", "beam", "missile", "support"].forEach(
+        (kind, i) =>
+          this.sprite(
+            pickupVisual(kind).key,
+            55 + i * 50,
+            576,
+            30,
+            30,
+          ).setDepth(4),
+      );
       this.sprite("player", 180, 82, 80, 80, 0.85, Math.sin(this.ambience) * 3);
       this.sprite("fire03", 180, 127, 10, 20, 0.9, 180);
     }
@@ -480,7 +554,7 @@ class FlightScene extends Phaser.Scene {
     label.setText(
       model.mode === "menu"
         ? ""
-        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "missile" ? "HOMING" : model.weaponMode === "beam" ? "PIERCE" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs} [X]`,
+        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : "STAGE 01"}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "missile" ? "HOMING" : model.weaponMode === "beam" ? "PIERCE" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs}${model.supportTime > 0 ? "  W:" + Math.ceil(model.supportTime) : " [X]"}`,
     );
     if (model.bombFlash > 0) {
       overlay.fillStyle(0xb8f8ff, Math.min(0.25, model.bombFlash * 0.25));
@@ -539,6 +613,13 @@ Object.defineProperty(window, "__P01__", {
     shots: model.shots,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
     pickups: model.pickups.filter((p) => p.active).length,
+    activePickups: model.pickups
+      .filter((p) => p.active)
+      .map((p) => ({ kind: p.kind, x: p.x, y: p.y })),
+    lastPickup: model.lastPickup,
+    supportTime: model.supportTime,
+    supportShots: model.supportShots,
+    supportDrones: model.supportDrones,
     boss: model.boss ? { ...model.boss } : null,
     bossDefeated: model.bossDefeated,
     weaponTime: model.weaponTime,

@@ -4,8 +4,16 @@ export type Behavior =
   | "turret"
   | "heavy"
   | "dive"
-  | "cross";
-export type PickupKind = "heal" | "double" | "power";
+  | "cross"
+  | "carrier";
+export type PickupKind =
+  | "heal"
+  | "double"
+  | "power"
+  | "spread"
+  | "beam"
+  | "missile"
+  | "support";
 export interface Wave {
   at: number;
   x: number;
@@ -64,6 +72,18 @@ export const stage01: StageConfig = {
         fireEvery: 2.4,
       })),
     ),
+    // Optional supply craft: intercept away from the center to choose a weapon.
+    ...(["spread", "beam", "missile"] as const).map((drop, i) => ({
+      at: 12 + i * 18,
+      x: i % 2 ? 390 : -30,
+      spawnY: 110,
+      direction: i % 2 ? -1 : 1,
+      speed: 65,
+      hp: 4,
+      points: 200,
+      behavior: "carrier" as const,
+      drop,
+    })),
     // Crossing patrols create horizontal interception opportunities for missiles.
     ...[21, 29, 43].flatMap((at, group) =>
       [0, 1, 2].map((i) => ({
@@ -113,7 +133,9 @@ export const stage01: StageConfig = {
     { at: 5, x: 180, kind: "power" },
     { at: 18, x: 180, kind: "power" },
     { at: 29, x: 180, kind: "heal" },
+    { at: 39, x: 180, kind: "support" },
     { at: 60, x: 180, kind: "heal" },
+    { at: 67, x: 90, kind: "support" },
   ],
   boss: { at: 70, hp: 400, fireEvery: 2.7, bulletSpeed: 140, points: 3000 },
 };

@@ -65,11 +65,15 @@ export class FlightModel {
   weaponLevel = 1;
   weaponMode: "spread" | "beam" | "missile" = "spread";
   focus = false;
+  supportTime = 0;
+  supportShots = 0;
+  private supportCooldown = 0;
   bombs = 2;
   bombFlash = 0;
   killCount = 0;
   damageCount = 0;
   pickupCount = 0;
+  lastPickup: PickupKind | null = null;
   lostReason: "damage" | "timeout" | null = null;
   effects: { x: number; y: number; life: number }[] = [];
   shots = 0;
@@ -95,11 +99,15 @@ export class FlightModel {
     this.weaponLevel = 1;
     this.weaponMode = "spread";
     this.focus = false;
+    this.supportTime = 0;
+    this.supportShots = 0;
+    this.supportCooldown = 0;
     this.bombs = 2;
     this.bombFlash = 0;
     this.killCount = 0;
     this.damageCount = 0;
     this.pickupCount = 0;
+    this.lastPickup = null;
     this.lostReason = null;
     this.effects = [];
     this.shots = 0;
@@ -107,6 +115,13 @@ export class FlightModel {
     this.nextPickup = 0;
     this.cooldown = 0;
     this.serial = 0;
+  }
+  get supportDrones(): { x: number; y: number }[] {
+    if (this.supportTime <= 0) return [];
+    return [-32, 32].map((offset) => ({
+      x: Math.max(8, Math.min(this.stage.width - 8, this.player.x + offset)),
+      y: this.player.y + 12,
+    }));
   }
   pause() {
     if (this.mode === "playing") this.mode = "paused";
@@ -194,6 +209,8 @@ export class FlightModel {
     this.invincible = Math.max(0, this.invincible - dt);
     this.bombFlash = Math.max(0, this.bombFlash - dt);
     this.cooldown -= dt;
+    this.supportTime = Math.max(0, this.supportTime - dt);
+    this.supportCooldown = Math.max(0, this.supportCooldown - dt);
     const length = Math.hypot(dx, dy);
     if (length) {
       this.player.x += (dx / length) * (focus ? 100 : 240) * dt;
@@ -259,6 +276,32 @@ export class FlightModel {
             ? 0.65
             : 0.14;
       this.shots++;
+    }
+    // Support is held-fire assistance, never an invulnerable collision shield.
+    if (fire && this.supportTime > 0 && this.supportCooldown <= 0) {
+      for (const drone of this.supportDrones) {
+        let bullet = this.bullets.find((b) => !b.active);
+        if (!bullet) {
+          bullet = { id: ++this.serial, x: 0, y: 0, active: false };
+          this.bullets.push(bullet);
+        }
+        Object.assign(bullet, {
+          x: drone.x,
+          y: drone.y - 12,
+          active: true,
+          vx: 0,
+          vy: -550,
+          kind: "support",
+          damage: 1,
+          width: 4,
+          targetId: undefined,
+          life: undefined,
+          pierceRemaining: 1,
+          hitIds: [],
+        });
+      }
+      this.supportShots++;
+      this.supportCooldown = 0.28;
     }
     while (
       this.nextWave < this.stage.waves.length &&
@@ -363,7 +406,7 @@ export class FlightModel {
     for (const e of this.enemies)
       if (e.active) {
         e.age = (e.age ?? 0) + dt;
-        if (e.behavior === "cross") {
+        if (e.behavior === "cross" || e.behavior === "carrier") {
           e.x += (e.direction ?? 1) * e.speed * dt;
         }
         if (e.behavior === "dive") {
@@ -388,6 +431,7 @@ export class FlightModel {
         if (
           e.behavior !== "dive" &&
           e.behavior !== "cross" &&
+          e.behavior !== "carrier" &&
           !(
             (e.behavior === "turret" || e.behavior === "heavy") &&
             e.y >= 150 &&
@@ -498,8 +542,18 @@ export class FlightModel {
           Math.hypot(p.x - this.player.x, p.y - this.player.y) < 26
         ) {
           p.active = false;
+          this.lastPickup = p.kind;
           if (p.kind === "heal") this.hp = Math.min(3, this.hp + 1);
-          else {
+          else if (p.kind === "support") {
+            this.supportTime = 8;
+            this.supportCooldown = 0;
+          } else {
+            if (
+              p.kind === "spread" ||
+              p.kind === "beam" ||
+              p.kind === "missile"
+            )
+              this.weaponMode = p.kind;
             this.weaponLevel = Math.min(3, this.weaponLevel + 1);
             this.weaponTime = 1;
           }
