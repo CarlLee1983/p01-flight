@@ -189,7 +189,7 @@ export class CoastalBackground {
   private harborArtScroll = harborArtState(0, 720);
   private harborArtAlpha = 0;
   private exitArt?: Phaser.GameObjects.Image;
-  private exitSea: Phaser.GameObjects.Image[] = [];
+  private exitNorthExtension = 1320;
   private exitHeight = 720;
   private exitY = -2416;
   private currents: Phaser.GameObjects.Graphics[] = [];
@@ -322,63 +322,103 @@ export class CoastalBackground {
         .get("harbor-exit")
         .getSourceImage() as HTMLImageElement;
       this.exitHeight = (source.height * 360) / source.width;
-      const exitKey = "p01-exit-world-block";
-      const seaKey = "p01-exit-open-water";
-      if (!scene.textures.exists(exitKey)) {
-        const canvas = scene.textures.createCanvas(
-          exitKey,
-          source.width,
-          source.height,
-        );
+      // A finite first-stage world strip, opaque everywhere except its southern
+      // arrival edge. All internal feathering composites onto opaque sea first.
+      const key = "p01-exit-opaque-world-v2";
+      const north = Math.min(source.width * 4, 4080 - source.height);
+      const height = north + source.height;
+      this.exitNorthExtension = (north * 360) / source.width;
+      if (!scene.textures.exists(key)) {
+        const canvas = scene.textures.createCanvas(key, source.width, height);
         if (canvas) {
           const c = canvas.getContext();
-          c.drawImage(source, 0, 0);
-          c.globalCompositeOperation = "destination-in";
-          const mask = c.createLinearGradient(0, 0, 0, source.height);
-          mask.addColorStop(0, "rgba(255,255,255,0)");
-          mask.addColorStop(90 / this.exitHeight, "white");
-          mask.addColorStop(1 - 90 / this.exitHeight, "white");
-          mask.addColorStop(1, "rgba(255,255,255,0)");
-          c.fillStyle = mask;
-          c.fillRect(0, 0, source.width, source.height);
-          c.globalCompositeOperation = "source-over";
-          canvas.refresh();
-        }
-      }
-      // Sample only the observed upper open-water region, excluding the top-right
-      // rock. This continuation prevents the old port from reappearing behind it.
-      if (!scene.textures.exists(seaKey)) {
-        const canvas = scene.textures.createCanvas(seaKey, 720, 720);
-        if (canvas) {
-          const c = canvas.getContext();
-          c.drawImage(source, 0, 200, source.width, 240, 0, 0, 720, 720);
-          c.globalCompositeOperation = "destination-in";
-          const mask = c.createLinearGradient(0, 0, 0, 720);
-          mask.addColorStop(0, "rgba(255,255,255,0)");
-          mask.addColorStop(40 / 360, "white");
-          mask.addColorStop(1 - 40 / 360, "white");
-          mask.addColorStop(1, "rgba(255,255,255,0)");
-          c.fillStyle = mask;
-          c.fillRect(0, 0, 720, 720);
-          c.globalCompositeOperation = "source-over";
-          canvas.refresh();
-        }
-      }
-      if (scene.textures.exists(exitKey) && scene.textures.exists(seaKey)) {
-        for (let i = 0; i < 4; i++)
-          this.exitSea.push(
-            scene.add
-              .image(0, 0, seaKey)
-              .setOrigin(0, 0)
-              .setDisplaySize(360, 360)
-              .setDepth(-10.86),
+          // Observed source y=200..440 contains only sea, no lighthouse or rock.
+          // Natural-size samples preserve wave scale (no 3x vertical stretching).
+          const sampleY = 200,
+            sampleHeight = 240,
+            seam = 40;
+          for (let y = 0; y < height; y += sampleHeight) {
+            const h = Math.min(sampleHeight, height - y);
+            c.drawImage(
+              source,
+              0,
+              sampleY,
+              source.width,
+              h,
+              0,
+              y,
+              source.width,
+              h,
+            );
+          }
+          // Blend the end of each sample into its beginning over opaque pixels.
+          // This keeps alpha=1, unlike overlapping translucent runtime sprites.
+          for (
+            let boundary = sampleHeight;
+            boundary < height;
+            boundary += sampleHeight
+          ) {
+            for (let row = 0; row < seam && boundary + row < height; row++) {
+              c.globalAlpha = 1 - row / seam;
+              c.drawImage(
+                source,
+                0,
+                sampleY + sampleHeight - seam + row,
+                source.width,
+                1,
+                0,
+                boundary + row,
+                source.width,
+                1,
+              );
+            }
+          }
+          c.globalAlpha = 1;
+          const edge = Math.round((90 * source.width) / 360);
+          // Exit picture's upper water blends into the opaque continuation.
+          for (let row = 0; row < edge; row++) {
+            c.globalAlpha = row / edge;
+            c.drawImage(
+              source,
+              0,
+              row,
+              source.width,
+              1,
+              0,
+              north + row,
+              source.width,
+              1,
+            );
+          }
+          c.globalAlpha = 1;
+          c.drawImage(
+            source,
+            0,
+            edge,
+            source.width,
+            source.height - edge,
+            0,
+            north + edge,
+            source.width,
+            source.height - edge,
           );
-        this.exitArt = scene.add
-          .image(0, 0, exitKey)
-          .setOrigin(0, 0)
-          .setDisplaySize(360, this.exitHeight)
-          .setDepth(-10.85);
+          // Only the south boundary is transparent to meet the existing harbor.
+          c.globalCompositeOperation = "destination-in";
+          const mask = c.createLinearGradient(0, height - edge, 0, height);
+          mask.addColorStop(0, "white");
+          mask.addColorStop(1, "rgba(255,255,255,0)");
+          c.fillStyle = mask;
+          c.fillRect(0, 0, source.width, height);
+          c.globalCompositeOperation = "source-over";
+          canvas.refresh();
+        }
       }
+      if (scene.textures.exists(key))
+        this.exitArt = scene.add
+          .image(0, 0, key)
+          .setOrigin(0, 0)
+          .setDisplaySize(360, (height * 360) / source.width)
+          .setDepth(-10.85);
     }
 
     // Subtle, original water streaks, separate from the bitmap's slower drift.
@@ -651,17 +691,11 @@ export class CoastalBackground {
         .setPosition(0, this.harborArtScroll.y[i])
         .setAlpha(this.harborArtAlpha);
     this.exitY = harborExitY(time, this.exitHeight);
+    const exitWorldY = this.exitY - this.exitNorthExtension;
     this.exitArt
-      ?.setPosition(0, this.exitY)
+      ?.setPosition(0, exitWorldY)
       .setAlpha(1)
-      .setVisible(this.exitY > -this.exitHeight && this.exitY < 640);
-    // Four reused water panels follow the exit northwards; no time-based screen fade.
-    const seaHead =
-      this.exitY > 960 ? 640 + ((this.exitY - 640) % 320) : this.exitY;
-    for (let i = 0; i < this.exitSea.length; i++) {
-      const y = seaHead - (i + 1) * 320 + 90;
-      this.exitSea[i].setPosition(0, y).setVisible(y > -360 && y < 640);
-    }
+      .setVisible(this.exitY > -this.exitHeight && exitWorldY < 640);
     for (let i = 0; i < this.coast.length; i++) {
       this.coast[i]
         .setPosition(0, this.state.coastY[i])
@@ -738,10 +772,15 @@ export class CoastalBackground {
       exitReady: !!this.exitArt,
       exitY: this.exitY,
       exitAlpha:
-        this.exitArt && this.exitY > -this.exitHeight && this.exitY < 640
+        this.exitArt &&
+        this.exitY > -this.exitHeight &&
+        this.exitY - this.exitNorthExtension < 640
           ? 1
           : 0,
-      exitSeaImages: this.exitSea.length,
+      exitSeaImages: 0,
+      exitWorldY: this.exitY - this.exitNorthExtension,
+      exitWorldHeight: this.exitNorthExtension + this.exitHeight,
+      exitOpaqueInterior: true,
       harborArtReady: this.harborArt.length > 0,
       harborArtImages: this.harborArt.length,
       harborArtAlpha: this.harborArtAlpha,
