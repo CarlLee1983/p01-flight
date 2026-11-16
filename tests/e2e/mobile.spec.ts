@@ -117,8 +117,8 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
     touchPoints: [moved, second],
   });
   await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [moved],
+    type: "touchEnd",
+    touchPoints: [second],
   });
   await expect.poll(async () => (await state(page)).bombs).toBe(1);
   console.log(
@@ -196,9 +196,13 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       touchPoints: [first, second],
     });
     await cdp.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [first],
+      type: "touchEnd",
+      touchPoints: [second],
     });
+    await expect
+      .poll(async () => (await state(page)).bombs)
+      .toBe(time === 85 ? 1 : 0);
+    expect((await state(page)).touchTarget).toBeTruthy();
   }
   await expect
     .poll(async () => (await state(page)).mode, { timeout: 30000 })
