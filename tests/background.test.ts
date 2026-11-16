@@ -6,6 +6,9 @@ import {
   coastalAreaState,
   COAST_AREAS,
   type CoastalAreaConfig,
+  COAST_LANDMARKS,
+  coastalLandmarkY,
+  type CoastalLandmarkConfig,
 } from "../src/game/background";
 
 describe("continuous coastal background", () => {
@@ -112,6 +115,81 @@ describe("continuous coastal background", () => {
       coastalAreaState(0, [COAST_AREAS[0], COAST_AREAS[2], COAST_AREAS[1]]),
     ).toThrow(RangeError);
   });
+  it("places landmarks once in world space at the same 32px/s as terrain", () => {
+    expect(new Set(COAST_LANDMARKS.map((l) => l.kind)).size).toBe(4);
+    for (const landmark of COAST_LANDMARKS) {
+      expect(coastalLandmarkY(landmark.distance, landmark)).toBe(0);
+      expect(coastalLandmarkY(landmark.distance + 32, landmark)).toBe(32);
+      // No modulo wrapping: a passed landmark never reappears lower in a tile cycle.
+      expect(coastalLandmarkY(landmark.distance + 640, landmark)).toBe(640);
+      expect(coastalLandmarkY(landmark.distance + 1280, landmark)).toBe(1280);
+    }
+  });
+  it("supports custom one-off landmark placement without redraw or new objects per frame", () => {
+    let created = 0,
+      drawn = 0;
+    const objects: any[] = [];
+    const object = () => {
+      const o: any = { x: 0, y: 0 };
+      const chain = () => o;
+      for (const method of [
+        "setDepth",
+        "setOrigin",
+        "setDisplaySize",
+        "setAlpha",
+        "setVisible",
+      ])
+        o[method] = chain;
+      for (const method of [
+        "fillStyle",
+        "fillRect",
+        "lineStyle",
+        "lineBetween",
+        "fillEllipse",
+        "strokeEllipse",
+      ])
+        o[method] = () => {
+          drawn++;
+          return o;
+        };
+      o.setPosition = (x: number, y: number) => {
+        o.x = x;
+        o.y = y;
+        return o;
+      };
+      created++;
+      objects.push(o);
+      return o;
+    };
+    const scene: any = {
+      add: { graphics: object, image: object },
+      textures: { exists: () => true },
+    };
+    const landmarks: CoastalLandmarkConfig[] = [
+      { id: "single-crane", kind: "crane", side: "right", distance: 900 },
+    ];
+    const background = new CoastalBackground(scene, COAST_AREAS, landmarks);
+    const initialCount = created,
+      initialDraws = drawn;
+    const stateReference = (background as any).state;
+    const positionsReference = stateReference.coastY;
+    const areaReference = (background as any).areaState;
+    for (let i = 0; i < 10000; i++) background.update(i / 60);
+    expect((background as any).state).toBe(stateReference);
+    expect((background as any).state.coastY).toBe(positionsReference);
+    expect((background as any).areaState).toBe(areaReference);
+    expect(created).toBe(initialCount);
+    expect(drawn).toBe(initialDraws);
+    background.update(40);
+    expect(background.diagnostics().landmarks).toEqual([
+      { id: "single-crane", kind: "crane", side: "right", x: 288, y: 380 },
+    ]);
+    const paused = background.diagnostics();
+    background.update(40);
+    expect(background.diagnostics()).toEqual(paused);
+    background.update(0);
+    expect(background.diagnostics().landmarks[0].y).toBe(-900);
+  });
   it("reuses objects and positions, including after wrapped time", () => {
     const objects: any[] = [];
     const object = () => {
@@ -123,6 +201,8 @@ describe("continuous coastal background", () => {
         "lineStyle",
         "lineBetween",
         "fillEllipse",
+        "strokeEllipse",
+        "setVisible",
         "setOrigin",
         "setDisplaySize",
         "setAlpha",
@@ -141,9 +221,9 @@ describe("continuous coastal background", () => {
       textures: { exists: () => true },
     };
     const background = new CoastalBackground(scene);
-    expect(objects).toHaveLength(17);
+    expect(objects).toHaveLength(21);
     for (let i = 0; i < 1000; i++) background.update(i / 60);
-    expect(objects).toHaveLength(17);
+    expect(objects).toHaveLength(21);
     background.update(42);
     const frozen = JSON.stringify(objects.map(({ x, y }) => ({ x, y })));
     background.update(42);
@@ -155,7 +235,7 @@ describe("continuous coastal background", () => {
     expect(background.diagnostics().sceneryWeights).toEqual([
       0, 0, 0, 0.5, 0.5,
     ]);
-    expect(background.diagnostics().sceneryObjects).toBe(7);
+    expect(background.diagnostics().sceneryObjects).toBe(11);
     const paused = background.diagnostics();
     background.update(72.5);
     expect(background.diagnostics()).toEqual(paused);

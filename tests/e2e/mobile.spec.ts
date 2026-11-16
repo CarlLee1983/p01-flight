@@ -179,6 +179,9 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     touchPoints: [],
   });
   expect((await state(page)).save.stages["stage-01"].clearCount).toBe(1);
+  await expect(
+    page.getByRole("heading", { name: "Stage 01 通關" }),
+  ).toBeVisible();
   await page.screenshot({ path: "docs/mobile-won.png" });
   await page.reload();
   await expect(page.getByText("已通關 · 通關 1 次")).toBeVisible();

@@ -37,6 +37,28 @@ export const COAST_AREAS: readonly CoastalAreaConfig[] = [
   { id: "command", label: "指揮艦區", at: 70, fade: 5, scenery: "command" },
 ];
 
+export type CoastalLandmarkKind = "tanks" | "warehouse" | "crane" | "emptyDock";
+export interface CoastalLandmarkConfig {
+  readonly id: string;
+  readonly kind: CoastalLandmarkKind;
+  readonly side: "left" | "right";
+  /** World distance at which the landmark's top crosses viewport y=0. */
+  readonly distance: number;
+}
+export const COAST_LANDMARKS: readonly CoastalLandmarkConfig[] = [
+  { id: "fuel-berth", kind: "tanks", side: "left", distance: 1056 },
+  { id: "cargo-hall", kind: "warehouse", side: "right", distance: 1280 },
+  { id: "loading-crane", kind: "crane", side: "left", distance: 1536 },
+  { id: "vacant-berth", kind: "emptyDock", side: "right", distance: 1760 },
+];
+const LANDMARK_HEIGHT = 144;
+export function coastalLandmarkY(
+  distance: number,
+  landmark: CoastalLandmarkConfig,
+): number {
+  return distance - landmark.distance;
+}
+
 const SCENERY_LAYERS: Record<
   CoastalScenery,
   readonly [number, number, number]
@@ -73,6 +95,7 @@ function validateAreas(areas: readonly CoastalAreaConfig[]) {
 export function coastalAreaState(
   time: number,
   areas: readonly CoastalAreaConfig[] = COAST_AREAS,
+  target = { index: 0, area: "", areaLabel: "", transition: 1 },
 ) {
   validateAreas(areas);
   const t = Number.isFinite(time) ? Math.max(0, time) : 0;
@@ -82,24 +105,32 @@ export function coastalAreaState(
   const progress =
     index > 0 && area.fade ? Math.min(1, (t - area.at) / area.fade) : 1;
   const blend = progress * progress * (3 - 2 * progress);
-  return { index, area: area.id, areaLabel: area.label, transition: blend };
+  target.index = index;
+  target.area = area.id;
+  target.areaLabel = area.label;
+  target.transition = blend;
+  return target;
 }
 
-export function coastalScrollState(time: number) {
+export function coastalScrollState(
+  time: number,
+  target = {
+    distance: 0,
+    offset: 0,
+    coastY: [0, 0, 0, 0],
+    currentOffset: 0,
+    cloudOffset: 0,
+  },
+) {
   const t = Number.isFinite(time) ? Math.max(0, time) : 0;
   const offset = (t * COAST_SCROLL.speed) % COAST_SCROLL.stride;
-  return {
-    distance: t * COAST_SCROLL.speed,
-    offset,
-    coastY: [
-      offset - 2 * COAST_SCROLL.stride,
-      offset - COAST_SCROLL.stride,
-      offset,
-      offset + COAST_SCROLL.stride,
-    ],
-    currentOffset: (t * COAST_SCROLL.currentSpeed) % COAST_SCROLL.height,
-    cloudOffset: (t * COAST_SCROLL.cloudSpeed) % 960,
-  };
+  target.distance = t * COAST_SCROLL.speed;
+  target.offset = offset;
+  for (let i = 0; i < 4; i++)
+    target.coastY[i] = offset + (i - 2) * COAST_SCROLL.stride;
+  target.currentOffset = (t * COAST_SCROLL.currentSpeed) % COAST_SCROLL.height;
+  target.cloudOffset = (t * COAST_SCROLL.cloudSpeed) % 960;
+  return target;
 }
 
 /** Four reused overlapping coast images above a permanent original ocean layer. */
@@ -113,6 +144,7 @@ export class CoastalBackground {
   private harbor: Phaser.GameObjects.Graphics[] = [];
   private command: Phaser.GameObjects.Graphics[] = [];
   private shade: Phaser.GameObjects.Graphics;
+  private landmarks: Phaser.GameObjects.Graphics[] = [];
   private weights: number[];
   private layers = [0.35, 0, 0];
   readonly coastReady: boolean;
@@ -120,8 +152,23 @@ export class CoastalBackground {
   constructor(
     scene: Phaser.Scene,
     private readonly areas: readonly CoastalAreaConfig[] = COAST_AREAS,
+    private readonly landmarkConfig: readonly CoastalLandmarkConfig[] = COAST_LANDMARKS,
   ) {
     validateAreas(areas);
+    const ids = new Set<string>();
+    for (const landmark of landmarkConfig) {
+      if (
+        !Number.isFinite(landmark.distance) ||
+        landmark.distance < 0 ||
+        ids.has(landmark.id) ||
+        !["tanks", "warehouse", "crane", "emptyDock"].includes(landmark.kind) ||
+        !["left", "right"].includes(landmark.side)
+      )
+        throw new RangeError(
+          "Landmarks require unique IDs, a valid kind/side and nonnegative distance",
+        );
+      ids.add(landmark.id);
+    }
     this.weights = new Array(areas.length).fill(0);
     const sea = scene.add.graphics().setDepth(-12);
     sea.fillStyle(0x103842);
@@ -196,6 +243,10 @@ export class CoastalBackground {
       this.harbor.push(this.drawHarbor(scene.add.graphics().setDepth(-10.7)));
       this.command.push(this.drawCommand(scene.add.graphics().setDepth(-10.6)));
     }
+    for (const landmark of landmarkConfig)
+      this.landmarks.push(
+        this.drawLandmark(scene.add.graphics().setDepth(-10.65), landmark.kind),
+      );
     this.shade = scene.add.graphics().setDepth(-10.5);
     this.shade.fillStyle(0x081321);
     this.shade.fillRect(0, 0, 360, 640);
@@ -218,37 +269,88 @@ export class CoastalBackground {
   }
 
   private drawHarbor(g: Phaser.GameObjects.Graphics) {
+    // Continuous quay only: distinct buildings are placed once in world space.
     for (let side = 0; side < 2; side++) {
       const x = side ? 286 : 0;
       g.fillStyle(0x18363c);
       g.fillRect(x, 0, 74, 640);
       g.lineStyle(2, 0x5a7777, 0.55);
       g.lineBetween(side ? 286 : 74, 0, side ? 286 : 74, 640);
-      for (const y of [40, 220, 400, 580]) {
-        g.fillStyle(0x29494c);
-        g.fillRect(x + 6, y, 61, 42);
-        g.fillStyle(0x40605e, 0.75);
-        g.fillRect(x + 10, y + 4, 24, 32);
-        g.fillStyle(0x4b5a51, 0.75);
-        g.fillRect(x + 37, y + 4, 24, 32);
-        g.lineStyle(1, 0x142f35, 0.8);
-        for (let n = 0; n < 4; n++) {
-          g.lineBetween(x + 12, y + 10 + n * 7, x + 31, y + 10 + n * 7);
-          g.lineBetween(x + 39, y + 10 + n * 7, x + 58, y + 10 + n * 7);
-        }
-        // Fixed overhead crane: confined to the dock, not the central lane.
-        g.lineStyle(4, 0x5d705e, 0.8);
-        const inner = side ? x + 12 : x + 62;
-        g.lineBetween(inner, y + 65, inner, y + 125);
-        g.lineBetween(inner, y + 65, side ? x + 65 : x + 5, y + 65);
-        g.lineStyle(1, 0x7c8e77, 0.7);
-        g.lineBetween(
-          side ? x + 50 : x + 20,
-          y + 65,
-          side ? x + 50 : x + 20,
-          y + 89,
-        );
+      g.lineStyle(1, 0x28474a, 0.6);
+      for (const y of [0, 160, 320, 480]) g.lineBetween(x + 3, y, x + 71, y);
+    }
+    return g;
+  }
+
+  private drawLandmark(
+    g: Phaser.GameObjects.Graphics,
+    kind: CoastalLandmarkKind,
+  ) {
+    // 68×144 logical px, intentionally subdued and without target markers.
+    g.fillStyle(0x203e43);
+    g.fillRect(0, 0, 68, LANDMARK_HEIGHT);
+    g.lineStyle(1, 0x456162, 0.65);
+    g.lineBetween(3, 0, 3, LANDMARK_HEIGHT);
+    g.lineBetween(65, 0, 65, LANDMARK_HEIGHT);
+    if (kind === "tanks") {
+      g.fillStyle(0x142e35);
+      g.fillRect(8, 8, 51, 122);
+      for (const y of [38, 96]) {
+        g.fillStyle(0x334c4e);
+        g.fillEllipse(34, y + 4, 45, 43);
+        g.fillStyle(0x516765);
+        g.fillEllipse(32, y, 42, 38);
+        g.lineStyle(2, 0x71827a, 0.5);
+        g.strokeEllipse(32, y, 32, 28);
+        g.lineStyle(2, 0x294146, 0.8);
+        g.lineBetween(32, y - 12, 32, y + 12);
       }
+      g.lineStyle(3, 0x485e5b);
+      g.lineBetween(55, 38, 55, 120);
+    } else if (kind === "warehouse") {
+      g.fillStyle(0x122c33);
+      g.fillRect(9, 16, 53, 112);
+      g.fillStyle(0x4b5a53);
+      g.fillRect(6, 12, 50, 108);
+      g.fillStyle(0x53655b);
+      g.fillRect(6, 12, 24, 108);
+      g.lineStyle(2, 0x293f40, 0.7);
+      for (const y of [25, 45, 65, 85, 105]) g.lineBetween(9, y, 53, y);
+      g.lineStyle(2, 0x718074, 0.6);
+      g.lineBetween(30, 14, 30, 117);
+      g.fillStyle(0x233e42);
+      g.fillRect(18, 115, 25, 9);
+      g.fillStyle(0x6a7865, 0.55);
+      g.fillRect(18, 127, 25, 3);
+    } else if (kind === "crane") {
+      g.fillStyle(0x31494b);
+      g.fillRect(20, 94, 28, 31);
+      g.fillStyle(0x56645a);
+      g.fillRect(23, 98, 22, 19);
+      g.lineStyle(5, 0x6b7460, 0.8);
+      g.lineBetween(34, 105, 34, 25);
+      g.lineBetween(12, 25, 59, 25);
+      g.lineStyle(1, 0x97a08b, 0.55);
+      g.lineBetween(34, 39, 14, 25);
+      g.lineBetween(34, 39, 57, 25);
+      g.lineBetween(55, 27, 55, 70);
+      g.lineBetween(55, 70, 50, 74);
+      g.lineStyle(1, 0x273f40);
+      g.lineBetween(26, 95, 26, 32);
+    } else {
+      // Deliberately empty loading berth gives the port visual breathing room.
+      g.fillStyle(0x263f43);
+      g.fillRect(7, 10, 54, 119);
+      g.lineStyle(2, 0x6c7661, 0.45);
+      for (const y of [19, 123]) {
+        g.lineBetween(14, y, 27, y);
+        g.lineBetween(40, y, 53, y);
+      }
+      g.lineStyle(1, 0x5c736b, 0.4);
+      g.lineBetween(14, 19, 14, 123);
+      g.lineBetween(53, 19, 53, 123);
+      g.fillStyle(0x122f36);
+      for (const y of [37, 93]) g.fillEllipse(61, y, 7, 11);
     }
     return g;
   }
@@ -281,8 +383,8 @@ export class CoastalBackground {
   }
 
   update(time: number) {
-    this.state = coastalScrollState(time);
-    this.areaState = coastalAreaState(time, this.areas);
+    coastalScrollState(time, this.state);
+    coastalAreaState(time, this.areas, this.areaState);
     this.weights.fill(0);
     this.weights[this.areaState.index] = this.areaState.transition;
     if (this.areaState.index > 0)
@@ -294,11 +396,11 @@ export class CoastalBackground {
         this.layers[layer] += profile[layer] * this.weights[i];
     }
     const [navigationAlpha, harborAlpha, commandAlpha] = this.layers;
-    this.coast.forEach((image, i) =>
-      image
+    for (let i = 0; i < this.coast.length; i++) {
+      this.coast[i]
         .setPosition(0, this.state.coastY[i])
-        .setAlpha(0.84 - harborAlpha * 0.26 - commandAlpha * 0.5),
-    );
+        .setAlpha(0.84 - harborAlpha * 0.26 - commandAlpha * 0.5);
+    }
     const groundOffset = this.state.distance % 640;
     for (let i = 0; i < 2; i++) {
       const y = groundOffset - i * 640;
@@ -306,16 +408,22 @@ export class CoastalBackground {
       this.harbor[i].setPosition(0, y).setAlpha(harborAlpha);
       this.command[i].setPosition(0, y).setAlpha(commandAlpha);
     }
+    for (let i = 0; i < this.landmarks.length; i++) {
+      const config = this.landmarkConfig[i];
+      const y = coastalLandmarkY(this.state.distance, config);
+      this.landmarks[i]
+        .setPosition(config.side === "left" ? 4 : 288, y)
+        .setAlpha(harborAlpha)
+        .setVisible(y > -LANDMARK_HEIGHT && y < 640 && harborAlpha > 0);
+    }
     this.shade.setAlpha(commandAlpha * 0.12);
-    this.currents.forEach((flow, i) =>
-      flow.setPosition(0, this.state.currentOffset - i * 640),
-    );
-    this.clouds.forEach((cloud, i) =>
-      cloud.setPosition(
+    for (let i = 0; i < this.currents.length; i++)
+      this.currents[i].setPosition(0, this.state.currentOffset - i * 640);
+    for (let i = 0; i < this.clouds.length; i++)
+      this.clouds[i].setPosition(
         i % 2 ? 345 : 10,
         ((this.state.cloudOffset + i * 320) % 960) - 160,
-      ),
-    );
+      );
   }
 
   diagnostics() {
@@ -326,7 +434,18 @@ export class CoastalBackground {
       sceneryWeights: [...this.weights],
       layerAlphas: [...this.layers],
       sceneryObjects:
-        this.navigation.length + this.harbor.length + this.command.length + 1,
+        this.navigation.length +
+        this.harbor.length +
+        this.command.length +
+        this.landmarks.length +
+        1,
+      landmarks: this.landmarkConfig.map((config) => ({
+        id: config.id,
+        kind: config.kind,
+        side: config.side,
+        x: config.side === "left" ? 4 : 288,
+        y: coastalLandmarkY(this.state.distance, config),
+      })),
       speed: COAST_SCROLL.speed,
       currentSpeed: COAST_SCROLL.currentSpeed,
       cloudSpeed: COAST_SCROLL.cloudSpeed,
