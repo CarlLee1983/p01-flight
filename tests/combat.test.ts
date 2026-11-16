@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
-import { stage01, type StageConfig } from "../src/data/stage";
+import { stage01, GROUND_VISIBLE_Y, type StageConfig } from "../src/data/stage";
 const empty: StageConfig = {
   ...stage01,
   waves: [],
@@ -769,7 +769,7 @@ describe("encounter sections and breakable cannons", () => {
       m.time = at;
       expect(m.section.id).toBe(id);
     }
-    expect(stage01.waves.some((w) => w.at >= 56 && w.at < 70)).toBe(false);
+    expect(stage01.waves.some((w) => w.at >= 66 && w.at < 70)).toBe(false);
     expect(stage01.pickups!.some((p) => p.kind === "heal" && p.at === 60)).toBe(
       true,
     );
@@ -918,6 +918,7 @@ describe("ground targets", () => {
             points: 100,
             behavior: "groundBattery",
             fireEvery: 1,
+            firstFireDelay: 0.6,
           },
         ],
       });
@@ -997,14 +998,14 @@ describe("Stage01 pacing pass", () => {
     ).toEqual([34, 35.2, 50, 51.2]);
   });
   it.each([30, 60, 120])(
-    "schedule clears residual enemies before the 60–70 second rest at %i FPS",
+    "schedule clears residual enemies before the 66–70 second rest at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
       // Isolate exit timing even when enemies survive. Not a gameplay victory fixture.
       m.invincible = 120;
-      run(m, 60, false, fps);
-      for (let i = 0; i < 9.8 * fps; i++) {
+      run(m, 66, false, fps);
+      for (let i = 0; i < 3.8 * fps; i++) {
         expect(m.enemies.some((e) => e.active)).toBe(false);
         expect(m.enemyBullets.some((b) => b.active)).toBe(false);
         expect(m.boss).toBeNull();
@@ -1195,7 +1196,7 @@ describe("escort formation density", () => {
     );
     expect(stage01.duration).toBe(115);
     expect(stage01.boss!.at).toBe(70);
-    expect(stage01.waves.every((w) => w.at < 56)).toBe(true);
+    expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
   });
   it.each([30, 60, 120])(
     "escort wings share formation phase, warn then fire only one fan at %i FPS",
@@ -1279,4 +1280,93 @@ describe("escort formation density", () => {
       expect(volley).toBe(true);
     },
   );
+});
+
+describe("ground readability under real continuous fire", () => {
+  it.each([30, 60, 120])(
+    "center-fire sees battery warning, firing and then destruction at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let visible = 0,
+        warning = false,
+        shot = false,
+        deadAt = 0,
+        watchId = 0;
+      for (let i = 0; i < 42 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        const e = m.enemies.find(
+          (e) =>
+            e.behavior === "groundBattery" && (!watchId || e.id === watchId),
+        );
+        if (e) {
+          if (!watchId) watchId = e.id;
+          if (e.visibleSince !== undefined && !visible)
+            visible = e.visibleSince;
+          warning ||= e.active && (e.telegraph ?? 0) > 0;
+          shot ||= (e.shotsFired ?? 0) > 0;
+          if (!e.active && !deadAt) deadAt = m.time;
+        }
+      }
+      expect(visible).toBeGreaterThan(32);
+      expect(warning).toBe(true);
+      expect(shot).toBe(true);
+      expect(m.groundShotCount).toBeGreaterThanOrEqual(2);
+      expect(deadAt - visible).toBeGreaterThan(1.5);
+      console.log(
+        "battery visible/shot/dead",
+        fps,
+        visible,
+        m.groundShotCount,
+        deadAt,
+      );
+    },
+  );
+  it("hidden ground cannot be missile-locked, bombed, shot or shoot", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 180,
+          spawnY: GROUND_VISIBLE_Y - 18,
+          speed: 32,
+          hp: 18,
+          points: 1,
+          behavior: "groundBattery",
+          fireEvery: 0.1,
+          firstFireDelay: 0.1,
+        },
+      ],
+    });
+    m.start();
+    m.switchWeapon();
+    m.switchWeapon();
+    m.update(0, 0, 0, true);
+    expect(m.bullets[0].targetId).toBeUndefined();
+    m.bullets.push({
+      id: 999,
+      x: 180,
+      y: GROUND_VISIBLE_Y - 18,
+      active: true,
+      damage: 100,
+    });
+    m.update(0);
+    expect(m.enemies[0].hp).toBe(18);
+    m.useBomb();
+    expect(m.enemies[0].hp).toBe(18);
+    expect(m.enemies[0].visibleSince).toBeUndefined();
+    run(m, 0.3);
+    expect(m.groundShotCount).toBe(0);
+    m.start();
+    expect(m.groundShotCount).toBe(0);
+  });
+  it("14-second continuous-fire screenshot route still has a living escort", () => {
+    const m = new FlightModel(stage01);
+    m.start();
+    run(m, 14, true);
+    expect(m.enemies.some((e) => e.active && e.behavior === "escort")).toBe(
+      true,
+    );
+  });
 });

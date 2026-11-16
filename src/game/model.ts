@@ -1,4 +1,4 @@
-import { GROUND_SCROLL_SPEED } from "../data/stage";
+import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
 export type Mode = "menu" | "playing" | "paused" | "won" | "lost";
 export interface Body {
@@ -26,6 +26,8 @@ export interface Enemy extends Body {
   originX?: number;
   fireCooldown?: number;
   fireEvery?: number;
+  shotsFired?: number;
+  visibleSince?: number;
   drop?: PickupKind;
   telegraph?: number;
   aimAngle?: number;
@@ -81,6 +83,7 @@ export class FlightModel {
   boss: Boss | null = null;
   bossDefeated = false;
   partsDestroyed = 0;
+  groundShotCount = 0;
   weaponTime = 0; // Compatibility field: 1 while permanently upgraded.
   weaponLevel = 1;
   weaponMode: "spread" | "beam" | "missile" = "spread";
@@ -116,6 +119,7 @@ export class FlightModel {
     this.boss = null;
     this.bossDefeated = false;
     this.partsDestroyed = 0;
+    this.groundShotCount = 0;
     this.weaponTime = 0;
     this.weaponLevel = 1;
     this.weaponMode = "spread";
@@ -179,7 +183,7 @@ export class FlightModel {
     this.invincible = Math.max(this.invincible, 2);
     for (const b of this.enemyBullets) b.active = false;
     for (const e of this.enemies)
-      if (e.active) {
+      if (this.interactable(e)) {
         e.hp -= 12;
         if (e.hp <= 0) this.destroyEnemy(e);
       }
@@ -193,6 +197,13 @@ export class FlightModel {
       this.finishBoss();
     }
     return true;
+  }
+  private interactable(e: Enemy): boolean {
+    return (
+      e.active &&
+      (!(e.behavior === "groundBattery" || e.behavior === "groundDepot") ||
+        (e.y >= GROUND_VISIBLE_Y && e.y <= this.stage.height + 26))
+    );
   }
   private destroyEnemy(e: Enemy) {
     if (!e.active) return;
@@ -405,9 +416,13 @@ export class FlightModel {
           age: 0,
           originX: w.x,
           fireCooldown:
-            w.behavior === "gatekeeper" ? 1.4 : (w.fireEvery ?? 999),
+            w.behavior === "gatekeeper"
+              ? 1.4
+              : (w.firstFireDelay ?? w.fireEvery ?? 999),
           telegraph: 0,
           aimAngle: undefined,
+          shotsFired: 0,
+          visibleSince: undefined,
           formationPhase: w.formationPhase ?? 0,
           volleyFired: false,
           holdFor: w.holdFor,
@@ -456,7 +471,7 @@ export class FlightModel {
         if (b.kind === "missile") {
           b.life = (b.life ?? 3.5) - dt;
           const targets = this.enemies.filter(
-            (e) => e.active && e.y < b.y + 60,
+            (e) => this.interactable(e) && e.y < b.y + 60,
           );
           const candidates = [
             ...(this.boss?.active
@@ -505,7 +520,11 @@ export class FlightModel {
         e.age = (e.age ?? 0) + dt;
         const ground =
           e.behavior === "groundBattery" || e.behavior === "groundDepot";
-        if (ground) e.y += (this.stage.groundSpeed ?? GROUND_SCROLL_SPEED) * dt;
+        if (ground) {
+          e.y += (this.stage.groundSpeed ?? GROUND_SCROLL_SPEED) * dt;
+          if (this.interactable(e) && e.visibleSince === undefined)
+            e.visibleSince = this.time;
+        }
         if (e.behavior === "cross" || e.behavior === "carrier") {
           e.x += (e.direction ?? 1) * e.speed * dt;
         }
@@ -616,6 +635,7 @@ export class FlightModel {
           e.y += e.speed * dt;
         if (
           e.fireEvery &&
+          this.interactable(e) &&
           e.behavior !== "gatekeeper" &&
           e.behavior !== "escort" &&
           e.behavior !== "groundDepot" &&
@@ -646,6 +666,8 @@ export class FlightModel {
                   Math.cos(a) * 135,
                 );
             } else this.shootEnemy(e.x, e.y + 20, 0, 155);
+            e.shotsFired = (e.shotsFired ?? 0) + 1;
+            if (e.behavior === "groundBattery") this.groundShotCount++;
             e.fireCooldown = e.fireEvery;
             e.aimAngle = undefined;
           }
@@ -760,7 +782,7 @@ export class FlightModel {
             (!(
               e.behavior === "groundBattery" || e.behavior === "groundDepot"
             ) ||
-              e.y >= 72) &&
+              this.interactable(e)) &&
             Math.abs(b.x - e.x) < 22 + (b.width ?? 0) / 2 &&
             Math.abs(b.y - e.y) < 25
           ) {

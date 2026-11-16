@@ -1,4 +1,5 @@
 export const GROUND_SCROLL_SPEED = 32;
+export const GROUND_VISIBLE_Y = 108;
 export type Behavior =
   | "straight"
   | "weave"
@@ -27,6 +28,7 @@ export interface Wave {
   points: number;
   behavior?: Behavior;
   fireEvery?: number;
+  firstFireDelay?: number;
   drop?: PickupKind;
   spawnY?: number;
   direction?: number;
@@ -97,9 +99,15 @@ export const stage01: StageConfig = {
     },
     {
       id: "resupply",
-      title: "補給接近",
+      title: "最後攔截",
       at: 56,
-      hint: "整隊補血，保留炸彈迎擊指揮艦",
+      hint: "躲開最後護航扇射，再收取修復補給",
+    },
+    {
+      id: "regroup",
+      title: "整隊接近",
+      at: 66,
+      hint: "補血整隊，保留炸彈迎擊指揮艦",
     },
     {
       id: "commander",
@@ -139,7 +147,7 @@ export const stage01: StageConfig = {
       })),
     ),
     // Two staggered escort flights: one telegraphed volley per aircraft.
-    ...[12, 52].flatMap((at) =>
+    ...[12, 58].flatMap((at) =>
       [60, 180, 300].map((x, i) => ({
         at: at + i * 0.8,
         x,
@@ -204,10 +212,11 @@ export const stage01: StageConfig = {
         at,
         x,
         speed: 110,
-        hp: at === 32 ? 12 : 5,
+        hp: at === 32 ? 18 : 5,
         points: 350,
         behavior: at === 32 ? ("groundBattery" as const) : ("turret" as const),
         fireEvery: at === 32 ? 4.8 : 2.2,
+        firstFireDelay: 0.9,
       })),
     ),
     ...[36].map((at) => ({

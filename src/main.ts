@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { stage01 } from "./data/stage";
+import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
@@ -160,6 +160,7 @@ class FlightScene extends Phaser.Scene {
       "interceptor",
       "carrier",
       "harbor-battlefield",
+      "harbor-exit",
       "ground-battery",
       "ground-depot",
     ])
@@ -627,16 +628,46 @@ class FlightScene extends Phaser.Scene {
                 : "ground-depot",
               e.x,
               e.y,
-              60,
-              e.behavior === "groundBattery" ? 60 : 41,
+              70,
+              e.behavior === "groundBattery" ? 70 : 48,
             ).setDepth(0);
+            // Subtle base rim distinguishes interactive targets from painted scenery.
+            if (e.y >= GROUND_VISIBLE_Y) {
+              overlay.lineStyle(
+                1,
+                e.behavior === "groundBattery" ? 0xf4ba72 : 0x88e1ca,
+                0.7,
+              );
+              overlay.strokeEllipse(e.x, e.y + 10, 64, 44);
+              if (e.hp < (e.maxHp ?? e.hp)) {
+                overlay.fillStyle(0x10232a, 0.9);
+                overlay.fillRect(e.x - 24, e.y - 39, 48, 3);
+                overlay.fillStyle(0xffc775);
+                overlay.fillRect(
+                  e.x - 24,
+                  e.y - 39,
+                  48 * Math.max(0, e.hp / (e.maxHp ?? e.hp)),
+                  3,
+                );
+              }
+            }
             if ((e.telegraph ?? 0) > 0) {
+              const angle = e.aimAngle ?? 0;
               overlay.lineStyle(2, 0xffbc73, 0.9);
               overlay.strokeCircle(
                 e.x,
-                e.y + 16,
-                10 + Math.sin(model.time * 20) * 3,
+                e.y + 20,
+                11 + Math.sin(model.time * 20) * 3,
               );
+              // Locked aim, not a tracking laser: the player can step aside.
+              overlay.lineStyle(1.5, 0xffbc73, 0.65);
+              for (let distance = 32; distance < 360; distance += 28)
+                overlay.lineBetween(
+                  e.x + Math.sin(angle) * distance,
+                  e.y + 20 + Math.cos(angle) * distance,
+                  e.x + Math.sin(angle) * (distance + 12),
+                  e.y + 20 + Math.cos(angle) * (distance + 12),
+                );
             }
             continue;
           }
@@ -1023,8 +1054,11 @@ Object.defineProperty(window, "__P01__", {
         attackPattern: e.attackPattern,
         attackLanes: e.attackLanes,
         volleyFired: e.volleyFired,
+        visibleSince: e.visibleSince,
+        shotsFired: e.shotsFired,
       })),
     shots: model.shots,
+    groundShotCount: model.groundShotCount,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
     pickups: model.pickups.filter((p) => p.active).length,
     activePickups: model.pickups

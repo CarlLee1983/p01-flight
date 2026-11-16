@@ -35,6 +35,7 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     "interceptor",
     "carrier",
     "harbor-battlefield",
+    "harbor-exit",
     "ground-battery",
     "ground-depot",
   ]) {
@@ -519,28 +520,72 @@ test("mid-stage patrol corvette warns alternating lanes before firing", async ({
   await page.keyboard.up("Space");
 });
 
-test("original ground battery and supply facility remain readable in the harbor", async ({
+test("ground batteries visibly warn and fire during continuous normal shooting", async ({
   page,
 }) => {
-  test.setTimeout(90000);
+  test.setTimeout(150000);
   await page.goto("/");
   await page.getByRole("button", { name: "開始飛行" }).click();
   await page.keyboard.down("Space");
-  await waitGameTime(page, 30);
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some(
+          (e: any) =>
+            e.behavior === "groundBattery" && e.y >= 108 && e.telegraph > 0,
+        ),
+      { timeout: 75000, intervals: [30] },
+    )
+    .toBe(true);
+  const warning = await state(page);
+  expect(warning.mode).toBe("playing");
+  expect(warning.background.harborArtReady).toBe(true);
+  const target = warning.activeEnemies.find(
+    (e: any) => e.behavior === "groundBattery" && e.telegraph > 0,
+  );
+  await page.screenshot({ path: "docs/ground-continuous-fire-warning.png" });
+  // Dodge the fixed aim and turn the main gun onto the visible shore battery.
+  const direction = target.x < warning.player.x ? "ArrowLeft" : "ArrowRight";
+  await page.keyboard.down(direction);
+  await expect
+    .poll(async () => Math.abs((await state(page)).player.x - target.x), {
+      intervals: [20],
+    })
+    .toBeLessThan(18);
+  await page.keyboard.up(direction);
+  await expect
+    .poll(async () => (await state(page)).groundShotCount, { timeout: 5000 })
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: "docs/ground-counterattack.png" });
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some((e: any) => e.id === target.id),
+      { timeout: 15000 },
+    )
+    .toBe(false);
+  // Return to the supply lane using input, never mutate the game model.
+  const current = await state(page);
+  const back = current.player.x < 180 ? "ArrowRight" : "ArrowLeft";
+  await page.keyboard.down(back);
+  await expect
+    .poll(async () => Math.abs((await state(page)).player.x - 180), {
+      intervals: [20],
+    })
+    .toBeLessThan(12);
+  await page.keyboard.up(back);
+  await waitGameTime(page, 56);
+  for (const time of [56, 64, 66, 69]) {
+    await waitGameTime(page, time);
+    const snapshot = await state(page);
+    expect(snapshot.mode).toBe("playing");
+    expect(snapshot.background.harborArtAlpha).toBeGreaterThan(0.8);
+    expect(snapshot.background.exitReady).toBe(true);
+    expect(snapshot.background.exitY).toBeCloseTo(
+      (snapshot.time - 53) * 32 - 720,
+      0,
+    );
+    await page.screenshot({ path: `docs/approach-continuous-${time}.png` });
+  }
   await page.keyboard.up("Space");
-  await waitGameTime(page, 39.5);
-  const snapshot = await state(page);
-  expect(snapshot.mode).toBe("playing");
-  expect(snapshot.background.harborArtReady).toBe(true);
-  expect(
-    snapshot.activeEnemies.some(
-      (e: any) => e.behavior === "groundBattery" && e.y > 100,
-    ),
-  ).toBe(true);
-  expect(
-    snapshot.activeEnemies.some(
-      (e: any) => e.behavior === "groundDepot" && e.y > 70,
-    ),
-  ).toBe(true);
-  await page.screenshot({ path: "docs/ground-art-harbor.png" });
 });

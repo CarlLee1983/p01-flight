@@ -173,6 +173,14 @@ export function harborArtState(
   return target;
 }
 
+/** Exit is a single world block: its southern warehouses enter at 53s. */
+export function harborExitY(time: number, height = 720) {
+  return (
+    (Math.max(0, Number.isFinite(time) ? time : 0) - 53) * COAST_SCROLL.speed -
+    height
+  );
+}
+
 /** Four reused overlapping coast images above a permanent original ocean layer. */
 export class CoastalBackground {
   private coast: Phaser.GameObjects.Image[] = [];
@@ -180,6 +188,10 @@ export class CoastalBackground {
   private harborArtHeight = 720;
   private harborArtScroll = harborArtState(0, 720);
   private harborArtAlpha = 0;
+  private exitArt?: Phaser.GameObjects.Image;
+  private exitSea: Phaser.GameObjects.Image[] = [];
+  private exitHeight = 720;
+  private exitY = -2416;
   private currents: Phaser.GameObjects.Graphics[] = [];
   private clouds: Phaser.GameObjects.Graphics[] = [];
   private state = coastalScrollState(0);
@@ -302,6 +314,70 @@ export class CoastalBackground {
               .setDisplaySize(360, this.harborArtHeight)
               .setDepth(-10.9),
           );
+      }
+    }
+
+    if (scene.textures.exists("harbor-exit")) {
+      const source = scene.textures
+        .get("harbor-exit")
+        .getSourceImage() as HTMLImageElement;
+      this.exitHeight = (source.height * 360) / source.width;
+      const exitKey = "p01-exit-world-block";
+      const seaKey = "p01-exit-open-water";
+      if (!scene.textures.exists(exitKey)) {
+        const canvas = scene.textures.createCanvas(
+          exitKey,
+          source.width,
+          source.height,
+        );
+        if (canvas) {
+          const c = canvas.getContext();
+          c.drawImage(source, 0, 0);
+          c.globalCompositeOperation = "destination-in";
+          const mask = c.createLinearGradient(0, 0, 0, source.height);
+          mask.addColorStop(0, "rgba(255,255,255,0)");
+          mask.addColorStop(90 / this.exitHeight, "white");
+          mask.addColorStop(1 - 90 / this.exitHeight, "white");
+          mask.addColorStop(1, "rgba(255,255,255,0)");
+          c.fillStyle = mask;
+          c.fillRect(0, 0, source.width, source.height);
+          c.globalCompositeOperation = "source-over";
+          canvas.refresh();
+        }
+      }
+      // Sample only the observed upper open-water region, excluding the top-right
+      // rock. This continuation prevents the old port from reappearing behind it.
+      if (!scene.textures.exists(seaKey)) {
+        const canvas = scene.textures.createCanvas(seaKey, 720, 720);
+        if (canvas) {
+          const c = canvas.getContext();
+          c.drawImage(source, 0, 200, source.width, 240, 0, 0, 720, 720);
+          c.globalCompositeOperation = "destination-in";
+          const mask = c.createLinearGradient(0, 0, 0, 720);
+          mask.addColorStop(0, "rgba(255,255,255,0)");
+          mask.addColorStop(40 / 360, "white");
+          mask.addColorStop(1 - 40 / 360, "white");
+          mask.addColorStop(1, "rgba(255,255,255,0)");
+          c.fillStyle = mask;
+          c.fillRect(0, 0, 720, 720);
+          c.globalCompositeOperation = "source-over";
+          canvas.refresh();
+        }
+      }
+      if (scene.textures.exists(exitKey) && scene.textures.exists(seaKey)) {
+        for (let i = 0; i < 4; i++)
+          this.exitSea.push(
+            scene.add
+              .image(0, 0, seaKey)
+              .setOrigin(0, 0)
+              .setDisplaySize(360, 360)
+              .setDepth(-10.86),
+          );
+        this.exitArt = scene.add
+          .image(0, 0, exitKey)
+          .setOrigin(0, 0)
+          .setDisplaySize(360, this.exitHeight)
+          .setDepth(-10.85);
       }
     }
 
@@ -553,14 +629,10 @@ export class CoastalBackground {
     for (let i = 0; i < this.areas.length; i++) {
       const scenery = this.areas[i].scenery;
       const profile = SCENERY_LAYERS[scenery];
-      const artWeight =
-        scenery === "offshore" || scenery === "approach"
-          ? 0
-          : scenery === "exit"
-            ? 0.5
-            : scenery === "command"
-              ? 0.55
-              : 1;
+      // Combat pacing does not remove the physical world. Supply / exit / boss
+      // sections all retain the same port strip and uninterrupted world distance.
+      // Only the initial offshore-to-port arrival fades the illustration in.
+      const artWeight = scenery === "offshore" ? 0 : 1;
       this.harborArtAlpha += artWeight * this.weights[i];
       this.coastOpacity += COAST_OPACITY[scenery] * this.weights[i];
       atmosphere += SCENERY_ATMOSPHERE[scenery] * this.weights[i];
@@ -578,6 +650,18 @@ export class CoastalBackground {
       this.harborArt[i]
         .setPosition(0, this.harborArtScroll.y[i])
         .setAlpha(this.harborArtAlpha);
+    this.exitY = harborExitY(time, this.exitHeight);
+    this.exitArt
+      ?.setPosition(0, this.exitY)
+      .setAlpha(1)
+      .setVisible(this.exitY > -this.exitHeight && this.exitY < 640);
+    // Four reused water panels follow the exit northwards; no time-based screen fade.
+    const seaHead =
+      this.exitY > 960 ? 640 + ((this.exitY - 640) % 320) : this.exitY;
+    for (let i = 0; i < this.exitSea.length; i++) {
+      const y = seaHead - (i + 1) * 320 + 90;
+      this.exitSea[i].setPosition(0, y).setVisible(y > -360 && y < 640);
+    }
     for (let i = 0; i < this.coast.length; i++) {
       this.coast[i]
         .setPosition(0, this.state.coastY[i])
@@ -651,9 +735,18 @@ export class CoastalBackground {
       cloudSpeed: COAST_SCROLL.cloudSpeed,
       coastReady: this.coastReady,
       coastImages: this.coast.length,
+      exitReady: !!this.exitArt,
+      exitY: this.exitY,
+      exitAlpha:
+        this.exitArt && this.exitY > -this.exitHeight && this.exitY < 640
+          ? 1
+          : 0,
+      exitSeaImages: this.exitSea.length,
       harborArtReady: this.harborArt.length > 0,
       harborArtImages: this.harborArt.length,
       harborArtAlpha: this.harborArtAlpha,
+      harborArtWorldDistance: this.state.distance,
+      harborArtStride: this.harborArtScroll.stride,
       harborArtY: [...this.harborArtScroll.y],
     };
   }

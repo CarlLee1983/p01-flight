@@ -89,3 +89,14 @@ Hashes:
 f6ac745469b61c326ca772746b2c249894730b1bc43b61eee2ca0c445d5c3bec p01-flight/public/assets/original/harbor-battlefield.png
 068256e4a7735f3b154025668f413599f1211a3253bc91eafc6b60417fafe844 p01-flight/public/assets/original/ground-battery.png
 bd503f344459f713105f74775354385eccbe64e768f2ce9900ad91d9a898ceb1 p01-flight/public/assets/original/ground-depot.png
+
+## Harbor exit / pre-boss approach (2026-11-16)
+
+`public/assets/original/harbor-exit.png`: 720 × 1440 RGB, generated with the built-in OpenAI image tool using this project's original harbor-battlefield.png as a style and ocean-palette reference only. No external art supplied. Original generated design, mechanically resized for runtime; existing assets unchanged.
+
+Prompt: actual top-down scrolling game terrain, tall 1:2 portrait, same finely painted prerendered coastal industrial style and muted teal sea; bottom quarter retains warehouse shores, middle transitions to asymmetric rocky breakwaters and beacon tips at left/right, top half opens to wide command-ship battle water. Keep central 65% open dark water. No ships, aircraft, boss, bullets, UI, text, borders or giant central platform. Upper-left daylight and matching gray-ochre rocky shore/materials.
+
+Visually inspected: distinct new composition that progresses from industrial shore at bottom through breakwaters to open sea at top. Color and texture closely match the preceding harbor. Suitable for the pre-boss transition rather than endlessly repeating dense port. Not proven pixel-seamless with previous image; runtime overlap/crossfade and actual motion QA are required. The top sea area is intentionally uncluttered. The image does not contain the boss; gameplay renders it independently.
+
+Hash:
+006c92972e52e13af1c966cb0e1e27763e7ee9de384952b803f4056af8ad69e2 p01-flight/public/assets/original/harbor-exit.png
