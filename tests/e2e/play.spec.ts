@@ -446,3 +446,67 @@ test("intercepting a supply craft yields a visible weapon choice capsule", async
   expect((await state(page)).weaponLevel).toBeGreaterThan(1);
   await page.screenshot({ path: "docs/weapon-selected.png" });
 });
+
+test("mid-stage patrol corvette warns alternating lanes before firing", async ({
+  page,
+}) => {
+  test.setTimeout(100000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await page.keyboard.down("Space");
+  await waitGameTime(page, 39.5);
+  await page.keyboard.up("Space");
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some(
+          (e: any) => e.behavior === "gatekeeper",
+        ),
+      { timeout: 10000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.find(
+          (e: any) => e.behavior === "gatekeeper",
+        )?.telegraph ?? 0,
+      { timeout: 10000, intervals: [40] },
+    )
+    .toBeGreaterThan(0);
+  const first = (await state(page)).activeEnemies.find(
+    (e: any) => e.behavior === "gatekeeper",
+  );
+  expect(first.attackLanes.length).toBeGreaterThan(0);
+  await page.screenshot({ path: "docs/patrol-lane-warning.png" });
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.find(
+          (e: any) => e.behavior === "gatekeeper",
+        )?.attackPattern,
+      { timeout: 10000, intervals: [40] },
+    )
+    .not.toBe(first.attackPattern);
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.find(
+          (e: any) => e.behavior === "gatekeeper",
+        )?.telegraph ?? 0,
+      { timeout: 10000, intervals: [40] },
+    )
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: "docs/patrol-opposite-warning.png" });
+  expect((await state(page)).mode).toBe("playing");
+  // A real weapon choice and movement after reading the opposing lane.
+  await page.keyboard.press("KeyC");
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(200);
+  await page.keyboard.up("ArrowRight");
+  await page.keyboard.down("Space");
+  await page.waitForTimeout(1500);
+  expect((await state(page)).weaponMode).toBe("beam");
+  await page.screenshot({ path: "docs/patrol-counterattack.png" });
+  await page.keyboard.up("Space");
+});

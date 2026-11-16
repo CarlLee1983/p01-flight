@@ -42,10 +42,12 @@ describe("continuous coastal background", () => {
     expect(coastalScrollState(NaN)).toEqual(coastalScrollState(0));
   });
   it("progresses through configured areas without resetting scroll distance", () => {
-    expect(COAST_AREAS.map((a) => a.at)).toEqual([0, 15, 32, 56, 70]);
+    expect(COAST_AREAS.map((a) => a.at)).toEqual([0, 15, 32, 40, 50, 56, 70]);
     expect(coastalAreaState(14).area).toBe("offshore");
     expect(coastalAreaState(20).area).toBe("channel");
-    expect(coastalAreaState(40).area).toBe("harbor");
+    expect(coastalAreaState(39).area).toBe("harbor");
+    expect(coastalAreaState(44).area).toBe("elite-basin");
+    expect(coastalAreaState(53).area).toBe("harbor-exit");
     expect(coastalAreaState(62).area).toBe("approach");
     expect(coastalAreaState(76).area).toBe("command");
     for (const area of COAST_AREAS.slice(1)) {
@@ -169,6 +171,24 @@ describe("continuous coastal background", () => {
       { id: "single-crane", kind: "crane", side: "right", distance: 900 },
     ];
     const background = new CoastalBackground(scene, COAST_AREAS, landmarks);
+    background.update(20);
+    let visual = background.diagnostics();
+    expect(visual.passages.find((p) => p.kind === "channel")?.alpha).toBe(1);
+    expect(visual.coastOpacity).toBeCloseTo(0.14);
+    background.update(44);
+    visual = background.diagnostics();
+    expect(visual.passages.find((p) => p.kind === "arena")?.alpha).toBe(1);
+    expect(visual.passages.find((p) => p.kind === "arena")?.y).toBe(-52);
+    expect(visual.coastOpacity).toBeCloseTo(0.025);
+    background.update(45);
+    expect(
+      background.diagnostics().passages.find((p) => p.kind === "arena")?.y,
+    ).toBe(-20);
+    background.update(61);
+    visual = background.diagnostics();
+    expect(visual.coastOpacity).toBe(0);
+    expect(visual.passages.every((p) => p.alpha === 0)).toBe(true);
+    expect(visual.layerAlphas).toEqual([0.2, 0, 0]);
     const initialCount = created,
       initialDraws = drawn;
     const stateReference = (background as any).state;
@@ -221,9 +241,9 @@ describe("continuous coastal background", () => {
       textures: { exists: () => true },
     };
     const background = new CoastalBackground(scene);
-    expect(objects).toHaveLength(21);
+    expect(objects).toHaveLength(23);
     for (let i = 0; i < 1000; i++) background.update(i / 60);
-    expect(objects).toHaveLength(21);
+    expect(objects).toHaveLength(23);
     background.update(42);
     const frozen = JSON.stringify(objects.map(({ x, y }) => ({ x, y })));
     background.update(42);
@@ -233,13 +253,15 @@ describe("continuous coastal background", () => {
     background.update(72.5);
     expect(background.diagnostics().area).toBe("command");
     expect(background.diagnostics().sceneryWeights).toEqual([
-      0, 0, 0, 0.5, 0.5,
+      0, 0, 0, 0, 0, 0.5, 0.5,
     ]);
-    expect(background.diagnostics().sceneryObjects).toBe(11);
+    expect(background.diagnostics().sceneryObjects).toBe(13);
     const paused = background.diagnostics();
     background.update(72.5);
     expect(background.diagnostics()).toEqual(paused);
     background.update(0);
-    expect(background.diagnostics().sceneryWeights).toEqual([1, 0, 0, 0, 0]);
+    expect(background.diagnostics().sceneryWeights).toEqual([
+      1, 0, 0, 0, 0, 0, 0,
+    ]);
   });
 });

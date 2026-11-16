@@ -8,7 +8,8 @@ export type Behavior =
   | "cross"
   | "carrier"
   | "groundBattery"
-  | "groundDepot";
+  | "groundDepot"
+  | "gatekeeper";
 export type PickupKind =
   | "heal"
   | "double"
@@ -28,6 +29,8 @@ export interface Wave {
   drop?: PickupKind;
   spawnY?: number;
   direction?: number;
+  holdFor?: number;
+  strafeWidth?: number;
 }
 export interface StageSection {
   id: string;
@@ -77,6 +80,18 @@ export const stage01: StageConfig = {
       title: "港區火力",
       at: 32,
       hint: "看見蓄力光圈，側移避開瞄準彈",
+    },
+    {
+      id: "blockade",
+      title: "突破封鎖",
+      at: 40,
+      hint: "先避開預告航道，再追擊橫移封鎖艦；集中火力可取得升級補給",
+    },
+    {
+      id: "push",
+      title: "最後推進",
+      at: 50,
+      hint: "看清俯衝方向，穿越最後一組攔截機",
     },
     {
       id: "resupply",
@@ -157,7 +172,7 @@ export const stage01: StageConfig = {
         behavior: "dive" as const,
       })),
     ),
-    ...[32, 40, 46].flatMap((at) =>
+    ...[32].flatMap((at) =>
       [80, 280].map((x) => ({
         at,
         x,
@@ -168,7 +183,7 @@ export const stage01: StageConfig = {
         fireEvery: at === 32 ? 4.8 : 2.2,
       })),
     ),
-    ...[36, 45].map((at) => ({
+    ...[36].map((at) => ({
       at,
       x: at === 36 ? 270 : 180,
       speed: 95,
@@ -178,6 +193,18 @@ export const stage01: StageConfig = {
       fireEvery: at === 36 ? undefined : 2.8,
       drop: at === 36 ? ("heal" as const) : undefined,
     })),
+    {
+      at: 40,
+      x: 180,
+      speed: 130,
+      hp: 64,
+      points: 1000,
+      behavior: "gatekeeper" as const,
+      fireEvery: 2.2,
+      holdFor: 9,
+      strafeWidth: 75,
+      drop: "power" as const,
+    },
   ].sort((a, b) => a.at - b.at),
   pickups: [
     { at: 5, x: 180, kind: "power" },

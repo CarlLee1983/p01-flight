@@ -294,7 +294,7 @@ describe("weapon and encounter progression", () => {
         .every((w) => w.behavior === "weave" || w.behavior === "cross"),
     ).toBe(true);
     expect(
-      stage01.waves.some((w) => w.behavior === "turret" && w.hp >= 5),
+      stage01.waves.some((w) => w.behavior === "gatekeeper" && w.hp >= 5),
     ).toBe(true);
     expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
     expect(stage01.pickups!.some((p) => p.at === 60 && p.kind === "heal")).toBe(
@@ -990,8 +990,8 @@ describe("Stage01 pacing pass", () => {
       stage01.waves.some((w) => w.behavior === "heavy" && w.at === 54),
     ).toBe(false);
     expect(
-      stage01.waves.filter((w) => w.behavior === "turret").map((w) => w.at),
-    ).toEqual([40, 40, 46, 46]);
+      stage01.waves.filter((w) => w.behavior === "gatekeeper").map((w) => w.at),
+    ).toEqual([40]);
     expect(
       stage01.waves.filter((w) => w.behavior === "dive").map((w) => w.at),
     ).toEqual([34, 35.2, 50, 51.2]);
@@ -1022,4 +1022,164 @@ describe("Stage01 pacing pass", () => {
       expect(m.lostReason).toBe("damage");
     },
   );
+});
+
+describe("gatekeeper encounter", () => {
+  it.each([30, 60, 120])(
+    "normal centered firing still exposes elite warnings and at least one volley at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let warning = false,
+        volley = false,
+        first = -1,
+        last = -1;
+      for (let i = 0; i < 52 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        const e = m.enemies.find(
+          (e) => e.active && e.behavior === "gatekeeper",
+        );
+        if (e) {
+          if (first < 0) first = m.time;
+          last = m.time;
+          warning ||= (e.telegraph ?? 0) > 0;
+          volley ||= (e.gateCycle ?? 0) > 0;
+          expect(e.maxHp).toBe(64);
+        }
+      }
+      expect(warning).toBe(true);
+      expect(volley).toBe(true);
+      expect(last - first).toBeGreaterThan(3);
+      console.log("gate visibility", fps, first, last);
+    },
+  );
+  it.each([30, 60, 120])(
+    "left, right and locked aim are telegraphed and bounded at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        waves: [
+          {
+            at: 0,
+            x: 180,
+            speed: 130,
+            hp: 1000,
+            points: 1,
+            behavior: "gatekeeper",
+            fireEvery: 2.2,
+            holdFor: 9,
+            strafeWidth: 75,
+          },
+        ],
+      });
+      m.start();
+      m.invincible = 100;
+      const patterns = new Set<string>();
+      const volleys: number[] = [];
+      let cycle = 0;
+      for (let i = 0; i < 10 * fps; i++) {
+        m.update(1 / fps);
+        const e = m.enemies[0];
+        if ((e.telegraph ?? 0) > 0) {
+          patterns.add(e.attackPattern!);
+          if (e.attackPattern === "left")
+            expect(e.attackLanes).toEqual([54, 100.80000000000001, 147.6]);
+          if (e.attackPattern === "right")
+            expect(e.attackLanes).toHaveLength(3);
+        }
+        if ((e.gateCycle ?? 0) > cycle) {
+          cycle = e.gateCycle!;
+          volleys.push(cycle);
+        }
+      }
+      expect(patterns).toEqual(new Set(["left", "right", "aim"]));
+      expect(volleys).toEqual([1, 2, 3]);
+      expect(m.enemies[0].telegraph).toBe(0);
+      expect(m.enemies[0].attackLanes).toEqual([]);
+      expect(m.enemies[0].y).toBeGreaterThan(150);
+      run(m, 6);
+      expect(m.enemies.some((e) => e.active)).toBe(false);
+    },
+  );
+  it("elite reward is single-drop and pause/restart reset encounter state", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 180,
+          spawnY: 150,
+          speed: 130,
+          hp: 1,
+          points: 1000,
+          behavior: "gatekeeper",
+          drop: "power",
+          fireEvery: 2.2,
+          holdFor: 9,
+        },
+      ],
+    });
+    m.start();
+    m.update(0);
+    m.pause();
+    const frozen = JSON.stringify(m.enemies);
+    run(m, 1);
+    expect(JSON.stringify(m.enemies)).toBe(frozen);
+    m.pause();
+    const e = m.enemies[0];
+    m.bullets.push({ id: 999, x: e.x, y: e.y, active: true });
+    m.update(0);
+    m.update(0);
+    expect(m.score).toBe(1000);
+    expect(
+      m.pickups.filter((p) => p.active && p.kind === "power"),
+    ).toHaveLength(1);
+    m.start();
+    expect(m.enemies).toHaveLength(0);
+  });
+});
+
+it("gatekeeper aim locks during warning while strafing remains a trackable target", () => {
+  const m = new FlightModel({
+    ...empty,
+    waves: [
+      {
+        at: 0,
+        x: 180,
+        speed: 130,
+        hp: 1000,
+        points: 1,
+        behavior: "gatekeeper",
+        fireEvery: 2.2,
+        holdFor: 9,
+        strafeWidth: 75,
+      },
+    ],
+  });
+  m.start();
+  m.invincible = 100;
+  let warned = false,
+    locked = 0;
+  const xs: number[] = [];
+  for (let i = 0; i < 10 * 60; i++) {
+    const e = m.enemies[0];
+    if (e?.attackPattern === "aim" && (e.telegraph ?? 0) > 0 && !warned) {
+      warned = true;
+      locked = e.aimAngle!;
+    }
+    m.update(1 / 60, warned ? 1 : 0);
+    if (m.enemies[0]) xs.push(m.enemies[0].x);
+    if ((m.enemies[0]?.gateCycle ?? 0) >= 3) break;
+  }
+  expect(warned).toBe(true);
+  expect(m.player.x).toBeGreaterThan(180);
+  expect(
+    m.enemyBullets.some(
+      (b) =>
+        b.active &&
+        Math.abs(b.vx - Math.sin(locked) * 180) < 0.001 &&
+        Math.abs(b.vy - Math.cos(locked) * 180) < 0.001,
+    ),
+  ).toBe(true);
+  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(100);
 });

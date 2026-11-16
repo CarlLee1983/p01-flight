@@ -18,6 +18,8 @@ export type CoastalScenery =
   | "offshore"
   | "channel"
   | "harbor"
+  | "arena"
+  | "exit"
   | "approach"
   | "command";
 export interface CoastalAreaConfig {
@@ -31,9 +33,11 @@ export interface CoastalAreaConfig {
 /** Pure timing/composition data; profiles can be reordered or repeated. */
 export const COAST_AREAS: readonly CoastalAreaConfig[] = [
   { id: "offshore", label: "外海試探", at: 0, fade: 0, scenery: "offshore" },
-  { id: "channel", label: "交叉航道", at: 15, fade: 4, scenery: "channel" },
+  { id: "channel", label: "狹港入口", at: 15, fade: 4, scenery: "channel" },
   { id: "harbor", label: "港區火力", at: 32, fade: 5, scenery: "harbor" },
-  { id: "approach", label: "補給接近", at: 56, fade: 5, scenery: "approach" },
+  { id: "elite-basin", label: "港池攔截", at: 40, fade: 3, scenery: "arena" },
+  { id: "harbor-exit", label: "突破港區", at: 50, fade: 3, scenery: "exit" },
+  { id: "approach", label: "補給水域", at: 56, fade: 4, scenery: "approach" },
   { id: "command", label: "指揮艦區", at: 70, fade: 5, scenery: "command" },
 ];
 
@@ -66,8 +70,30 @@ const SCENERY_LAYERS: Record<
   offshore: [0.35, 0, 0],
   channel: [1, 0, 0],
   harbor: [0, 1, 0],
-  approach: [0, 0.45, 0.65],
+  arena: [0, 0.3, 0],
+  exit: [0.15, 0.1, 0],
+  approach: [0.2, 0, 0],
   command: [0, 0, 1],
+};
+
+/** Ground silhouette, rather than tint alone, establishes each section. */
+const COAST_OPACITY: Record<CoastalScenery, number> = {
+  offshore: 0.72,
+  channel: 0.14,
+  harbor: 0.1,
+  arena: 0.025,
+  exit: 0.025,
+  approach: 0,
+  command: 0.035,
+};
+const SCENERY_ATMOSPHERE: Record<CoastalScenery, number> = {
+  offshore: 0,
+  channel: 0.06,
+  harbor: 0.08,
+  arena: 0.12,
+  exit: 0.04,
+  approach: 0,
+  command: 0.16,
 };
 
 function validateAreas(areas: readonly CoastalAreaConfig[]) {
@@ -145,6 +171,9 @@ export class CoastalBackground {
   private command: Phaser.GameObjects.Graphics[] = [];
   private shade: Phaser.GameObjects.Graphics;
   private landmarks: Phaser.GameObjects.Graphics[] = [];
+  private passages: { index: number; graphic: Phaser.GameObjects.Graphics }[] =
+    [];
+  private coastOpacity = COAST_OPACITY.offshore;
   private weights: number[];
   private layers = [0.35, 0, 0];
   readonly coastReady: boolean;
@@ -247,6 +276,17 @@ export class CoastalBackground {
       this.landmarks.push(
         this.drawLandmark(scene.add.graphics().setDepth(-10.65), landmark.kind),
       );
+    for (let index = 0; index < areas.length; index++) {
+      const scenery = areas[index].scenery;
+      if (scenery === "channel" || scenery === "arena")
+        this.passages.push({
+          index,
+          graphic: this.drawPassage(
+            scene.add.graphics().setDepth(-10.55),
+            scenery,
+          ),
+        });
+    }
     this.shade = scene.add.graphics().setDepth(-10.5);
     this.shade.fillStyle(0x081321);
     this.shade.fillRect(0, 0, 360, 640);
@@ -355,6 +395,62 @@ export class CoastalBackground {
     return g;
   }
 
+  private drawPassage(
+    g: Phaser.GameObjects.Graphics,
+    kind: "channel" | "arena",
+  ) {
+    // One world-space structure per configured event, not repeating terrain tiles.
+    // Every solid silhouette stays outside x=90..270. These are not collision walls.
+    for (let side = 0; side < 2; side++) {
+      const edge = side ? 288 : 0;
+      if (kind === "channel") {
+        // Long tapered port breakwaters with wide, unmistakable gate shoulders.
+        g.fillStyle(0x13282f);
+        g.fillRect(edge, 30, 72, 790);
+        g.fillStyle(0x3b5151);
+        g.fillRect(edge + 6, 30, 60, 790);
+        g.fillStyle(0x233e42);
+        g.fillRect(edge + 18, 48, 36, 754);
+        const shoulder = side ? 270 : 62;
+        g.fillStyle(0x314a4b);
+        g.fillRect(shoulder, 140, 28, 190);
+        g.fillStyle(0x506361);
+        g.fillRect(shoulder + 5, 146, 18, 178);
+        g.lineStyle(2, 0x789181, 0.5);
+        g.lineBetween(side ? 272 : 88, 148, side ? 272 : 88, 324);
+        for (const y of [66, 350, 640, 790]) {
+          g.fillStyle(0x4e625d);
+          g.fillRect(edge + 12, y, 48, 14);
+          g.fillStyle(0x9e956a, 0.5);
+          g.fillRect(side ? 290 : 64, y, 5, 14);
+        }
+      } else {
+        // Wide octagonal-looking basin: sparse corner piers, open combat water.
+        const x = side ? 310 : 0;
+        g.fillStyle(0x2e4247);
+        g.fillRect(x, 0, 50, 900);
+        g.fillStyle(0x42575a);
+        g.fillRect(x + 8, 0, 34, 900);
+        for (const y of [70, 640]) {
+          const berth = side ? 277 : 0;
+          g.fillStyle(0x182d36);
+          g.fillRect(berth, y + 6, 83, 138);
+          g.fillStyle(0x3f5154);
+          g.fillRect(berth, y, 83, 128);
+          g.fillStyle(0x263d44);
+          g.fillRect(berth + 8, y + 12, 67, 102);
+          g.lineStyle(2, 0x718179, 0.35);
+          g.lineBetween(berth + 12, y + 18, berth + 71, y + 18);
+          g.lineBetween(berth + 12, y + 108, berth + 71, y + 108);
+        }
+        // Submerged mooring lines are deliberately faint, not false aiming guides.
+        g.lineStyle(1, 0x56767a, 0.16);
+        g.lineBetween(side ? 304 : 56, 230, side ? 304 : 56, 615);
+      }
+    }
+    return g;
+  }
+
   private drawCommand(g: Phaser.GameObjects.Graphics) {
     // Large carrier-side structures replace the small harbor containers.
     // Central x=90..270 remains open water beneath the actual enemy flagship.
@@ -390,8 +486,13 @@ export class CoastalBackground {
     if (this.areaState.index > 0)
       this.weights[this.areaState.index - 1] = 1 - this.areaState.transition;
     this.layers.fill(0);
+    this.coastOpacity = 0;
+    let atmosphere = 0;
     for (let i = 0; i < this.areas.length; i++) {
-      const profile = SCENERY_LAYERS[this.areas[i].scenery];
+      const scenery = this.areas[i].scenery;
+      const profile = SCENERY_LAYERS[scenery];
+      this.coastOpacity += COAST_OPACITY[scenery] * this.weights[i];
+      atmosphere += SCENERY_ATMOSPHERE[scenery] * this.weights[i];
       for (let layer = 0; layer < 3; layer++)
         this.layers[layer] += profile[layer] * this.weights[i];
     }
@@ -399,7 +500,7 @@ export class CoastalBackground {
     for (let i = 0; i < this.coast.length; i++) {
       this.coast[i]
         .setPosition(0, this.state.coastY[i])
-        .setAlpha(0.84 - harborAlpha * 0.26 - commandAlpha * 0.5);
+        .setAlpha(this.coastOpacity);
     }
     const groundOffset = this.state.distance % 640;
     for (let i = 0; i < 2; i++) {
@@ -416,7 +517,16 @@ export class CoastalBackground {
         .setAlpha(harborAlpha)
         .setVisible(y > -LANDMARK_HEIGHT && y < 640 && harborAlpha > 0);
     }
-    this.shade.setAlpha(commandAlpha * 0.12);
+    for (let i = 0; i < this.passages.length; i++) {
+      const passage = this.passages[i];
+      const area = this.areas[passage.index];
+      const y = this.state.distance - area.at * COAST_SCROLL.speed - 180;
+      passage.graphic
+        .setPosition(0, y)
+        .setAlpha(this.weights[passage.index])
+        .setVisible(this.weights[passage.index] > 0 && y < 640 && y > -900);
+    }
+    this.shade.setAlpha(atmosphere);
     for (let i = 0; i < this.currents.length; i++)
       this.currents[i].setPosition(0, this.state.currentOffset - i * 640);
     for (let i = 0; i < this.clouds.length; i++)
@@ -432,12 +542,21 @@ export class CoastalBackground {
       ...this.areaState,
       coastY: [...this.state.coastY],
       sceneryWeights: [...this.weights],
+      coastOpacity: this.coastOpacity,
+      passages: this.passages.map(({ index }) => ({
+        id: this.areas[index].id,
+        kind: this.areas[index].scenery,
+        y:
+          this.state.distance - this.areas[index].at * COAST_SCROLL.speed - 180,
+        alpha: this.weights[index],
+      })),
       layerAlphas: [...this.layers],
       sceneryObjects:
         this.navigation.length +
         this.harbor.length +
         this.command.length +
         this.landmarks.length +
+        this.passages.length +
         1,
       landmarks: this.landmarkConfig.map((config) => ({
         id: config.id,

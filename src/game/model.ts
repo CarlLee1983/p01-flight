@@ -17,6 +17,7 @@ export interface Body {
   hitIds?: number[];
 }
 export interface Enemy extends Body {
+  maxHp?: number;
   speed: number;
   hp: number;
   points: number;
@@ -30,6 +31,11 @@ export interface Enemy extends Body {
   aimAngle?: number;
   direction?: number;
   diveAngle?: number;
+  holdFor?: number;
+  strafeWidth?: number;
+  gateCycle?: number;
+  attackPattern?: "left" | "right" | "aim";
+  attackLanes?: number[];
 }
 export interface EnemyBullet extends Body {
   vx: number;
@@ -391,13 +397,20 @@ export class FlightModel {
         w,
         {
           id: ++this.serial,
+          maxHp: w.hp,
           y: w.spawnY ?? -24,
           active: true,
           age: 0,
           originX: w.x,
-          fireCooldown: w.fireEvery ?? 999,
+          fireCooldown:
+            w.behavior === "gatekeeper" ? 1.4 : (w.fireEvery ?? 999),
           telegraph: 0,
           aimAngle: undefined,
+          holdFor: w.holdFor,
+          strafeWidth: w.strafeWidth,
+          gateCycle: 0,
+          attackPattern: undefined,
+          attackLanes: [],
           direction: w.direction ?? 1,
           diveAngle: undefined,
         },
@@ -492,6 +505,58 @@ export class FlightModel {
         if (e.behavior === "cross" || e.behavior === "carrier") {
           e.x += (e.direction ?? 1) * e.speed * dt;
         }
+        if (e.behavior === "gatekeeper") {
+          const holding = e.age < (e.holdFor ?? 9);
+          if (holding) {
+            e.y = Math.min(150, e.y + e.speed * dt);
+            e.x =
+              (e.originX ?? 180) +
+              Math.sin(e.age * 0.9) * (e.strafeWidth ?? 75);
+            e.attackPattern = (["left", "right", "aim"] as const)[
+              (e.gateCycle ?? 0) % 3
+            ];
+            e.attackLanes =
+              e.attackPattern === "left"
+                ? [0.15, 0.28, 0.41].map((x) => x * this.stage.width)
+                : e.attackPattern === "right"
+                  ? [0.59, 0.72, 0.85].map((x) => x * this.stage.width)
+                  : [];
+            if (e.y >= 150) {
+              e.fireCooldown = (e.fireCooldown ?? 1.4) - dt;
+              if (e.fireCooldown <= 0.75 && e.aimAngle === undefined)
+                e.aimAngle = Math.atan2(
+                  this.player.x - e.x,
+                  this.player.y - e.y,
+                );
+              e.telegraph =
+                e.fireCooldown > 0 && e.fireCooldown <= 0.75
+                  ? e.fireCooldown
+                  : 0;
+              if (e.fireCooldown <= 0) {
+                if (e.attackPattern === "aim")
+                  this.shootEnemy(
+                    e.x,
+                    e.y + 24,
+                    Math.sin(e.aimAngle ?? 0) * 180,
+                    Math.cos(e.aimAngle ?? 0) * 180,
+                  );
+                else
+                  for (const x of e.attackLanes)
+                    this.shootEnemy(x, e.y + 24, 0, 180);
+                e.gateCycle = (e.gateCycle ?? 0) + 1;
+                e.fireCooldown = e.fireEvery ?? 2.2;
+                e.aimAngle = undefined;
+                e.attackPattern = undefined;
+                e.attackLanes = [];
+              }
+            }
+          } else {
+            e.y += e.speed * dt;
+            e.telegraph = 0;
+            e.attackPattern = undefined;
+            e.attackLanes = [];
+          }
+        }
         if (e.behavior === "dive") {
           if (e.age >= 1 && e.age < 1.7) e.telegraph = 1.7 - e.age;
           if (e.age >= 1.7 && e.diveAngle === undefined) {
@@ -513,6 +578,7 @@ export class FlightModel {
           );
         if (
           !ground &&
+          e.behavior !== "gatekeeper" &&
           e.behavior !== "dive" &&
           e.behavior !== "cross" &&
           e.behavior !== "carrier" &&
@@ -525,6 +591,7 @@ export class FlightModel {
           e.y += e.speed * dt;
         if (
           e.fireEvery &&
+          e.behavior !== "gatekeeper" &&
           e.behavior !== "groundDepot" &&
           e.y > 40 &&
           e.y < 400
