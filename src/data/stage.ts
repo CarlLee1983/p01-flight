@@ -62,7 +62,8 @@ export interface StageConfig {
   };
 }
 // Twelve-aircraft flights alternate sweep direction and silhouette rhythm.
-// Their threat is interception/body positioning; gunships retain the bullet budget.
+// One wing aircraft per row fires; the other two remain interception threats.
+// Short first delay lets fast flights fire while visible; staggered entry avoids a wall.
 const reinforcementTimes = [
   13, 17, 21, 25, 29, 33, 37, 43, 47, 51, 55, 63, 67, 71, 75, 79, 83, 87, 91,
   99, 103, 107, 111, 113, 115, 116.5,
@@ -82,6 +83,8 @@ const reinforcements: Wave[] = reinforcementTimes.flatMap((at, group) =>
         hp: 1,
         points: 80,
         behavior: "cross",
+        fireEvery: lane === 0 && at <= 111 ? 0.75 : undefined,
+        firstFireDelay: lane === 0 && at <= 111 ? 0.6 : undefined,
       };
     return {
       at: at + row * 0.32 + lane * 0.08,
@@ -90,6 +93,8 @@ const reinforcements: Wave[] = reinforcementTimes.flatMap((at, group) =>
       hp: 1,
       points: 80,
       behavior: group % 3 === 0 ? "straight" : "weave",
+      fireEvery: lane === 0 && at <= 111 ? 0.75 : undefined,
+      firstFireDelay: lane === 0 && at <= 111 ? 0.6 : undefined,
     };
   }),
 );
@@ -200,7 +205,7 @@ export const stage01: StageConfig = {
         hp: 2,
         points: 150,
         behavior: "weave" as const,
-        fireEvery: 2.4,
+        fireEvery: 1.2,
       })),
     ),
     // Two staggered escort flights: one telegraphed volley per aircraft.
@@ -272,7 +277,7 @@ export const stage01: StageConfig = {
         hp: at === 32 ? 18 : 5,
         points: 350,
         behavior: at === 32 ? ("groundBattery" as const) : ("turret" as const),
-        fireEvery: at === 32 ? 4.8 : 2.2,
+        fireEvery: at === 32 ? 2.6 : 1.5,
         firstFireDelay: 0.9,
       })),
     ),
@@ -307,7 +312,7 @@ export const stage01: StageConfig = {
         hp: 3,
         points: 170,
         behavior: "weave" as const,
-        fireEvery: 2.6,
+        fireEvery: 1.2,
       })),
     ),
     ...[60, 300].map((x, i) => ({
@@ -317,7 +322,7 @@ export const stage01: StageConfig = {
       hp: 18,
       points: 350,
       behavior: "groundBattery" as const,
-      fireEvery: 4.8,
+      fireEvery: 2.6,
       firstFireDelay: 0.9,
     })),
     ...[78, 86].flatMap((at, group) =>
@@ -360,7 +365,7 @@ export const stage01: StageConfig = {
       hp: 9,
       points: 300,
       behavior: "heavy" as const,
-      fireEvery: 2.8,
+      fireEvery: 1.5,
     })),
     ...[98, 112].flatMap((at, group) =>
       [0, 1, 2].map((i) => ({
@@ -370,7 +375,7 @@ export const stage01: StageConfig = {
         hp: 2,
         points: 150,
         behavior: "weave" as const,
-        fireEvery: 2.8,
+        fireEvery: 1.5,
       })),
     ),
     ...[110, 180, 250].map((x, i) => ({

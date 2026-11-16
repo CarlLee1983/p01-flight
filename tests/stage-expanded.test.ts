@@ -191,8 +191,8 @@ it("provides 405 airborne opponents with bounded firing roles, not phantom groun
     ).length,
   ).toBe(399);
   expect(
-    stage01.waves.filter((w) => w.points === 80).every((w) => !w.fireEvery),
-  ).toBe(true);
+    stage01.waves.filter((w) => w.points === 80 && w.fireEvery).length,
+  ).toBe(92);
 });
 
 it("aircraft must enter the playfield before bullets, missiles or bombs can hit them", () => {
