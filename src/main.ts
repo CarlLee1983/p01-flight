@@ -6,6 +6,7 @@ import { FlightAudio } from "./game/audio";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
 import { createGroundTextures } from "./game/ground-art";
+import { TouchInput } from "./game/touch-input";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -14,6 +15,7 @@ try {
 const saves = new BrowserSaveRepository(storage);
 const model = new FlightModel(stage01);
 const audio = new FlightAudio();
+const touch = new TouchInput();
 let previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
 const panel = document.querySelector<HTMLElement>("#panel")!;
 let lastMode: Mode | null = null;
@@ -24,7 +26,22 @@ let overlay: Phaser.GameObjects.Graphics;
 let backgroundInfo: Record<string, unknown> = {};
 let frameCount = 0,
   frameTime = 0;
+// pointerdown supports a second finger while the first one is captured on canvas.
+// Keyboard/screen-reader generated clicks (detail=0) remain accessible, without
+// executing the following synthetic touch click a second time.
+function bindTouchAction(id: string, action: () => void) {
+  const button = document.getElementById(id) as HTMLButtonElement | null;
+  button?.addEventListener("pointerdown", (event) => {
+    if (button.disabled) return;
+    event.preventDefault();
+    action();
+  });
+  button?.addEventListener("click", (event) => {
+    if (event.detail === 0 && !button.disabled) action();
+  });
+}
 function start() {
+  touch.cancel();
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
   model.start();
@@ -33,12 +50,28 @@ function start() {
 }
 function renderPanel() {
   panel.dataset.mode = model.mode;
+  if (model.mode !== "playing") touch.cancel();
+  for (const id of ["touch-bomb", "touch-weapon"]) {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    if (button) button.disabled = model.mode !== "playing";
+  }
+  const pause = document.getElementById(
+    "touch-pause",
+  ) as HTMLButtonElement | null;
+  if (pause) {
+    pause.disabled = !["playing", "paused"].includes(model.mode);
+    pause.textContent = model.mode === "paused" ? "繼續" : "暫停";
+    pause.setAttribute(
+      "aria-label",
+      model.mode === "paused" ? "繼續遊戲" : "暫停遊戲",
+    );
+  }
   const record = saves.data.stages[stage01.id];
   const warning = saves.warning
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">C 切換散射／貫穿／追蹤 · Shift 精準移動</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
     panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>按住 Space／Z 射擊。留意編隊進場與蓄力光圈，側移躲開瞄準彈。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
@@ -109,6 +142,9 @@ class FlightScene extends Phaser.Scene {
   pickupNoticeUntil = 0;
   sectionNotice!: Phaser.GameObjects.Text;
   bossAdvice!: Phaser.GameObjects.Text;
+  endingAge = 0;
+  lastDrawMode: Mode = "menu";
+  bossWarningPlayed = false;
   bank = 0;
   lastPlayerX = 180;
   ambience = 0;
@@ -243,9 +279,94 @@ class FlightScene extends Phaser.Scene {
         this.cameras.main.shake(180, 0.008);
       }
     });
+    const canvas = this.game.canvas;
+    const clearTouch = () => touch.cancel();
+    canvas.addEventListener("pointerdown", (event) => {
+      if (
+        model.mode !== "playing" ||
+        !["touch", "pen"].includes(event.pointerType)
+      )
+        return;
+      const rect = canvas.getBoundingClientRect();
+      if (
+        touch.begin(
+          event.pointerId,
+          event.clientX,
+          event.clientY,
+          model.player.x,
+          model.player.y,
+          { x: rect.width / stage01.width, y: rect.height / stage01.height },
+        )
+      ) {
+        canvas.setPointerCapture(event.pointerId);
+        void audio.unlock();
+        event.preventDefault();
+      }
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (touch.move(event.pointerId, event.clientX, event.clientY))
+        event.preventDefault();
+    });
+    canvas.addEventListener("pointerup", (event) => touch.end(event.pointerId));
+    canvas.addEventListener("pointercancel", (event) =>
+      touch.end(event.pointerId),
+    );
+    canvas.addEventListener("lostpointercapture", (event) =>
+      touch.end(event.pointerId),
+    );
+    window.addEventListener("blur", clearTouch);
+    window.addEventListener("resize", () => touch.resize());
+    bindTouchAction("touch-bomb", () => {
+      void audio.unlock();
+      if (model.useBomb()) {
+        audio.play("bomb");
+        this.cameras.main.shake(180, 0.008);
+      }
+    });
+    bindTouchAction("touch-weapon", () => {
+      void audio.unlock();
+      if (model.switchWeapon()) audio.play("power");
+    });
+    bindTouchAction("touch-pause", () => {
+      model.pause();
+      renderPanel();
+    });
     renderPanel();
   }
   update(_time: number, delta: number) {
+    if (model.mode !== this.lastDrawMode) {
+      this.endingAge = 0;
+      this.lastDrawMode = model.mode;
+    }
+    if (model.mode === "playing" && model.time === 0)
+      this.bossWarningPlayed = false;
+    if (model.mode === "won") this.endingAge += Math.min(delta / 1000, 0.05);
+    panel.style.visibility =
+      model.mode === "won" && this.endingAge < 1.2 ? "hidden" : "visible";
+    if (
+      model.mode === "playing" &&
+      model.time >= 65 &&
+      model.time < 70 &&
+      !this.bossWarningPlayed
+    ) {
+      this.bossWarningPlayed = true;
+      audio.play("phase");
+    }
+    const bombButton = document.getElementById(
+      "touch-bomb",
+    ) as HTMLButtonElement | null;
+    if (bombButton) {
+      bombButton.textContent = `炸彈 ${model.bombs}`;
+      bombButton.disabled = model.mode !== "playing" || model.bombs === 0;
+    }
+    const weaponButton = document.getElementById("touch-weapon");
+    if (weaponButton)
+      weaponButton.textContent =
+        model.weaponMode === "spread"
+          ? "散射"
+          : model.weaponMode === "beam"
+            ? "貫穿"
+            : "追蹤";
     frameCount++;
     frameTime += delta;
     if (model.mode === "playing" || model.mode === "menu")
@@ -256,12 +377,15 @@ class FlightScene extends Phaser.Scene {
       names.some((k) => this.keys[k].isDown) ? 1 : 0;
     if (model.mode === "playing" && model.time === 0)
       this.pickupNoticeUntil = 0;
+    if (model.mode !== "playing") touch.cancel();
+    const touchFrame = touch.sample(model.player, delta / 1000);
     model.update(
       delta / 1000,
       on("D", "RIGHT") - on("A", "LEFT"),
       on("S", "DOWN") - on("W", "UP"),
-      !!on("SPACE", "Z"),
+      !!on("SPACE", "Z") || touchFrame.fire,
       !!on("SHIFT"),
+      touchFrame.target,
     );
     const move = model.player.x - this.lastPlayerX;
     this.bank = Phaser.Math.Linear(
@@ -322,6 +446,7 @@ class FlightScene extends Phaser.Scene {
     }
     if (model.mode !== lastMode) {
       renderPanel();
+      if (model.mode === "won") panel.style.visibility = "hidden";
       if (model.mode === "won" || model.mode === "lost") audio.play(model.mode);
     }
     this.draw();
@@ -337,6 +462,13 @@ class FlightScene extends Phaser.Scene {
     );
     if (section)
       this.sectionNotice.setText(`${section.title}\n${section.hint}`);
+    if (model.mode === "playing" && model.time >= 65 && model.time < 70) {
+      this.sectionNotice
+        .setVisible(true)
+        .setText(
+          `指揮艦接近 · ${Math.ceil(70 - model.time)}\n保留炸彈，留意兩側砲座`,
+        );
+    }
     this.bossAdvice.setVisible(
       model.mode === "playing" && !!model.boss?.active,
     );
@@ -349,7 +481,11 @@ class FlightScene extends Phaser.Scene {
     for (const image of this.visuals) image.setVisible(false);
     graphics.clear();
     overlay.clear();
-    this.background.update(model.mode === "menu" ? this.ambience : model.time);
+    this.background.update(
+      model.mode === "menu"
+        ? this.ambience
+        : model.time + (model.mode === "won" ? this.endingAge : 0),
+    );
     backgroundInfo = this.background.diagnostics();
     if (model.mode !== "menu") {
       for (const b of model.bullets)
@@ -576,7 +712,13 @@ class FlightScene extends Phaser.Scene {
           drone.y,
         );
       }
-      const p = model.player;
+      const p =
+        model.mode === "won"
+          ? {
+              x: model.player.x,
+              y: model.player.y - Math.min(this.endingAge, 1.2) * 220,
+            }
+          : model.player;
       if (model.invincible <= 0 || Math.floor(model.time * 14) % 2 === 0) {
         this.sprite(
           "player",
@@ -606,7 +748,9 @@ class FlightScene extends Phaser.Scene {
         // Collision bounds stay independent of decorative sprite size.
       }
       for (const e of model.effects) {
-        const progress = 1 - e.life / 0.45;
+        const life = e.life - (model.mode === "won" ? this.endingAge : 0);
+        if (life <= 0) continue;
+        const progress = 1 - life / 0.45;
         overlay.lineStyle(3 * (1 - progress) + 1, 0xffd58a, 1 - progress);
         overlay.strokeCircle(e.x, e.y, 4 + progress * 29);
         overlay.fillStyle(0xfff5cb, Math.max(0, 1 - progress * 2));
@@ -645,11 +789,36 @@ class FlightScene extends Phaser.Scene {
       overlay.fillStyle(0x0c2133, 0.96);
       overlay.fillRect(0, 0, 360, 72);
     }
+    if (model.mode !== "menu") {
+      const sections = stage01.sections ?? [];
+      sections.forEach((section, i) => {
+        const active = model.time >= section.at;
+        overlay.fillStyle(active ? 0x8ce5d0 : 0x314b58, active ? 0.9 : 0.55);
+        overlay.fillRect(16 + i * 66, 67, 60, 3);
+      });
+    }
     label.setText(
       model.mode === "menu"
         ? ""
-        : `SCORE ${String(model.score).padStart(6, "0")}    LIFE ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? "BOSS P" + model.boss.phase : model.time > 65 ? "BOSS INCOMING" : (model.section?.title ?? "STAGE 01")}   ${Math.ceil(stage01.duration - model.time)}s\n${model.weaponMode === "missile" ? "HOMING" : model.weaponMode === "beam" ? "PIERCE" : "SPREAD"} ${model.weaponLevel}/3    BOMB ${model.bombs}${model.supportTime > 0 ? "  W:" + Math.ceil(model.supportTime) : " [X]"}`,
+        : `分數 ${String(model.score).padStart(6, "0")}   生命 ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? `指揮艦 P${model.boss.phase} · ${Math.ceil(stage01.duration - model.time)}s` : (model.section?.title ?? "STAGE 01")}\n${model.weaponMode === "missile" ? "追蹤" : model.weaponMode === "beam" ? "貫穿" : "散射"} ${model.weaponLevel}/3   炸彈 ${model.bombs}${model.supportTime > 0 ? "  僚機 " + Math.ceil(model.supportTime) + "s" : ""}`,
     );
+    if (model.mode === "won" && this.endingAge < 1.2 && model.boss) {
+      const t = this.endingAge / 1.2;
+      overlay.lineStyle(5 * (1 - t) + 1, 0xffd697, 1 - t);
+      overlay.strokeCircle(model.boss.x, model.boss.y, 20 + t * 180);
+      overlay.fillStyle(0xffe5a5, Math.max(0, 0.7 - t));
+      overlay.fillCircle(model.boss.x, model.boss.y, 18 + t * 35);
+      for (let i = 0; i < 12; i++) {
+        const a = (i * Math.PI) / 6;
+        overlay.lineStyle(2, 0xffac76, 1 - t);
+        overlay.lineBetween(
+          model.boss.x + Math.cos(a) * t * 60,
+          model.boss.y + Math.sin(a) * t * 60,
+          model.boss.x + Math.cos(a) * t * 150,
+          model.boss.y + Math.sin(a) * t * 150,
+        );
+      }
+    }
     if (model.bombFlash > 0) {
       overlay.fillStyle(0xb8f8ff, Math.min(0.25, model.bombFlash * 0.25));
       overlay.fillRect(0, 72, 360, 568);
@@ -677,6 +846,7 @@ new Phaser.Game({
   fps: { target: 60 },
 });
 document.addEventListener("visibilitychange", () => {
+  if (document.hidden) touch.cancel();
   if (document.hidden && model.mode === "playing") {
     model.pause();
     renderPanel();
@@ -686,6 +856,7 @@ document.addEventListener("visibilitychange", () => {
 Object.defineProperty(window, "__P01__", {
   value: () => ({
     mode: model.mode,
+    touchTarget: touch.target,
     time: model.time,
     score: model.score,
     hp: model.hp,

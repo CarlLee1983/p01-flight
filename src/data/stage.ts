@@ -96,9 +96,13 @@ export const stage01: StageConfig = {
   // Small opening formations, alternating flank squadrons, armored batteries,
   // then a quiet resupply lane before the final encounter.
   waves: [
-    ...[2, 6, 10].flatMap((at) =>
-      [120, 180, 240].map((x, i) => ({
-        at: at + i * 0.22,
+    ...[2, 6, 10].flatMap((at, group) =>
+      [
+        [120, 180, 240],
+        [90, 150, 210],
+        [270, 210, 150],
+      ][group].map((x, i) => ({
+        at: at + (group === 0 ? [0.22, 0, 0.22][i] : i * 0.22),
         x,
         speed: 105,
         hp: 1,
@@ -143,7 +147,7 @@ export const stage01: StageConfig = {
       })),
     ),
     // Diving pairs warn, lock a flight line, then commit; no extra bullet curtain.
-    ...[34, 52].flatMap((at) =>
+    ...[34, 50].flatMap((at) =>
       [75, 285].map((x, i) => ({
         at: at + i * 1.2,
         x,
@@ -153,7 +157,7 @@ export const stage01: StageConfig = {
         behavior: "dive" as const,
       })),
     ),
-    ...[32, 40, 49].flatMap((at) =>
+    ...[32, 40, 46].flatMap((at) =>
       [80, 280].map((x) => ({
         at,
         x,
@@ -164,7 +168,7 @@ export const stage01: StageConfig = {
         fireEvery: at === 32 ? 4.8 : 2.2,
       })),
     ),
-    ...[36, 45, 54].map((at) => ({
+    ...[36, 45].map((at) => ({
       at,
       x: at === 36 ? 270 : 180,
       speed: 95,

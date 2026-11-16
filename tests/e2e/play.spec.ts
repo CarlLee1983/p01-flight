@@ -118,6 +118,9 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect(won.bossDefeated).toBe(true);
   expect(won.score).toBeGreaterThan(0);
   expect(won.save.stages["stage-01"].clearCount).toBe(1);
+  await expect(
+    page.getByRole("heading", { name: "Stage 01 通關" }),
+  ).toBeVisible();
   await page.screenshot({ path: "docs/won.png" });
   await page.waitForTimeout(1000);
   expect((await state(page)).save.stages["stage-01"].clearCount).toBe(1);

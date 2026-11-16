@@ -2,7 +2,10 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
     <meta name="theme-color" content="#06151b" />
     <title>雲際航線 · COASTLINE ASSAULT</title>
   </head>
@@ -12,8 +15,21 @@
         <h1>雲際航線</h1>
         <p>COASTLINE ASSAULT <span>STAGE 01</span></p>
       </header>
-      <div id="game" aria-label="第一關遊戲畫面">
-        <section id="panel" aria-label="遊戲選單與操作"></section>
+      <div class="play-layout">
+        <div id="game" aria-label="第一關遊戲畫面">
+          <section id="panel" aria-label="遊戲選單與操作"></section>
+        </div>
+        <nav id="touch-controls" aria-label="觸控遊戲操作">
+          <button id="touch-bomb" type="button" aria-label="使用炸彈">
+            炸彈
+          </button>
+          <button id="touch-weapon" type="button" aria-label="切換武器">
+            武器
+          </button>
+          <button id="touch-pause" type="button" aria-label="暫停遊戲">
+            暫停
+          </button>
+        </nav>
       </div>
       <footer class="pilot-guide">
         <div class="keys" aria-label="鍵盤操作指南">
@@ -25,9 +41,9 @@
           <span><kbd>P</kbd> 暫停</span>
         </div>
         <p class="local-note">
-          桌機鍵盤遊玩 · 紀錄僅存於此瀏覽器，清除網站資料將遺失。
+          鍵盤或觸控遊玩 · 紀錄僅存於此瀏覽器，清除網站資料將遺失。
         </p>
-        <p class="mobile-note">需要實體鍵盤操作；手機尚未支援觸控遊玩。</p>
+        <p class="mobile-note">按住畫面拖曳移動並連射 · 放開停止射擊</p>
       </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>

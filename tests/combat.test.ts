@@ -961,3 +961,65 @@ describe("ground targets", () => {
     },
   );
 });
+
+describe("Stage01 pacing pass", () => {
+  it("opening has a leader, left echelon and mirrored right echelon without extra aircraft", () => {
+    const opening = stage01.waves.filter((w) => w.at < 11);
+    expect(opening).toHaveLength(9);
+    expect(opening.filter((w) => w.at < 3).map((w) => [w.at, w.x])).toEqual([
+      [2, 180],
+      [2.22, 120],
+      [2.22, 240],
+    ]);
+    expect(
+      opening.filter((w) => w.at >= 6 && w.at < 7).map((w) => [w.at, w.x]),
+    ).toEqual([
+      [6, 90],
+      [6.22, 150],
+      [6.44, 210],
+    ]);
+    expect(opening.filter((w) => w.at >= 10).map((w) => [w.at, w.x])).toEqual([
+      [10, 270],
+      [10.22, 210],
+      [10.44, 150],
+    ]);
+    expect(
+      stage01.waves.filter((w) => w.behavior === "carrier").map((w) => w.at),
+    ).toEqual([12, 30, 48]);
+    expect(
+      stage01.waves.some((w) => w.behavior === "heavy" && w.at === 54),
+    ).toBe(false);
+    expect(
+      stage01.waves.filter((w) => w.behavior === "turret").map((w) => w.at),
+    ).toEqual([40, 40, 46, 46]);
+    expect(
+      stage01.waves.filter((w) => w.behavior === "dive").map((w) => w.at),
+    ).toEqual([34, 35.2, 50, 51.2]);
+  });
+  it.each([30, 60, 120])(
+    "schedule clears residual enemies before the 60–70 second rest at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      // Isolate exit timing even when enemies survive. Not a gameplay victory fixture.
+      m.invincible = 120;
+      run(m, 60, false, fps);
+      for (let i = 0; i < 9.8 * fps; i++) {
+        expect(m.enemies.some((e) => e.active)).toBe(false);
+        expect(m.enemyBullets.some((b) => b.active)).toBe(false);
+        expect(m.boss).toBeNull();
+        m.update(1 / fps);
+      }
+    },
+  );
+  it.each([30, 60, 120])(
+    "idle normal-input pilot still loses at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      run(m, 60, false, fps);
+      expect(m.mode).toBe("lost");
+      expect(m.lostReason).toBe("damage");
+    },
+  );
+});

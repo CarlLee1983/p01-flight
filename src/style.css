@@ -5,6 +5,18 @@
   --mint: #85f7d1;
   --amber: #ffd295;
   --stage-width: clamp(324px, calc((100svh - 155px) * 0.5625), 450px);
+  --rail-width: 0px;
+  --rail-gap: 0px;
+  --touch-display: none;
+  --keys-display: flex;
+  --local-note-display: block;
+  --touch-note-display: none;
+  --header-display: flex;
+  --menu-hit-size: 0px;
+  --playing-button-display: inline-block;
+  --panel-side: 6%;
+  --panel-pad: 25px 24px 19px;
+  --panel-heading-size: clamp(24px, 5vw, 32px);
   font-family: "Segoe UI", "Noto Sans TC", system-ui, sans-serif;
   font-synthesis: none;
 }
@@ -23,12 +35,16 @@ body {
   );
 }
 .flight-deck {
-  width: var(--stage-width);
+  width: calc(var(--stage-width) + var(--rail-width) + var(--rail-gap));
+  max-width: calc(
+    100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 16px
+  );
   margin: 0 auto;
-  padding: 16px 0 14px;
+  padding: max(8px, env(safe-area-inset-top)) 0
+    max(8px, env(safe-area-inset-bottom));
 }
 .masthead {
-  display: flex;
+  display: var(--header-display);
   justify-content: space-between;
   align-items: center;
   gap: 14px;
@@ -55,7 +71,7 @@ h1 {
   margin-left: 8px;
 }
 #game {
-  width: 100%;
+  width: var(--stage-width);
   height: calc(var(--stage-width) * 16 / 9);
   position: relative;
   overflow: hidden;
@@ -72,17 +88,18 @@ h1 {
   z-index: 0;
   width: 100% !important;
   height: 100% !important;
+  touch-action: none;
 }
 #panel {
   position: absolute;
   z-index: 2;
-  left: 6%;
-  right: 6%;
+  left: var(--panel-side);
+  right: var(--panel-side);
   top: 50%;
   transform: translateY(-50%);
   max-height: calc(100% - 32px);
   overflow: auto;
-  padding: 25px 24px 19px;
+  padding: var(--panel-pad);
   text-align: center;
   border: 1px solid #b3e3d83d;
   border-top: 2px solid var(--mint);
@@ -95,7 +112,7 @@ h1 {
 #panel h2 {
   margin: 0 0 14px;
   color: #f0fff7;
-  font-size: clamp(24px, 5vw, 32px);
+  font-size: var(--panel-heading-size);
   font-weight: 900;
   line-height: 1.25;
   letter-spacing: 0.04em;
@@ -130,6 +147,7 @@ h1 {
 }
 button {
   appearance: none;
+  min-height: var(--menu-hit-size);
   cursor: pointer;
   padding: 12px 16px;
   margin: 6px 4px;
@@ -199,6 +217,8 @@ details {
   text-align: left;
 }
 summary {
+  min-height: var(--menu-hit-size);
+  align-content: center;
   text-align: center;
   color: #a9c8bb;
   cursor: pointer;
@@ -211,6 +231,7 @@ label {
 }
 input {
   display: block;
+  min-height: var(--menu-hit-size);
   width: 100%;
   margin-top: 7px;
   accent-color: var(--mint);
@@ -266,7 +287,7 @@ input {
 }
 #panel[data-mode="playing"] button,
 #panel[data-mode="playing"] #mute {
-  display: inline-block;
+  display: var(--playing-button-display);
   min-width: 0;
   margin: 1px 3px;
   padding: 5px 7px;
@@ -294,7 +315,7 @@ input {
   padding-top: 12px;
 }
 .keys {
-  display: flex;
+  display: var(--keys-display);
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px 12px;
@@ -322,8 +343,11 @@ kbd {
   line-height: 1.6;
   text-align: center;
 }
+.local-note {
+  display: var(--local-note-display);
+}
 .mobile-note {
-  display: none;
+  display: var(--touch-note-display);
 }
 progress {
   width: 100%;
@@ -337,10 +361,14 @@ progress {
 }
 @media (max-width: 520px) {
   :root {
-    --stage-width: min(450px, calc(100vw - 20px));
+    --stage-width: min(
+      450px,
+      calc(100vw - 20px),
+      calc((100svh - 155px) * 0.5625)
+    );
   }
   .flight-deck {
-    padding-top: 11px;
+    padding-top: max(8px, env(safe-area-inset-top));
   }
   .masthead {
     margin-bottom: 9px;
@@ -356,7 +384,7 @@ progress {
     margin: 4px 0 0;
   }
   #panel {
-    padding: 20px 17px 15px;
+    padding: var(--panel-pad);
   }
   #panel p {
     font-size: 11px;
@@ -365,12 +393,161 @@ progress {
     gap: 8px;
   }
   .mobile-note {
-    display: block;
     color: #c4aa79;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   button {
     transition: none;
+  }
+}
+
+.play-layout {
+  display: grid;
+  grid-template-columns: var(--stage-width) var(--rail-width);
+  column-gap: var(--rail-gap);
+  align-items: stretch;
+}
+#touch-controls {
+  display: var(--touch-display);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+#touch-controls button {
+  width: 52px;
+  min-width: 44px;
+  height: 52px;
+  min-height: 44px;
+  padding: 6px 2px;
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0;
+  border-radius: 8px;
+  transform: none;
+  background: #173d42;
+  color: #d3eee6;
+  border-color: #588d84;
+  box-shadow: 0 3px 0 #031519;
+}
+#touch-controls #touch-bomb {
+  background: #5a3a26;
+  color: #ffe5b5;
+  border-color: #b28b59;
+}
+#touch-controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+#touch-controls button:active:not(:disabled) {
+  background: #3c6960;
+  box-shadow: none;
+}
+/* Attribute hook supports a user's touch preference and explicit test setup.
+   isMobile alone is not a CSS media feature; hasTouch normally matches coarse. */
+:root[data-touch-controls="true"] {
+  --stage-width: min(
+    450px,
+    calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 76px),
+    calc(
+      (
+          100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) -
+            100px
+        ) *
+        0.5625
+    )
+  );
+  --rail-width: 52px;
+  --rail-gap: 8px;
+  --touch-display: flex;
+  --keys-display: none;
+  --local-note-display: none;
+  --touch-note-display: block;
+  --menu-hit-size: 44px;
+  --playing-button-display: none;
+  --panel-side: 3%;
+  --panel-pad: 18px 10px 12px;
+  --panel-heading-size: 24px;
+}
+@media (pointer: coarse) {
+  :root {
+    --stage-width: min(
+      450px,
+      calc(
+        100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 76px
+      ),
+      calc(
+        (
+            100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) -
+              100px
+          ) *
+          0.5625
+      )
+    );
+    --rail-width: 52px;
+    --rail-gap: 8px;
+    --touch-display: flex;
+    --keys-display: none;
+    --local-note-display: none;
+    --touch-note-display: block;
+    --menu-hit-size: 44px;
+    --playing-button-display: none;
+    --panel-side: 3%;
+    --panel-pad: 18px 10px 12px;
+    --panel-heading-size: 24px;
+  }
+  button:hover {
+    transform: none;
+  }
+}
+@media (max-height: 500px) {
+  :root[data-touch-controls="true"] {
+    --stage-width: min(
+      450px,
+      calc(
+        100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 76px
+      ),
+      calc(
+        (
+            100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) -
+              52px
+          ) *
+          0.5625
+      )
+    );
+    --header-display: none;
+    --panel-pad: 10px 8px;
+    --panel-heading-size: 21px;
+  }
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  :root {
+    --stage-width: min(
+      450px,
+      calc(
+        100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 76px
+      ),
+      calc(
+        (
+            100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) -
+              52px
+          ) *
+          0.5625
+      )
+    );
+    --header-display: none;
+    --panel-pad: 10px 8px;
+    --panel-heading-size: 21px;
+  }
+}
+
+@media (max-height: 500px) {
+  .pilot-guide {
+    padding-top: 8px;
+  }
+  .mobile-note {
+    margin-top: 6px;
   }
 }
