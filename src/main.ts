@@ -47,6 +47,7 @@ function start() {
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
   model.start();
+  audio.resetMusic();
   renderMetrics.reset();
   recorded = false;
   renderPanel();
@@ -74,7 +75,7 @@ function renderPanel() {
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子配樂與音效，Boss 戰切換專屬主題。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
     panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意預告後移位，避免留在鎖定線上。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
@@ -410,6 +411,15 @@ class FlightScene extends Phaser.Scene {
             ? "beam"
             : "shot",
       );
+    audio.setMusicContext(
+      model.boss?.active
+        ? "boss"
+        : ["recovery", "regroup"].includes(model.section.id)
+          ? "recovery"
+          : model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
+            ? "pressure"
+            : "flight",
+    );
     audio.setIntensity(
       model.boss?.active ||
         model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
@@ -786,6 +796,30 @@ class FlightScene extends Phaser.Scene {
             overlay.fillRect(e.x + 17, e.y, 8, 23);
           }
         }
+      // Amber dashed rays are locked attack forecasts, never damaging beams.
+      // Rays stop at the playfield edge; the gap is intentionally left clear.
+      for (const e of model.enemies) {
+        if (!e.active || (e.telegraph ?? 0) <= 0) continue;
+        const angles =
+          e.behavior === "dive" && e.aimAngle !== undefined
+            ? [e.aimAngle]
+            : (e.attackAngles ?? []);
+        for (const angle of angles) {
+          overlay.lineStyle(1.3, 0xffd179, 0.55);
+          for (let d = 20; d < 480; d += 24) {
+            const x = e.x + Math.sin(angle) * d;
+            const y =
+              e.y + (e.behavior === "heavy" ? 20 : 0) + Math.cos(angle) * d;
+            if (x < 10 || x > 350 || y < 84 || y > 625) break;
+            overlay.lineBetween(
+              x,
+              y,
+              x + Math.sin(angle) * 10,
+              y + Math.cos(angle) * 10,
+            );
+          }
+        }
+      }
       for (const shot of model.enemyBullets)
         if (shot.active) {
           overlay.fillStyle(0xff5f9e);
@@ -853,6 +887,28 @@ class FlightScene extends Phaser.Scene {
               cannon.x - 8,
               cannon.y + 8,
             );
+          }
+        }
+        if (model.boss.attackWarning > 0) {
+          for (const [index, angle] of model.boss.attackAngles.entries()) {
+            if (index === 0 && !model.boss.cannons[0].active) continue;
+            if (
+              index === model.boss.attackAngles.length - 1 &&
+              !model.boss.cannons[1].active
+            )
+              continue;
+            overlay.lineStyle(1.8, 0xffd179, 0.65);
+            for (let d = 40; d < 580; d += 26) {
+              const x = model.boss.x + Math.sin(angle) * d;
+              const y = model.boss.y + 28 + Math.cos(angle) * d;
+              if (x < 10 || x > 350 || y > 625) break;
+              overlay.lineBetween(
+                x,
+                y,
+                x + Math.sin(angle) * 13,
+                y + Math.cos(angle) * 13,
+              );
+            }
           }
         }
         // Reactor pulses convey phase escalation without altering collision bounds.
@@ -1071,6 +1127,7 @@ Object.defineProperty(window, "__P01__", {
         hp: e.hp,
         maxHp: e.maxHp,
         telegraph: e.telegraph,
+        attackAngles: e.attackAngles,
         attackPattern: e.attackPattern,
         attackLanes: e.attackLanes,
         volleyFired: e.volleyFired,

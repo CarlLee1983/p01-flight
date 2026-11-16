@@ -97,6 +97,20 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
   await page.screenshot({ path: "docs/boss.png" });
+  await expect
+    .poll(async () => (await state(page)).boss?.attackWarning ?? 0, {
+      timeout: 7000,
+      intervals: [20],
+    })
+    .toBeGreaterThan(0);
+  const warning = (await state(page)).boss;
+  expect(warning.attackAngles.length).toBeGreaterThanOrEqual(2);
+  await page.screenshot({ path: "docs/boss-attack-forecast.png" });
+  await expect
+    .poll(async () => (await state(page)).audio.musicSection, { timeout: 5000 })
+    .toBe("boss");
+  expect((await state(page)).audio.notesScheduled).toBeGreaterThan(100);
+  expect((await state(page)).audio.sectionTransitionCount).toBeGreaterThan(2);
   await waitGameTime(page, BOSS_AT + 7);
   await expect.poll(async () => (await state(page)).partsDestroyed).toBe(2);
   await page.screenshot({ path: "docs/boss-cannons-destroyed.png" });
@@ -301,6 +315,18 @@ test("audio unlock, mute persistence and bomb edge trigger", async ({
   await expect
     .poll(async () => (await state(page)).audio.state)
     .toBe("running");
+  await expect
+    .poll(async () => (await state(page)).audio.notesScheduled)
+    .toBeGreaterThan(0);
+  await page.keyboard.press("p");
+  const pausedMusic = (await state(page)).audio.musicStep;
+  await page.waitForTimeout(400);
+  expect((await state(page)).audio.musicStep).toBe(pausedMusic);
+  expect((await state(page)).audio.activeVoices).toBe(0);
+  await page.keyboard.press("p");
+  await expect
+    .poll(async () => (await state(page)).audio.musicStep)
+    .toBeGreaterThan(pausedMusic);
   await page.keyboard.down("x");
   await page.waitForTimeout(1000);
   expect((await state(page)).bombs).toBe(1);
