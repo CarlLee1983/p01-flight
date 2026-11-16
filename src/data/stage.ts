@@ -47,6 +47,7 @@ export interface StageConfig {
   title: string;
   duration: number;
   groundSpeed?: number;
+  enemyBurstShots?: number;
   width: number;
   height: number;
   waves: Wave[];
@@ -57,6 +58,7 @@ export interface StageConfig {
     hp: number;
     fireEvery: number;
     bulletSpeed: number;
+    burstShots?: number;
     sideCannonHp?: number;
     points: number;
   };
@@ -99,6 +101,7 @@ const reinforcements: Wave[] = reinforcementTimes.flatMap((at, group) =>
   }),
 );
 export const stage01: StageConfig = {
+  enemyBurstShots: 2,
   id: "stage-01",
   title: "雲際航線",
   duration: 170,
@@ -416,6 +419,7 @@ export const stage01: StageConfig = {
     hp: 400,
     fireEvery: 2.7,
     bulletSpeed: 140,
+    burstShots: 4,
     sideCannonHp: 24,
     points: 3000,
   },

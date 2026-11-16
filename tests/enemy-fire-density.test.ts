@@ -27,7 +27,7 @@ it.each([30, 60, 120])(
     });
     expect(shots.size).toBe(92);
     expect(total).toBeGreaterThanOrEqual(120);
-    expect(peak).toBeLessThanOrEqual(32);
+    expect(peak).toBeLessThanOrEqual(40);
     expect(m.enemyBullets.some((b) => b.active)).toBe(false);
     expect(
       stage01.waves

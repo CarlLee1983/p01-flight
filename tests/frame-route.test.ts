@@ -52,7 +52,7 @@ it.each([10, 15, 20, 30, 60])(
         }
         if (!b1 && m.time >= 140) b1 = m.useBomb();
         if (!b2 && m.time >= 146) b2 = m.useBomb();
-        if (weapon === "missile" && m.time >= 150 && m.time < 150.3) dx = 1;
+        if (weapon === "missile" && m.time >= 149 && m.time < 149.5) dx = 1;
         advanceFrame(
           m,
           1 / fps,
@@ -103,7 +103,7 @@ it.each([10, 15, 20, 30, 60])(
       expect(m.damageCount).toBeGreaterThan(0);
       expect(midDamage).toBeGreaterThan(0);
       expect(maxE).toBeLessThanOrEqual(18);
-      expect(maxB).toBeLessThanOrEqual(24);
+      expect(maxB).toBeLessThanOrEqual(48);
     }
   },
 );

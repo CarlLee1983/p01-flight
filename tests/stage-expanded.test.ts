@@ -51,7 +51,7 @@ it.each([30, 60, 120])(
         }
         if (!b1 && m.time >= 140) b1 = m.useBomb();
         if (!b2 && m.time >= 146) b2 = m.useBomb();
-        if (weapon === "missile" && m.time >= 150 && m.time < 150.3) dx = 1;
+        if (weapon === "missile" && m.time >= 149 && m.time < 149.5) dx = -1;
         m.update(1 / fps, dx, 0, true, weapon === "missile" && m.time >= 125);
         for (const e of m.enemies)
           if (
@@ -101,7 +101,7 @@ it.each([30, 60, 120])(
       expect(m.damageCount).toBeGreaterThan(0);
       expect(midDamage).toBeGreaterThan(0);
       expect(maxE).toBeLessThanOrEqual(18);
-      expect(maxB).toBeLessThanOrEqual(24);
+      expect(maxB).toBeLessThanOrEqual(48);
     }
   },
 );
@@ -130,9 +130,9 @@ it.each([30, 60, 120])(
       m.enemyBullets.length,
     );
     expect(m.enemies.length).toBeLessThanOrEqual(32);
-    expect(m.enemyBullets.length).toBeLessThanOrEqual(32);
+    expect(m.enemyBullets.length).toBeLessThanOrEqual(40);
     expect(maxE).toBeLessThanOrEqual(32);
-    expect(maxB).toBeLessThanOrEqual(32);
+    expect(maxB).toBeLessThanOrEqual(40);
   },
 );
 it("new route uses distinct roles and fixed-time supplies instead of extending Boss health", () => {

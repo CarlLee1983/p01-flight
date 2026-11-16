@@ -23,8 +23,18 @@ describe("combat increment", () => {
       let bomb1 = false,
         bomb2 = false;
       for (let i = 0; i < 171 * fps; i++) {
-        if (!bomb1 && m.time >= 140) bomb1 = m.useBomb();
-        if (!bomb2 && m.time >= 146) bomb2 = m.useBomb();
+        if (
+          !bomb1 &&
+          (m.time >= 140 ||
+            (m.boss?.active && m.hp === 1 && m.invincible < 0.1))
+        )
+          bomb1 = m.useBomb();
+        if (
+          !bomb2 &&
+          (m.time >= 146 ||
+            (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
+        )
+          bomb2 = m.useBomb();
         m.update(1 / fps, 0, 0, true);
         if (m.partsDestroyed > cannonTimes.length) cannonTimes.push(m.time);
         sawBoss ||= !!m.boss?.active;
@@ -441,7 +451,7 @@ describe("focused dual weapons", () => {
     m.start();
     m.invincible = 100;
     run(m, 3.5);
-    expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(3);
+    expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(6);
     expect(m.enemies[0].y).toBeLessThan(153);
     run(m, 4);
     expect(m.enemies[0].y).toBeLessThan(153);
@@ -458,8 +468,17 @@ it.each([30, 60, 120])(
     let bomb1 = false,
       bomb2 = false;
     for (let i = 0; i < 171 * fps; i++) {
-      if (!bomb1 && m.time >= 140) bomb1 = m.useBomb();
-      if (!bomb2 && m.time >= 146) bomb2 = m.useBomb();
+      if (
+        !bomb1 &&
+        (m.time >= 140 || (m.boss?.active && m.hp === 1 && m.invincible < 0.1))
+      )
+        bomb1 = m.useBomb();
+      if (
+        !bomb2 &&
+        (m.time >= 146 ||
+          (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
+      )
+        bomb2 = m.useBomb();
       const cycle = (m.time - 125) % 6;
       const dx = m.time < 125 ? 0 : cycle < 1.5 ? -1 : cycle < 4.5 ? 1 : -1;
       m.update(1 / fps, dx, 0, true, true);
@@ -612,9 +631,18 @@ it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
       m.switchWeapon();
       switched = true;
     }
-    if (!b1 && m.time >= 140) b1 = m.useBomb();
-    if (!b2 && m.time >= 146) b2 = m.useBomb();
-    m.update(1 / fps, m.time >= 150 && m.time < 150.3 ? 1 : 0, 0, true, true);
+    if (
+      !b1 &&
+      (m.time >= 140 || (m.boss?.active && m.hp === 1 && m.invincible < 0.1))
+    )
+      b1 = m.useBomb();
+    if (
+      !b2 &&
+      (m.time >= 146 ||
+        (b1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
+    )
+      b2 = m.useBomb();
+    m.update(1 / fps, m.time >= 149 && m.time < 149.5 ? 1 : 0, 0, true, true);
   }
   console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
   expect(m.mode).toBe("won");
@@ -1232,7 +1260,7 @@ describe("escort formation density", () => {
       expect(Math.max(...offsets) - Math.min(...offsets)).toBeLessThan(1.1);
       run(m, 1, false, fps);
       expect(m.enemies.every((e) => e.volleyFired)).toBe(true);
-      expect(m.enemyBullets.length).toBeLessThanOrEqual(9);
+      expect(m.enemyBullets.length).toBeLessThanOrEqual(18);
       // Expired bullets must not be replaced by a second volley.
       run(m, 7, false, fps);
       expect(m.enemies.some((e) => e.active)).toBe(false);
