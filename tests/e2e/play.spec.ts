@@ -25,7 +25,15 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     expect(response.status()).toBe(200);
     expect(response.headers()["content-type"]).toContain("image/png");
   }
-  for (const name of ["player", "scout", "heavy", "boss", "coast"]) {
+  for (const name of [
+    "player",
+    "scout",
+    "heavy",
+    "boss",
+    "coast",
+    "interceptor",
+    "carrier",
+  ]) {
     const response = await page.request.get(`/assets/original/${name}.png`);
     expect(response.status()).toBe(200);
     expect(response.headers()["content-type"]).toContain("image/png");
@@ -42,6 +50,15 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await page.screenshot({ path: "docs/cross-formation.png" });
   await waitGameTime(page, 35);
   await page.screenshot({ path: "docs/dive-attack.png" });
+  await waitGameTime(page, 45);
+  await expect
+    .poll(async () => (await state(page)).supportTime)
+    .toBeGreaterThan(0);
+  await expect
+    .poll(async () => (await state(page)).supportShots)
+    .toBeGreaterThan(0);
+  expect((await state(page)).supportDrones).toHaveLength(2);
+  await page.screenshot({ path: "docs/wingman-support.png" });
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
@@ -82,6 +99,8 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     expect(reset.weaponLevel).toBe(1);
     expect(reset.weaponMode).toBe("spread");
     expect(reset.bombs).toBe(2);
+    expect(reset.supportTime).toBe(0);
+    expect(reset.supportDrones).toHaveLength(0);
     expect(reset.focus).toBe(false);
     expect(reset.boss).toBeNull();
     await page.getByRole("button", { name: "返回標題" }).click();
@@ -351,4 +370,43 @@ test("continuous coastal travel and parallax are visible, pause freezes them", a
   } finally {
     await context.close();
   }
+});
+
+test("intercepting a supply craft yields a visible weapon choice capsule", async ({
+  page,
+}) => {
+  test.setTimeout(40000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await page.keyboard.press("c");
+  await expect.poll(async () => (await state(page)).weaponMode).toBe("beam");
+  await page.keyboard.down("ArrowLeft");
+  await expect
+    .poll(async () => (await state(page)).player.x, { intervals: [20] })
+    .toBeLessThan(105);
+  await page.keyboard.up("ArrowLeft");
+  await page.keyboard.down("Space");
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activePickups.some((p: any) => p.kind === "spread"),
+      { timeout: 24000, intervals: [50] },
+    )
+    .toBe(true);
+  await page.screenshot({ path: "docs/weapon-capsule.png" });
+  for (let i = 0; i < 30; i++) {
+    const s = await state(page),
+      pickup = s.activePickups.find((p: any) => p.kind === "spread");
+    if (!pickup || Math.abs(pickup.x - s.player.x) < 7) break;
+    const key = pickup.x > s.player.x ? "ArrowRight" : "ArrowLeft";
+    await page.keyboard.down(key);
+    await page.waitForTimeout(25);
+    await page.keyboard.up(key);
+  }
+  await expect
+    .poll(async () => (await state(page)).lastPickup, { timeout: 8000 })
+    .toBe("spread");
+  expect((await state(page)).weaponMode).toBe("spread");
+  expect((await state(page)).weaponLevel).toBeGreaterThan(1);
+  await page.screenshot({ path: "docs/weapon-selected.png" });
 });

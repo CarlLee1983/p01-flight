@@ -614,3 +614,138 @@ it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
   console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
   expect(m.mode).toBe("won");
 });
+
+describe("weapon supply and temporary escorts", () => {
+  it.each([30, 60, 120])(
+    "S/B/M packages select and upgrade shared level at %i FPS",
+    (fps) => {
+      const m = new FlightModel(empty);
+      m.start();
+      for (const [index, kind] of (
+        ["spread", "beam", "missile"] as const
+      ).entries()) {
+        m.pickups.push({
+          id: 900 + index,
+          x: m.player.x,
+          y: m.player.y,
+          active: true,
+          kind,
+        });
+        m.update(1 / fps);
+        expect(m.weaponMode).toBe(kind);
+        expect(m.weaponLevel).toBe(Math.min(3, index + 2));
+        const count = m.pickupCount;
+        m.update(1 / fps);
+        expect(m.pickupCount).toBe(count);
+      }
+      m.switchWeapon();
+      expect(m.weaponMode).toBe("spread");
+      expect(m.weaponLevel).toBe(3);
+      m.start();
+      expect(m.weaponLevel).toBe(1);
+    },
+  );
+  it.each([30, 60, 120])(
+    "eight-second escorts shoot independently, expire and never block at %i FPS",
+    (fps) => {
+      const m = new FlightModel(empty);
+      m.start();
+      m.switchWeapon();
+      m.pickups.push({
+        id: 900,
+        x: 180,
+        y: 540,
+        active: true,
+        kind: "support",
+      });
+      m.update(1 / fps);
+      expect(m.supportTime).toBe(8);
+      expect(m.weaponMode).toBe("beam");
+      expect(m.weaponLevel).toBe(1);
+      expect(m.supportDrones).toEqual([
+        { x: 148, y: 552 },
+        { x: 212, y: 552 },
+      ]);
+      m.enemyBullets.push({
+        id: 901,
+        x: 148,
+        y: 552,
+        vx: 0,
+        vy: 0,
+        active: true,
+      });
+      m.update(1 / fps, 0, 0, true);
+      expect(
+        m.bullets.filter((b) => b.kind === "support" && b.active),
+      ).toHaveLength(2);
+      expect(m.supportShots).toBe(1);
+      expect(m.enemyBullets[0].active).toBe(true);
+      expect(m.hp).toBe(3);
+      run(m, 2, true, fps);
+      expect(m.supportShots).toBeGreaterThan(5);
+      m.pause();
+      const frozen = m.supportTime;
+      run(m, 1, true, fps);
+      expect(m.supportTime).toBe(frozen);
+      m.pause();
+      run(m, 7, false, fps);
+      expect(m.supportTime).toBe(0);
+      expect(m.supportDrones).toHaveLength(0);
+      const shots = m.supportShots;
+      run(m, 1, true, fps);
+      expect(m.supportShots).toBe(shots);
+      m.start();
+      expect(m.supportTime).toBe(0);
+      expect(m.supportShots).toBe(0);
+    },
+  );
+  it("support refresh is capped at eight seconds and dead pilots cannot collect it", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.supportTime = 6;
+    m.pickups.push({ id: 1, x: 180, y: 540, kind: "support", active: true });
+    m.update(0);
+    expect(m.supportTime).toBe(8);
+    m.hp = 1;
+    m.invincible = 0;
+    m.enemyBullets.push({ id: 2, x: 180, y: 540, vx: 0, vy: 0, active: true });
+    m.pickups.push({ id: 3, x: 180, y: 540, kind: "missile", active: true });
+    m.update(0);
+    expect(m.mode).toBe("lost");
+    expect(m.weaponMode).toBe("spread");
+  });
+  it.each([30, 60, 120])(
+    "carrier crosses without firing and drops its exact package once at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        waves: [
+          {
+            at: 0,
+            x: -30,
+            spawnY: 110,
+            direction: 1,
+            speed: 65,
+            hp: 4,
+            points: 200,
+            behavior: "carrier",
+            drop: "missile",
+          },
+        ],
+      });
+      m.start();
+      run(m, 2, false, fps);
+      const e = m.enemies[0];
+      expect(e.x).toBeCloseTo(100, 0);
+      expect(e.y).toBe(110);
+      expect(m.enemyBullets).toHaveLength(0);
+      m.bullets.push({ id: 900, x: e.x, y: e.y, active: true, damage: 4 });
+      m.update(0);
+      m.update(0);
+      expect(
+        m.pickups.filter((p) => p.active && p.kind === "missile"),
+      ).toHaveLength(1);
+      expect(m.score).toBe(200);
+    },
+  );
+});
