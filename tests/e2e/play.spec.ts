@@ -38,6 +38,10 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
     .toBeGreaterThan(1);
   await page.screenshot({ path: "docs/playing.png" });
+  await waitGameTime(page, 21.5);
+  await page.screenshot({ path: "docs/cross-formation.png" });
+  await waitGameTime(page, 35);
+  await page.screenshot({ path: "docs/dive-attack.png" });
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);

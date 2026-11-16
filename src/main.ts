@@ -312,7 +312,7 @@ class FlightScene extends Phaser.Scene {
             e.behavior === "cross"
               ? -(e.direction ?? 1) * 72
               : e.behavior === "dive"
-                ? ((e.diveAngle ?? Math.PI / 2) * 180) / Math.PI - 90
+                ? (-(e.diveAngle ?? 0) * 180) / Math.PI
                 : e.behavior === "weave"
                   ? Math.sin((e.age ?? 0) * 2.6) * 18
                   : 0,
