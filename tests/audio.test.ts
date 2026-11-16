@@ -224,4 +224,29 @@ describe("original procedural audio", () => {
     expect(ctx.oscillators).toHaveLength(total + 1);
     a.dispose();
   });
+  it("missile uses a low rising launch cue with its own cooldown and mute", async () => {
+    vi.stubGlobal("AudioContext", Context);
+    const a = new FlightAudio();
+    await a.unlock();
+    const ctx = Context.instances[0];
+    a.play("missile");
+    a.play("missile");
+    expect(ctx.oscillators).toHaveLength(1);
+    expect(ctx.oscillators[0].type).toBe("triangle");
+    expect(ctx.oscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      48,
+      0,
+    );
+    expect(
+      ctx.oscillators[0].frequency.exponentialRampToValueAtTime,
+    ).toHaveBeenCalledWith(140, 0.2);
+    ctx.currentTime = 0.23;
+    a.play("missile");
+    expect(ctx.oscillators).toHaveLength(2);
+    a.setVolumes(0, 0);
+    ctx.currentTime = 0.5;
+    a.play("missile");
+    expect(ctx.oscillators).toHaveLength(2);
+    a.dispose();
+  });
 });

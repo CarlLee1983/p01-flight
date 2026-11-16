@@ -8,8 +8,12 @@ export interface Body {
   vx?: number;
   vy?: number;
   damage?: number;
-  kind?: "spread" | "beam" | PickupKind;
+  kind?: "spread" | "beam" | "missile" | PickupKind;
   width?: number;
+  targetId?: number;
+  life?: number;
+  pierceRemaining?: number;
+  hitIds?: number[];
 }
 export interface Enemy extends Body {
   speed: number;
@@ -23,6 +27,8 @@ export interface Enemy extends Body {
   drop?: PickupKind;
   telegraph?: number;
   aimAngle?: number;
+  direction?: number;
+  diveAngle?: number;
 }
 export interface EnemyBullet extends Body {
   vx: number;
@@ -57,7 +63,7 @@ export class FlightModel {
   bossDefeated = false;
   weaponTime = 0; // Compatibility field: 1 while permanently upgraded.
   weaponLevel = 1;
-  weaponMode: "spread" | "beam" = "spread";
+  weaponMode: "spread" | "beam" | "missile" = "spread";
   focus = false;
   bombs = 2;
   bombFlash = 0;
@@ -108,7 +114,12 @@ export class FlightModel {
   }
   switchWeapon(): boolean {
     if (this.mode !== "playing") return false;
-    this.weaponMode = this.weaponMode === "spread" ? "beam" : "spread";
+    this.weaponMode =
+      this.weaponMode === "spread"
+        ? "beam"
+        : this.weaponMode === "beam"
+          ? "missile"
+          : "spread";
     return true;
   }
   /** Call once per input edge, never once per held-key frame. */
@@ -197,13 +208,17 @@ export class FlightModel {
       Math.min(this.stage.height - 24, this.player.y),
     );
     if (fire && this.cooldown <= 0) {
-      for (const angle of this.weaponMode === "beam"
-        ? [0]
-        : this.weaponLevel === 3
-          ? [-0.24, -0.12, 0, 0.12, 0.24]
-          : this.weaponLevel === 2
-            ? [-0.14, 0, 0.14]
-            : [0]) {
+      for (const angle of this.weaponMode === "missile"
+        ? this.weaponLevel === 1
+          ? [0]
+          : [-0.22, 0.22]
+        : this.weaponMode === "beam"
+          ? [0]
+          : this.weaponLevel === 3
+            ? [-0.24, -0.12, 0, 0.12, 0.24]
+            : this.weaponLevel === 2
+              ? [-0.14, 0, 0.14]
+              : [0]) {
         let b = this.bullets.find((b) => !b.active);
         if (!b) {
           b = { id: ++this.serial, x: 0, y: 0, active: false };
@@ -211,18 +226,38 @@ export class FlightModel {
         }
         Object.assign(b, {
           x: this.player.x,
-          vx: Math.sin(angle) * 550,
-          vy: -Math.cos(angle) * (this.weaponMode === "beam" ? 850 : 550),
+          vx: Math.sin(angle) * (this.weaponMode === "missile" ? 330 : 550),
+          vy:
+            -Math.cos(angle) *
+            (this.weaponMode === "beam"
+              ? 850
+              : this.weaponMode === "missile"
+                ? 330
+                : 550),
           damage:
-            this.weaponMode === "beam" ? [2, 3, 4][this.weaponLevel - 1] : 1,
+            this.weaponMode === "beam"
+              ? [2, 3, 4][this.weaponLevel - 1]
+              : this.weaponMode === "missile"
+                ? [5, 3.5, 4.5][this.weaponLevel - 1]
+                : 1,
           kind: this.weaponMode,
+          targetId: undefined,
+          life: this.weaponMode === "missile" ? 3.5 : undefined,
+          pierceRemaining:
+            this.weaponMode === "beam" ? this.weaponLevel + 1 : 1,
+          hitIds: [],
           width:
             this.weaponMode === "beam" ? [5, 8, 12][this.weaponLevel - 1] : 4,
           y: this.player.y - 26,
           active: true,
         });
       }
-      this.cooldown = this.weaponMode === "beam" ? 0.22 : 0.14;
+      this.cooldown =
+        this.weaponMode === "beam"
+          ? 0.22
+          : this.weaponMode === "missile"
+            ? 0.65
+            : 0.14;
       this.shots++;
     }
     while (
@@ -248,13 +283,16 @@ export class FlightModel {
         { behavior: "straight", fireEvery: undefined, drop: undefined },
         w,
         {
-          y: -24,
+          id: ++this.serial,
+          y: w.spawnY ?? -24,
           active: true,
           age: 0,
           originX: w.x,
           fireCooldown: w.fireEvery ?? 999,
           telegraph: 0,
           aimAngle: undefined,
+          direction: w.direction ?? 1,
+          diveAngle: undefined,
         },
       );
     }
@@ -280,14 +318,65 @@ export class FlightModel {
       };
     for (const b of this.bullets)
       if (b.active) {
+        if (b.kind === "missile") {
+          b.life = (b.life ?? 3.5) - dt;
+          const targets = this.enemies.filter(
+            (e) => e.active && e.y < b.y + 60,
+          );
+          const candidates = [
+            ...targets.map((e) => ({ id: e.id, x: e.x, y: e.y })),
+            ...(this.boss?.active && this.boss.y < b.y + 60
+              ? [{ id: -1, x: this.boss.x, y: this.boss.y }]
+              : []),
+          ];
+          const target =
+            candidates.find((e) => e.id === b.targetId) ??
+            candidates.sort(
+              (a, c) =>
+                Math.hypot(a.x - b.x, a.y - b.y) -
+                Math.hypot(c.x - b.x, c.y - b.y),
+            )[0];
+          b.targetId = target?.id;
+          if (target) {
+            const angle = Math.atan2(b.vy ?? -330, b.vx ?? 0);
+            const desired = Math.atan2(target.y - b.y, target.x - b.x);
+            const delta = Math.atan2(
+              Math.sin(desired - angle),
+              Math.cos(desired - angle),
+            );
+            const next = angle + Math.max(-4 * dt, Math.min(4 * dt, delta));
+            b.vx = Math.cos(next) * 330;
+            b.vy = Math.sin(next) * 330;
+          }
+          if (b.life <= 0) b.active = false;
+        }
         b.x += (b.vx ?? 0) * dt;
         b.y += (b.vy ?? -550) * dt;
-        if (b.y < -24 || b.x < -24 || b.x > this.stage.width + 24)
+        if (
+          b.y < -24 ||
+          b.x < -24 ||
+          b.x > this.stage.width + 24 ||
+          b.y > this.stage.height + 30
+        )
           b.active = false;
       }
     for (const e of this.enemies)
       if (e.active) {
         e.age = (e.age ?? 0) + dt;
+        if (e.behavior === "cross") {
+          e.x += (e.direction ?? 1) * e.speed * dt;
+        }
+        if (e.behavior === "dive") {
+          if (e.age >= 1 && e.age < 1.7) e.telegraph = 1.7 - e.age;
+          if (e.age >= 1.7 && e.diveAngle === undefined) {
+            e.diveAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
+            e.telegraph = 0;
+          }
+          if (e.diveAngle !== undefined) {
+            e.x += Math.sin(e.diveAngle) * 260 * dt;
+            e.y += Math.cos(e.diveAngle) * 260 * dt;
+          } else if (e.age < 1) e.y += e.speed * dt;
+        }
         if (e.behavior === "weave")
           e.x = Math.max(
             25,
@@ -297,6 +386,8 @@ export class FlightModel {
             ),
           );
         if (
+          e.behavior !== "dive" &&
+          e.behavior !== "cross" &&
           !(
             (e.behavior === "turret" || e.behavior === "heavy") &&
             e.y >= 150 &&
@@ -333,7 +424,13 @@ export class FlightModel {
             e.aimAngle = undefined;
           }
         }
-        if (e.y > this.stage.height + 30) e.active = false;
+        if (
+          e.y > this.stage.height + 30 ||
+          e.x < -50 ||
+          e.x > this.stage.width + 50 ||
+          e.y < -80
+        )
+          e.active = false;
       }
     if (this.boss?.active && this.stage.boss) {
       const boss = this.boss;
@@ -415,23 +512,28 @@ export class FlightModel {
         for (const e of this.enemies)
           if (
             e.active &&
+            !b.hitIds?.includes(e.id) &&
             Math.abs(b.x - e.x) < 22 + (b.width ?? 0) / 2 &&
             Math.abs(b.y - e.y) < 25
           ) {
-            b.active = false;
+            (b.hitIds ??= []).push(e.id);
+            b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
+            if (b.pierceRemaining <= 0) b.active = false;
             e.hp -= b.damage ?? 1;
             this.effects.push({ x: b.x, y: b.y, life: 0.25 });
             if (e.hp <= 0) this.destroyEnemy(e);
-            break;
+            if (!b.active) break;
           }
         const boss = this.boss;
         if (
           b.active &&
           boss?.active &&
+          !b.hitIds?.includes(-1) &&
           Math.abs(b.x - boss.x) < 48 + (b.width ?? 0) / 2 &&
           Math.abs(b.y - boss.y) < 36
         ) {
           b.active = false;
+          (b.hitIds ??= []).push(-1);
           boss.hp -= b.damage ?? 1;
           this.effects.push({ x: b.x, y: b.y, life: 0.25 });
           this.finishBoss();

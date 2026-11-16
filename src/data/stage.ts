@@ -1,4 +1,10 @@
-export type Behavior = "straight" | "weave" | "turret" | "heavy";
+export type Behavior =
+  | "straight"
+  | "weave"
+  | "turret"
+  | "heavy"
+  | "dive"
+  | "cross";
 export type PickupKind = "heal" | "double" | "power";
 export interface Wave {
   at: number;
@@ -9,6 +15,8 @@ export interface Wave {
   behavior?: Behavior;
   fireEvery?: number;
   drop?: PickupKind;
+  spawnY?: number;
+  direction?: number;
 }
 export interface StageConfig {
   id: string;
@@ -54,6 +62,30 @@ export const stage01: StageConfig = {
         points: 150,
         behavior: "weave" as const,
         fireEvery: 2.4,
+      })),
+    ),
+    // Crossing patrols create horizontal interception opportunities for missiles.
+    ...[21, 29, 43].flatMap((at, group) =>
+      [0, 1, 2].map((i) => ({
+        at: at + i * 0.55,
+        x: group % 2 ? 390 : -30,
+        spawnY: 160 + i * 30,
+        direction: group % 2 ? -1 : 1,
+        speed: 125,
+        hp: 2,
+        points: 180,
+        behavior: "cross" as const,
+      })),
+    ),
+    // Diving pairs warn, lock a flight line, then commit; no extra bullet curtain.
+    ...[34, 52].flatMap((at) =>
+      [75, 285].map((x, i) => ({
+        at: at + i * 1.2,
+        x,
+        speed: 140,
+        hp: 3,
+        points: 240,
+        behavior: "dive" as const,
       })),
     ),
     ...[32, 40, 49].flatMap((at) =>

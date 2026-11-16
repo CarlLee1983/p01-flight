@@ -288,7 +288,7 @@ describe("weapon and encounter progression", () => {
     expect(
       stage01.waves
         .filter((w) => w.at >= 15 && w.at < 30)
-        .every((w) => w.behavior === "weave"),
+        .every((w) => w.behavior === "weave" || w.behavior === "cross"),
     ).toBe(true);
     expect(
       stage01.waves.some((w) => w.behavior === "turret" && w.hp >= 5),
@@ -385,6 +385,8 @@ describe("focused dual weapons", () => {
       m.pause();
       m.switchWeapon();
       expect(m.weaponLevel).toBe(level);
+      expect(m.weaponMode).toBe("missile");
+      m.switchWeapon();
       expect(m.weaponMode).toBe("spread");
       m.start();
       expect(m.weaponMode).toBe("spread");
@@ -462,3 +464,153 @@ it.each([30, 60, 120])(
     expect(m.time).toBeLessThan(115);
   },
 );
+
+describe("homing and piercing", () => {
+  it("C cycles three mechanically distinct modes and reset returns spread", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.switchWeapon();
+    expect(m.weaponMode).toBe("beam");
+    m.switchWeapon();
+    expect(m.weaponMode).toBe("missile");
+    m.switchWeapon();
+    expect(m.weaponMode).toBe("spread");
+  });
+  it.each([1, 2, 3])(
+    "missile level %i has finite life, limited turn rate and slower cadence",
+    (level) => {
+      const m = new FlightModel(empty);
+      m.start();
+      m.weaponLevel = level;
+      m.switchWeapon();
+      m.switchWeapon();
+      m.enemies.push({
+        id: 90,
+        x: 280,
+        y: 250,
+        hp: 100,
+        speed: 0,
+        points: 1,
+        active: true,
+      });
+      m.update(0, 0, 0, true);
+      expect(m.bullets).toHaveLength(level === 1 ? 1 : 2);
+      const b = m.bullets[0],
+        initial = Math.atan2(b.vy!, b.vx!);
+      m.update(0.05, 0, 0, true);
+      expect(m.shots).toBe(1);
+      expect(b.targetId).toBe(90);
+      expect(Math.abs(Math.atan2(b.vy!, b.vx!) - initial)).toBeLessThanOrEqual(
+        0.201,
+      );
+      expect(b.vx).toBeGreaterThan(Math.cos(initial) * 330);
+      run(m, 4);
+      expect(m.bullets.every((b) => !b.active)).toBe(true);
+    },
+  );
+  it("missiles reacquire a live target when their target dies", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.switchWeapon();
+    m.switchWeapon();
+    m.enemies.push(
+      { id: 90, x: 180, y: 300, hp: 20, speed: 0, points: 1, active: true },
+      { id: 91, x: 240, y: 250, hp: 20, speed: 0, points: 1, active: true },
+    );
+    m.update(0.01, 0, 0, true);
+    expect(m.bullets[0].targetId).toBe(90);
+    m.enemies[0].active = false;
+    m.update(0.01);
+    expect(m.bullets[0].targetId).toBe(91);
+  });
+  it("one beam pierces distinct targets, never damages a target on successive overlap frames", () => {
+    const m = new FlightModel(empty);
+    m.start();
+    m.switchWeapon();
+    m.weaponLevel = 3;
+    m.enemies.push(
+      { id: 90, x: 180, y: 400, hp: 20, speed: 0, points: 1, active: true },
+      { id: 91, x: 180, y: 350, hp: 20, speed: 0, points: 1, active: true },
+    );
+    m.update(0, 0, 0, true);
+    const b = m.bullets[0];
+    b.y = 400;
+    b.vy = 0;
+    m.update(0);
+    m.update(0.01);
+    m.update(0.01);
+    expect(m.enemies[0].hp).toBe(16);
+    expect(b.active).toBe(true);
+    b.y = 350;
+    m.update(0);
+    m.update(0);
+    expect(m.enemies[1].hp).toBe(16);
+    expect(b.hitIds).toEqual([90, 91]);
+    expect(b.pierceRemaining).toBe(2);
+  });
+  it("reused enemy pool slots receive new spawn identity for piercing", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        { at: 0, x: 100, speed: 0, hp: 1, points: 1 },
+        { at: 1, x: 100, speed: 0, hp: 1, points: 1 },
+      ],
+    });
+    m.start();
+    m.update(0);
+    const id = m.enemies[0].id;
+    m.enemies[0].active = false;
+    run(m, 1.1);
+    expect(m.enemies).toHaveLength(1);
+    expect(m.enemies[0].id).not.toBe(id);
+  });
+  it("dive warns then locks its path; cross enters from the side and exits", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        { at: 0, x: 75, speed: 140, hp: 3, points: 1, behavior: "dive" },
+        {
+          at: 0,
+          x: -30,
+          spawnY: 160,
+          direction: 1,
+          speed: 125,
+          hp: 2,
+          points: 1,
+          behavior: "cross",
+        },
+      ],
+    });
+    m.start();
+    run(m, 1.2);
+    expect(m.enemies[0].telegraph).toBeGreaterThan(0);
+    expect(m.enemies[1].y).toBe(160);
+    expect(m.enemies[1].x).toBeCloseTo(120, 0);
+    run(m, 0.6);
+    const angle = m.enemies[0].diveAngle;
+    expect(angle).toBeDefined();
+    for (let i = 0; i < 30; i++) m.update(1 / 60, 1, 0);
+    expect(m.enemies[0].diveAngle).toBe(angle);
+    run(m, 2);
+    expect(m.enemies[1].active).toBe(false);
+  });
+});
+it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
+  const m = new FlightModel(stage01);
+  m.start();
+  let switched = false,
+    b1 = false,
+    b2 = false;
+  for (let i = 0; i < 116 * fps; i++) {
+    if (!switched && m.time >= 70) {
+      m.switchWeapon();
+      m.switchWeapon();
+      switched = true;
+    }
+    if (!b1 && m.time >= 85) b1 = m.useBomb();
+    if (!b2 && m.time >= 91) b2 = m.useBomb();
+    m.update(1 / fps, 0, 0, true);
+  }
+  console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
+  expect(m.mode).toBe("won");
+});

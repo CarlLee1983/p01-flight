@@ -1,4 +1,5 @@
 export type FlightSound =
+  | "missile"
   | "beam"
   | "shot"
   | "hit"
@@ -115,7 +116,9 @@ export class FlightAudio {
     )
       return;
     const now = this.context!.currentTime;
-    const routine = ["shot", "beam", "hit", "explode"].includes(kind);
+    const routine = ["shot", "beam", "missile", "hit", "explode"].includes(
+      kind,
+    );
     if (
       routine &&
       (now < this.warningUntil ||
@@ -123,16 +126,22 @@ export class FlightAudio {
     )
       return;
     const gap =
-      kind === "beam"
-        ? 0.16
-        : kind === "shot"
-          ? 0.085
-          : kind === "hit"
-            ? 0.055
-            : 0.12;
+      kind === "missile"
+        ? 0.22
+        : kind === "beam"
+          ? 0.16
+          : kind === "shot"
+            ? 0.085
+            : kind === "hit"
+              ? 0.055
+              : 0.12;
     if (now - (this.lastSound.get(kind) ?? -Infinity) < gap) return;
     this.lastSound.set(kind, now);
     switch (kind) {
+      case "missile":
+        // Low rising launch thump, distinct from the chirp and sustained beam.
+        this.tone(48, 140, 0.2, "triangle", 0.24, false, 0.012);
+        break;
       case "beam":
         // Two stable, beating harmonics and a slower attack make this a buzz,
         // unlike the spread shot's short downward chirp. Both remain quiet.
