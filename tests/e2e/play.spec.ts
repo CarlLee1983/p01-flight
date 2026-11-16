@@ -518,3 +518,29 @@ test("mid-stage patrol corvette warns alternating lanes before firing", async ({
   await page.screenshot({ path: "docs/patrol-counterattack.png" });
   await page.keyboard.up("Space");
 });
+
+test("original ground battery and supply facility remain readable in the harbor", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await page.keyboard.down("Space");
+  await waitGameTime(page, 30);
+  await page.keyboard.up("Space");
+  await waitGameTime(page, 39.5);
+  const snapshot = await state(page);
+  expect(snapshot.mode).toBe("playing");
+  expect(snapshot.background.harborArtReady).toBe(true);
+  expect(
+    snapshot.activeEnemies.some(
+      (e: any) => e.behavior === "groundBattery" && e.y > 100,
+    ),
+  ).toBe(true);
+  expect(
+    snapshot.activeEnemies.some(
+      (e: any) => e.behavior === "groundDepot" && e.y > 70,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "docs/ground-art-harbor.png" });
+});
