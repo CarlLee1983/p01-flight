@@ -285,6 +285,20 @@ class FlightScene extends Phaser.Scene {
                   ? 0xffed9e
                   : 0xffffff,
           );
+          if (b.kind === "missile") {
+            const length = Math.hypot(b.vx ?? 0, b.vy ?? -330) || 1;
+            const dx = (b.vx ?? 0) / length,
+              dy = (b.vy ?? -330) / length;
+            overlay.lineStyle(4, 0xffb34f, 0.8);
+            overlay.lineBetween(b.x - dx * 18, b.y - dy * 18, b.x, b.y);
+            overlay.lineStyle(2, 0xfff4cf, 1);
+            overlay.lineBetween(
+              b.x - dx * 5,
+              b.y - dy * 5,
+              b.x + dx * 5,
+              b.y + dy * 5,
+            );
+          }
         }
       for (const e of model.enemies)
         if (e.active) {
