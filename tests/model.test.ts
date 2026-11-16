@@ -21,7 +21,12 @@ describe("flight rules", () => {
     expect(a.player.y).toBe(70);
   });
   it("fire cooldown, pools, offscreen cleanup", () => {
-    const m = new FlightModel({ ...stage01, waves: [] });
+    const m = new FlightModel({
+      ...stage01,
+      waves: [],
+      boss: undefined,
+      pickups: [],
+    });
     m.start();
     advance(m, 10, true);
     expect(m.shots).toBeGreaterThan(60);
@@ -31,7 +36,12 @@ describe("flight rules", () => {
     expect(m.bullets.some((b) => b.active)).toBe(false);
   });
   it("single hit scores once", () => {
-    const m = new FlightModel({ ...stage01, waves: [] });
+    const m = new FlightModel({
+      ...stage01,
+      waves: [],
+      boss: undefined,
+      pickups: [],
+    });
     m.start();
     m.enemies.push({
       id: 1,
@@ -50,7 +60,12 @@ describe("flight rules", () => {
     expect(m.score).toBe(100);
   });
   it("invulnerability prevents overlap killing instantly", () => {
-    const m = new FlightModel({ ...stage01, waves: [] });
+    const m = new FlightModel({
+      ...stage01,
+      waves: [],
+      boss: undefined,
+      pickups: [],
+    });
     m.start();
     for (let i = 0; i < 3; i++)
       m.enemies.push({
@@ -68,7 +83,12 @@ describe("flight rules", () => {
     expect(m.hp).toBe(2);
   });
   it("wins at 75 seconds and restart resets all state", () => {
-    const m = new FlightModel({ ...stage01, waves: [] });
+    const m = new FlightModel({
+      ...stage01,
+      waves: [],
+      boss: undefined,
+      pickups: [],
+    });
     m.start();
     advance(m, 76);
     expect(m.mode).toBe("won");
@@ -82,7 +102,12 @@ describe("flight rules", () => {
     expect(m.bullets.length).toBeLessThan(10);
   });
   it("loses on third distinct hit; paused time is frozen", () => {
-    const m = new FlightModel({ ...stage01, waves: [] });
+    const m = new FlightModel({
+      ...stage01,
+      waves: [],
+      boss: undefined,
+      pickups: [],
+    });
     m.start();
     m.pause();
     advance(m, 5);
@@ -157,7 +182,7 @@ describe("Stage 01 playthrough fixtures", () => {
     m.start();
     for (let i = 0; i < 76 * 60; i++) {
       const t = i / 60;
-      m.update(1 / 60, t >= 12 && t < 12.8 ? -1 : 0, 0, true);
+      m.update(1 / 60, 0, 0, true);
     }
     expect(m.mode).toBe("won");
     expect(m.hp).toBeGreaterThan(0);
