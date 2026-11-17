@@ -1,4 +1,10 @@
 import type Phaser from "phaser";
+import {
+  STAGE01_SCENERY,
+  type SceneryTimeline,
+  type CoastalScenery,
+  type CoastalAreaConfig,
+} from "../data/scenery";
 import { GROUND_SCROLL_SPEED } from "../data/stage";
 
 /** Coast source is 720×1080; display at half size, blending 180 source pixels. */
@@ -14,32 +20,8 @@ export const COAST_SCROLL = {
   cloudSpeed: 85,
 } as const;
 
-export type CoastalScenery =
-  | "offshore"
-  | "channel"
-  | "harbor"
-  | "arena"
-  | "exit"
-  | "approach"
-  | "command";
-export interface CoastalAreaConfig {
-  readonly id: string;
-  readonly label: string;
-  readonly at: number;
-  readonly fade: number;
-  readonly scenery: CoastalScenery;
-}
-
-/** Pure timing/composition data; profiles can be reordered or repeated. */
-export const COAST_AREAS: readonly CoastalAreaConfig[] = [
-  { id: "offshore", label: "外海試探", at: 0, fade: 0, scenery: "offshore" },
-  { id: "channel", label: "狹港入口", at: 15, fade: 4, scenery: "channel" },
-  { id: "harbor", label: "港區火力", at: 32, fade: 5, scenery: "harbor" },
-  { id: "elite-basin", label: "港池攔截", at: 40, fade: 3, scenery: "arena" },
-  { id: "harbor-exit", label: "突破港區", at: 50, fade: 3, scenery: "exit" },
-  { id: "approach", label: "補給水域", at: 56, fade: 4, scenery: "approach" },
-  { id: "command", label: "指揮艦區", at: 70, fade: 5, scenery: "command" },
-];
+export { type CoastalScenery, type CoastalAreaConfig } from "../data/scenery";
+export const COAST_AREAS = STAGE01_SCENERY.areas;
 
 export type CoastalLandmarkKind = "tanks" | "warehouse" | "crane" | "emptyDock";
 export interface CoastalLandmarkConfig {
@@ -173,10 +155,15 @@ export function harborArtState(
   return target;
 }
 
-/** Exit is a single world block: its southern warehouses enter at 53s. */
-export function harborExitY(time: number, height = 720) {
+/** Exit is a single world block: its southern warehouses enter at the configured world distance. */
+export function harborExitY(
+  time: number,
+  height = 720,
+  exitAt = STAGE01_SCENERY.exitAt,
+) {
   return (
-    (Math.max(0, Number.isFinite(time) ? time : 0) - 53) * COAST_SCROLL.speed -
+    (Math.max(0, Number.isFinite(time) ? time : 0) - exitAt) *
+      COAST_SCROLL.speed -
     height
   );
 }
@@ -188,6 +175,14 @@ export class CoastalBackground {
   private harborArtHeight = 720;
   private harborArtScroll = harborArtState(0, 720);
   private harborArtAlpha = 0;
+  private artworkBlocks: {
+    id: string;
+    enterAt: number;
+    north: number;
+    height: number;
+    image: Phaser.GameObjects.Image;
+    y: number;
+  }[] = [];
   private exitArt?: Phaser.GameObjects.Image;
   private exitNorthExtension = 1320;
   private exitHeight = 720;
@@ -207,12 +202,23 @@ export class CoastalBackground {
   private weights: number[];
   private layers = [0.35, 0, 0];
   readonly coastReady: boolean;
+  private readonly areas: readonly CoastalAreaConfig[];
 
   constructor(
     scene: Phaser.Scene,
-    private readonly areas: readonly CoastalAreaConfig[] = COAST_AREAS,
+    areas: readonly CoastalAreaConfig[] | undefined = undefined,
     private readonly landmarkConfig: readonly CoastalLandmarkConfig[] = COAST_LANDMARKS,
+    private readonly timeline: SceneryTimeline = STAGE01_SCENERY,
   ) {
+    areas = areas ?? timeline.areas;
+    this.areas = areas;
+    if (
+      !Number.isFinite(timeline.exitAt) ||
+      timeline.exitAt < 0 ||
+      !Number.isFinite(timeline.duration) ||
+      timeline.duration < timeline.exitAt
+    )
+      throw new RangeError("Invalid scenery timeline");
     validateAreas(areas);
     const ids = new Set<string>();
     for (const landmark of landmarkConfig) {
@@ -315,6 +321,136 @@ export class CoastalBackground {
               .setDepth(-10.9),
           );
       }
+    }
+
+    for (const block of timeline.artworkBlocks ?? []) {
+      if (!scene.textures.exists(block.texture)) continue;
+      const source = scene.textures
+        .get(block.texture)
+        .getSourceImage() as HTMLImageElement;
+      const height = (source.height * 360) / source.width;
+      const north = Math.min(source.width * 4, 4080 - source.height);
+      const worldHeight = north + source.height;
+      const key = `p01-world-block-opaque-v2-${block.id}`;
+      if (!scene.textures.exists(key)) {
+        const canvas = scene.textures.createCanvas(
+          key,
+          source.width,
+          worldHeight,
+        );
+        if (canvas) {
+          const c = canvas.getContext();
+          // The refinery's observed centre (x=240..480,y=0..240) is water.
+          // Tile at original pixel scale onto an opaque base, then blend seams
+          // into that base. Never layer transparent water over the old port.
+          const tile = 240,
+            seam = 40,
+            sampleX = (source.width - tile) / 2;
+          for (let y = 0; y < worldHeight; y += tile) {
+            for (let x = 0; x < source.width; x += tile) {
+              const w = Math.min(tile, source.width - x),
+                h = Math.min(tile, worldHeight - y);
+              c.drawImage(source, sampleX, 0, w, h, x, y, w, h);
+            }
+          }
+          for (let boundary = tile; boundary < source.width; boundary += tile) {
+            for (
+              let col = 0;
+              col < seam && boundary + col < source.width;
+              col++
+            ) {
+              c.globalAlpha = 1 - col / seam;
+              for (let y = 0; y < worldHeight; y += tile) {
+                const h = Math.min(tile, worldHeight - y);
+                c.drawImage(
+                  source,
+                  sampleX + tile - seam + col,
+                  0,
+                  1,
+                  h,
+                  boundary + col,
+                  y,
+                  1,
+                  h,
+                );
+              }
+            }
+          }
+          for (let y = tile; y < worldHeight; y += tile) {
+            for (let row = 0; row < seam && y + row < worldHeight; row++) {
+              c.globalAlpha = 1 - row / seam;
+              for (let x = 0; x < source.width; x += tile) {
+                const w = Math.min(tile, source.width - x);
+                c.drawImage(
+                  source,
+                  sampleX,
+                  tile - seam + row,
+                  w,
+                  1,
+                  x,
+                  y + row,
+                  w,
+                  1,
+                );
+              }
+            }
+          }
+          c.globalAlpha = 1;
+          const edge = Math.round((90 * source.width) / 360);
+          for (let row = 0; row < edge; row++) {
+            c.globalAlpha = row / edge;
+            c.drawImage(
+              source,
+              0,
+              row,
+              source.width,
+              1,
+              0,
+              north + row,
+              source.width,
+              1,
+            );
+          }
+          c.globalAlpha = 1;
+          c.drawImage(
+            source,
+            0,
+            edge,
+            source.width,
+            source.height - edge,
+            0,
+            north + edge,
+            source.width,
+            source.height - edge,
+          );
+          c.globalCompositeOperation = "destination-in";
+          const mask = c.createLinearGradient(
+            0,
+            worldHeight - edge,
+            0,
+            worldHeight,
+          );
+          mask.addColorStop(0, "white");
+          mask.addColorStop(1, "rgba(255,255,255,0)");
+          c.fillStyle = mask;
+          c.fillRect(0, 0, source.width, worldHeight);
+          c.globalCompositeOperation = "source-over";
+          canvas.refresh();
+        }
+      }
+      if (scene.textures.exists(key))
+        this.artworkBlocks.push({
+          id: block.id,
+          enterAt: block.enterAt,
+          north: (north * 360) / source.width,
+          height,
+          image: scene.add
+            .image(0, 0, key)
+            .setOrigin(0, 0)
+            .setDisplaySize(360, (worldHeight * 360) / source.width)
+            .setDepth(-10.88),
+          y: -height,
+        });
     }
 
     if (scene.textures.exists("harbor-exit")) {
@@ -690,7 +826,16 @@ export class CoastalBackground {
       this.harborArt[i]
         .setPosition(0, this.harborArtScroll.y[i])
         .setAlpha(this.harborArtAlpha);
-    this.exitY = harborExitY(time, this.exitHeight);
+    for (let i = 0; i < this.artworkBlocks.length; i++) {
+      const block = this.artworkBlocks[i];
+      block.y =
+        this.state.distance - block.enterAt * COAST_SCROLL.speed - block.height;
+      block.image
+        .setPosition(0, block.y - block.north)
+        .setAlpha(1)
+        .setVisible(block.y > -block.height && block.y - block.north < 640);
+    }
+    this.exitY = harborExitY(time, this.exitHeight, this.timeline.exitAt);
     const exitWorldY = this.exitY - this.exitNorthExtension;
     this.exitArt
       ?.setPosition(0, exitWorldY)
@@ -769,6 +914,16 @@ export class CoastalBackground {
       cloudSpeed: COAST_SCROLL.cloudSpeed,
       coastReady: this.coastReady,
       coastImages: this.coast.length,
+      artworkBlocks: this.artworkBlocks.map(({ id, y, height, north }) => ({
+        id,
+        y,
+        height,
+        worldY: y - north,
+        worldHeight: height + north,
+        opaqueNorth: true,
+      })),
+      exitAt: this.timeline.exitAt,
+      sceneryDuration: this.timeline.duration,
       exitReady: !!this.exitArt,
       exitY: this.exitY,
       exitAlpha:

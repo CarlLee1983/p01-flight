@@ -17,8 +17,8 @@ class Osc {
   onended: (() => void) | null = null;
   connect = vi.fn();
   disconnect = vi.fn();
-  start = vi.fn();
-  stop = vi.fn();
+  start = vi.fn((_when?: number) => {});
+  stop = vi.fn((_when?: number) => {});
 }
 class Context {
   static instances: Context[] = [];
@@ -48,6 +48,8 @@ class Context {
   });
 }
 afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   Context.instances = [];
 });
@@ -63,7 +65,7 @@ describe("original procedural audio", () => {
     const ctx = Context.instances[0];
     a.update(0.016);
     a.play("shot");
-    expect(a.diagnostics().activeVoices).toBe(4);
+    expect(a.diagnostics().activeVoices).toBe(7);
     a.setPlaying(false);
     expect(a.diagnostics().activeVoices).toBe(0);
     expect(
@@ -177,25 +179,35 @@ describe("original procedural audio", () => {
     );
     a.dispose();
   });
-  it("intensity changes the next rhythmic pulse without stopping current envelopes", async () => {
+  it("score changes section on a bar boundary and pauses retain musical position", async () => {
     vi.stubGlobal("AudioContext", Context);
     const a = new FlightAudio();
     await a.unlock();
     const ctx = Context.instances[0];
     a.setPlaying(true);
     a.update(0.01);
-    expect(ctx.oscillators).toHaveLength(3);
+    expect(a.diagnostics().musicSection).toBe("intro");
+    expect(ctx.oscillators).toHaveLength(6);
     const stopCalls = ctx.oscillators.map((o) => o.stop.mock.calls.length);
     a.setIntensity(2);
-    expect(a.diagnostics().intensity).toBe(2);
     expect(ctx.oscillators.map((o) => o.stop.mock.calls.length)).toEqual(
       stopCalls,
     );
     a.update(0.1);
-    a.update(0.1);
-    a.update(0.1);
-    expect(ctx.oscillators).toHaveLength(5); // offbeat arp plus high tick
+    expect(a.diagnostics().musicSection).toBe("intro");
     a.setPlaying(false);
+    const step = a.diagnostics().musicStep;
+    a.update(10);
+    expect(a.diagnostics().musicStep).toBe(step);
+    a.setPlaying(true);
+    expect(a.diagnostics().musicStep).toBe(step);
+    for (let i = 0; i < 120; i++) {
+      Context.instances[0].currentTime += 1 / 60;
+      a.update(1 / 60);
+    }
+    expect(a.diagnostics().musicSection).toBe("boss");
+    a.resetMusic();
+    expect(a.diagnostics().musicStep).toBe(0);
     expect(a.diagnostics().activeVoices).toBe(0);
     a.dispose();
   });
@@ -247,6 +259,141 @@ describe("original procedural audio", () => {
     ctx.currentTime = 0.5;
     a.play("missile");
     expect(ctx.oscillators).toHaveLength(2);
+    a.dispose();
+  });
+  it.each([30, 60, 120])(
+    "score tempo stays stable at %i FPS and all ended nodes release",
+    async (fps) => {
+      vi.stubGlobal("AudioContext", Context);
+      const a = new FlightAudio();
+      await a.unlock();
+      const ctx = Context.instances[0];
+      a.setPlaying(true);
+      for (let i = 0; i < 75 * fps; i++) {
+        ctx.currentTime = i / fps;
+        for (const o of ctx.oscillators) {
+          const ending = o.stop.mock.calls[0]?.[0] as number | undefined;
+          if (ending !== undefined && ending <= ctx.currentTime && o.onended)
+            o.onended();
+        }
+        a.update(1 / fps);
+        expect(a.diagnostics().activeVoices).toBeLessThanOrEqual(12);
+      }
+      expect(a.diagnostics().musicStep).toBeGreaterThanOrEqual(659);
+      expect(a.diagnostics().musicStep).toBeLessThanOrEqual(662);
+      a.setPlaying(false);
+      expect(a.diagnostics().activeVoices).toBe(0);
+      expect(
+        ctx.oscillators.every((o) => o.disconnect.mock.calls.length === 1),
+      ).toBe(true);
+      a.dispose();
+    },
+  );
+  it("explicit encounter context overrides legacy intensity and exposes actual scheduled notes", async () => {
+    vi.stubGlobal("AudioContext", Context);
+    const a = new FlightAudio();
+    await a.unlock();
+    a.setPlaying(true);
+    a.setIntensity(2);
+    a.setMusicContext("flight");
+    a.update(0.01);
+    expect(a.diagnostics().musicSection).toBe("intro");
+    expect(a.diagnostics().notesScheduled).toBe(6);
+    a.setMusicContext("pressure");
+    for (let i = 0; i < 120; i++) {
+      Context.instances[0].currentTime += 1 / 60;
+      a.update(1 / 60);
+    }
+    expect(a.diagnostics().musicSection).toBe("assault");
+    a.setMusicContext("recovery");
+    for (let i = 0; i < 120; i++) {
+      Context.instances[0].currentTime += 1 / 60;
+      a.update(1 / 60);
+    }
+    expect(a.diagnostics().musicSection).toBe("breather");
+    a.setMusicContext("boss");
+    for (let i = 0; i < 120; i++) {
+      Context.instances[0].currentTime += 1 / 60;
+      a.update(1 / 60);
+    }
+    expect(a.diagnostics().musicSection).toBe("boss");
+    expect(a.diagnostics().sectionTransitionCount).toBe(3);
+    a.setVolumes(0, 0);
+    const count = a.diagnostics().notesScheduled;
+    for (let i = 0; i < 120; i++) {
+      Context.instances[0].currentTime += 1 / 60;
+      a.update(1 / 60);
+    }
+    expect(a.diagnostics().notesScheduled).toBe(count);
+    a.resetMusic();
+    expect(a.diagnostics().notesScheduled).toBe(0);
+    expect(a.diagnostics().sectionTransitionCount).toBe(0);
+    a.dispose();
+  });
+  it.each([16, 5, 2])(
+    "AudioContext lookahead remains 132 BPM with %i FPS render updates",
+    async (fps) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+      vi.stubGlobal("AudioContext", Context);
+      const a = new FlightAudio();
+      await a.unlock();
+      const ctx = Context.instances[0];
+      Object.defineProperty(ctx, "currentTime", {
+        get: () => Date.now() / 1000,
+      });
+      const cleanup = setInterval(() => {
+        for (const o of ctx.oscillators) {
+          const end = o.stop.mock.calls[0]?.[0];
+          if (end !== undefined && end <= ctx.currentTime && o.onended)
+            o.onended();
+        }
+      }, 10);
+      a.setPlaying(true);
+      a.update(0);
+      for (let i = 0; i < fps * 8; i++) {
+        vi.advanceTimersByTime(1000 / fps);
+        a.update(1 / fps);
+      }
+      expect(a.diagnostics().musicStep).toBeGreaterThanOrEqual(71);
+      expect(a.diagnostics().musicStep).toBeLessThanOrEqual(72);
+      expect(a.diagnostics().queuedMusicSteps).toBeLessThanOrEqual(3);
+      // Notes are scheduled ahead at the AudioContext grid, not quantized to frames.
+      const starts = ctx.oscillators.flatMap((o) =>
+        o.start.mock.calls.map((args) => args[0] as number),
+      );
+      expect(
+        starts.some((t) => Math.abs(t * fps - Math.round(t * fps)) > 0.1),
+      ).toBe(true);
+      for (const t of starts)
+        expect((t - 0.01) / (60 / 132 / 4)).toBeCloseTo(
+          Math.round((t - 0.01) / (60 / 132 / 4)),
+          5,
+        );
+      a.setPlaying(false);
+      const step = a.diagnostics().musicStep;
+      vi.advanceTimersByTime(10000);
+      expect(a.diagnostics().musicStep).toBe(step);
+      a.setPlaying(true);
+      a.update(0);
+      expect(a.diagnostics().musicStep - step).toBeLessThanOrEqual(2);
+      a.dispose();
+      clearInterval(cleanup);
+    },
+  );
+  it("a blocked main thread skips expired notes without catch-up burst", async () => {
+    vi.stubGlobal("AudioContext", Context);
+    const a = new FlightAudio();
+    await a.unlock();
+    const ctx = Context.instances[0];
+    a.setPlaying(true);
+    a.update(0);
+    const before = a.diagnostics().musicStep;
+    ctx.currentTime = 10;
+    a.update(10);
+    expect(a.diagnostics().musicStep - before).toBeGreaterThan(80);
+    expect(a.diagnostics().queuedMusicSteps).toBeLessThanOrEqual(3);
+    expect(a.diagnostics().activeVoices).toBeLessThanOrEqual(12);
     a.dispose();
   });
 });

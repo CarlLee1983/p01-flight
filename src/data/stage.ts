@@ -47,6 +47,7 @@ export interface StageConfig {
   title: string;
   duration: number;
   groundSpeed?: number;
+  enemyBurstShots?: number;
   width: number;
   height: number;
   waves: Wave[];
@@ -57,14 +58,53 @@ export interface StageConfig {
     hp: number;
     fireEvery: number;
     bulletSpeed: number;
+    burstShots?: number;
     sideCannonHp?: number;
     points: number;
   };
 }
+// Twelve-aircraft flights alternate sweep direction and silhouette rhythm.
+// One wing aircraft per row fires; the other two remain interception threats.
+// Short first delay lets fast flights fire while visible; staggered entry avoids a wall.
+const reinforcementTimes = [
+  13, 17, 21, 25, 29, 33, 37, 43, 47, 51, 55, 63, 67, 71, 75, 79, 83, 87, 91,
+  99, 103, 107, 111, 113, 115, 116.5,
+];
+const reinforcements: Wave[] = reinforcementTimes.flatMap((at, group) =>
+  Array.from({ length: 12 }, (_, i): Wave => {
+    const side = group % 2 ? -1 : 1;
+    const row = Math.floor(i / 3);
+    const lane = i % 3;
+    if (group % 3 === 2)
+      return {
+        at: at + i * 0.12,
+        x: side === 1 ? -30 : 390,
+        spawnY: 130 + lane * 44,
+        direction: side,
+        speed: 220,
+        hp: 1,
+        points: 80,
+        behavior: "cross",
+        fireEvery: lane === 0 && at <= 111 ? 0.75 : undefined,
+        firstFireDelay: lane === 0 && at <= 111 ? 0.6 : undefined,
+      };
+    return {
+      at: at + row * 0.32 + lane * 0.08,
+      x: side === 1 ? 48 + lane * 42 : 312 - lane * 42,
+      speed: 225,
+      hp: 1,
+      points: 80,
+      behavior: group % 3 === 0 ? "straight" : "weave",
+      fireEvery: lane === 0 && at <= 111 ? 0.75 : undefined,
+      firstFireDelay: lane === 0 && at <= 111 ? 0.6 : undefined,
+    };
+  }),
+);
 export const stage01: StageConfig = {
+  enemyBurstShots: 2,
   id: "stage-01",
   title: "雲際航線",
-  duration: 115,
+  duration: 170,
   groundSpeed: GROUND_SCROLL_SPEED,
   sections: [
     {
@@ -93,26 +133,50 @@ export const stage01: StageConfig = {
     },
     {
       id: "push",
-      title: "最後推進",
+      title: "突破第一道封鎖",
       at: 50,
-      hint: "看清俯衝方向，穿越最後一組攔截機",
+      hint: "看清俯衝方向，穿越第一道攔截線",
     },
     {
       id: "resupply",
-      title: "最後攔截",
+      title: "港外護航",
       at: 56,
-      hint: "躲開最後護航扇射，再收取修復補給",
+      hint: "躲開護航扇射，再收取修復補給",
+    },
+    {
+      id: "pressure",
+      title: "港區壓制",
+      at: 62,
+      hint: "攔截側入機，優先處理岸邊瞄準砲台",
+    },
+    {
+      id: "escort-run",
+      title: "護航航道",
+      at: 78,
+      hint: "追擊側翼護航機，預告亮起時移出瞄準線",
+    },
+    {
+      id: "recovery",
+      title: "補給轉向",
+      at: 96,
+      hint: "收取修復，準備出口突圍",
+    },
+    {
+      id: "breakout",
+      title: "出口突圍",
+      at: 102,
+      hint: "移位避開重裝扇射，穿過交叉編隊",
     },
     {
       id: "regroup",
       title: "整隊接近",
-      at: 66,
-      hint: "補血整隊，保留炸彈迎擊指揮艦",
+      at: 121,
+      hint: "確認武器與炸彈，迎擊指揮艦",
     },
     {
       id: "commander",
       title: "指揮艦",
-      at: 70,
+      at: 125,
       hint: "擊破兩側炮座可減少外側火力；核心擊破即通關",
     },
   ],
@@ -121,6 +185,7 @@ export const stage01: StageConfig = {
   // Small opening formations, alternating flank squadrons, armored batteries,
   // then a quiet resupply lane before the final encounter.
   waves: [
+    ...reinforcements,
     ...[2, 6, 10].flatMap((at, group) =>
       [
         [120, 180, 240],
@@ -143,7 +208,7 @@ export const stage01: StageConfig = {
         hp: 2,
         points: 150,
         behavior: "weave" as const,
-        fireEvery: 2.4,
+        fireEvery: 1.2,
       })),
     ),
     // Two staggered escort flights: one telegraphed volley per aircraft.
@@ -215,7 +280,7 @@ export const stage01: StageConfig = {
         hp: at === 32 ? 18 : 5,
         points: 350,
         behavior: at === 32 ? ("groundBattery" as const) : ("turret" as const),
-        fireEvery: at === 32 ? 4.8 : 2.2,
+        fireEvery: at === 32 ? 2.6 : 1.5,
         firstFireDelay: 0.9,
       })),
     ),
@@ -241,6 +306,100 @@ export const stage01: StageConfig = {
       strafeWidth: 75,
       drop: "power" as const,
     },
+    // Harbor pressure: alternating flanks, not a repeated full-screen wave.
+    ...[64, 68].flatMap((at, group) =>
+      [0, 1, 2].map((i) => ({
+        at: at + i * 0.45,
+        x: group ? 255 : 105,
+        speed: 125,
+        hp: 3,
+        points: 170,
+        behavior: "weave" as const,
+        fireEvery: 1.2,
+      })),
+    ),
+    ...[60, 300].map((x, i) => ({
+      at: 70 + i * 1.2,
+      x,
+      speed: 32,
+      hp: 18,
+      points: 350,
+      behavior: "groundBattery" as const,
+      fireEvery: 2.6,
+      firstFireDelay: 0.9,
+    })),
+    ...[78, 86].flatMap((at, group) =>
+      [60, 180, 300].map((x, i) => ({
+        at: at + i * 0.9,
+        x: group ? 360 - x : x,
+        speed: 145,
+        hp: 4,
+        points: 160,
+        behavior: "escort" as const,
+        formationPhase: i * 0.9,
+      })),
+    ),
+    ...[66, 82, 94, 108].flatMap((at) =>
+      [0, 1, 2, 3].map((i) => ({
+        at: at + i * 0.55,
+        x: i % 2 ? -30 : 390,
+        spawnY: 150 + i * 32,
+        direction: i % 2 ? 1 : -1,
+        speed: 145,
+        hp: 2,
+        points: 180,
+        behavior: "cross" as const,
+      })),
+    ),
+    ...[90, 102].flatMap((at) =>
+      [80, 280].map((x, i) => ({
+        at: at + i * 1.1,
+        x,
+        speed: 150,
+        hp: 3,
+        points: 240,
+        behavior: "dive" as const,
+      })),
+    ),
+    ...[88, 106].map((at, i) => ({
+      at,
+      x: i ? 235 : 125,
+      speed: 110,
+      hp: 9,
+      points: 300,
+      behavior: "heavy" as const,
+      fireEvery: 1.5,
+    })),
+    ...[98, 112].flatMap((at, group) =>
+      [0, 1, 2].map((i) => ({
+        at: at + i * 0.5,
+        x: group ? 250 : 110,
+        speed: 145,
+        hp: 2,
+        points: 150,
+        behavior: "weave" as const,
+        fireEvery: 1.5,
+      })),
+    ),
+    ...[110, 180, 250].map((x, i) => ({
+      at: 116 + i * 0.2,
+      x,
+      speed: 180,
+      hp: 2,
+      points: 120,
+      behavior: "straight" as const,
+    })),
+    ...[73, 93, 114].map((at, i) => ({
+      at,
+      x: i % 2 ? 390 : -30,
+      spawnY: 120,
+      direction: i % 2 ? -1 : 1,
+      speed: 85,
+      hp: 4,
+      points: 200,
+      behavior: "carrier" as const,
+      drop: "support" as const,
+    })),
   ].sort((a, b) => a.at - b.at),
   pickups: [
     { at: 5, x: 180, kind: "power" },
@@ -249,12 +408,18 @@ export const stage01: StageConfig = {
     { at: 39, x: 180, kind: "support" },
     { at: 60, x: 180, kind: "heal" },
     { at: 67, x: 90, kind: "support" },
+    { at: 74, x: 180, kind: "heal" },
+    { at: 84, x: 270, kind: "power" },
+    { at: 96, x: 180, kind: "heal" },
+    { at: 108, x: 90, kind: "support" },
+    { at: 118, x: 180, kind: "heal" },
   ],
   boss: {
-    at: 70,
+    at: 125,
     hp: 400,
     fireEvery: 2.7,
     bulletSpeed: 140,
+    burstShots: 4,
     sideCannonHp: 24,
     points: 3000,
   },

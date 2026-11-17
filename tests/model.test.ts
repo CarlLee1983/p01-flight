@@ -90,9 +90,9 @@ describe("flight rules", () => {
       pickups: [],
     });
     m.start();
-    advance(m, 116);
+    advance(m, 171);
     expect(m.mode).toBe("won");
-    expect(m.time).toBe(115);
+    expect(m.time).toBe(170);
     for (let i = 0; i < 10; i++) {
       m.start();
       advance(m, 1, true);
@@ -182,9 +182,9 @@ describe("Stage 01 playthrough fixtures", () => {
     m.start();
     let bomb1 = false,
       bomb2 = false;
-    for (let i = 0; i < 116 * 60; i++) {
-      if (!bomb1 && m.time >= 85) bomb1 = m.useBomb();
-      if (!bomb2 && m.time >= 91) bomb2 = m.useBomb();
+    for (let i = 0; i < 171 * 60; i++) {
+      if (!bomb1 && m.time >= 140) bomb1 = m.useBomb();
+      if (!bomb2 && m.time >= 146) bomb2 = m.useBomb();
       m.update(1 / 60, 0, 0, true);
     }
     expect(m.mode).toBe("won");

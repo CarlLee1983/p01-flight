@@ -3,9 +3,11 @@ import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
+import { advanceFrame } from "./game/frame-step";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
 import { TouchInput } from "./game/touch-input";
+import { RenderMetrics } from "./game/render-metrics";
 import "./style.css";
 let storage: Storage | null = null;
 try {
@@ -22,7 +24,8 @@ let recorded = false;
 let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
-let backgroundInfo: Record<string, unknown> = {};
+let readBackgroundInfo: () => Record<string, unknown> = () => ({});
+const renderMetrics = new RenderMetrics();
 let frameCount = 0,
   frameTime = 0;
 // pointerdown supports a second finger while the first one is captured on canvas.
@@ -44,6 +47,8 @@ function start() {
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
   model.start();
+  audio.resetMusic();
+  renderMetrics.reset();
   recorded = false;
   renderPanel();
 }
@@ -70,7 +75,7 @@ function renderPanel() {
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子配樂與音效，Boss 戰切換專屬主題。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
     panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意預告後移位，避免留在鎖定線上。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
@@ -161,6 +166,7 @@ class FlightScene extends Phaser.Scene {
       "carrier",
       "harbor-battlefield",
       "harbor-exit",
+      "harbor-refinery",
       "ground-battery",
       "ground-depot",
     ])
@@ -190,14 +196,13 @@ class FlightScene extends Phaser.Scene {
   ) {
     let image = this.visuals[this.visualIndex++];
     if (!image) {
-      image = this.add.image(x, y, key).setDepth(1);
+      image = this.add.image(x, y, key).setDepth(1).setOrigin(0.5);
       this.visuals.push(image);
     }
+    if (image.texture.key !== key) image.setTexture(key);
     image
-      .setTexture(key)
       .setPosition(x, y)
       .setDisplaySize(width, height)
-      .setOrigin(0.5)
       .setAlpha(alpha)
       .setAngle(angle)
       .setVisible(true)
@@ -207,6 +212,7 @@ class FlightScene extends Phaser.Scene {
   }
   create() {
     this.background = new CoastalBackground(this);
+    readBackgroundInfo = () => this.background.diagnostics();
     createPickupTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
@@ -347,8 +353,8 @@ class FlightScene extends Phaser.Scene {
       model.mode === "won" && this.endingAge < 1.2 ? "hidden" : "visible";
     if (
       model.mode === "playing" &&
-      model.time >= 65 &&
-      model.time < 70 &&
+      model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
+      model.time < (stage01.boss?.at ?? Infinity) &&
       !this.bossWarningPlayed
     ) {
       this.bossWarningPlayed = true;
@@ -381,7 +387,8 @@ class FlightScene extends Phaser.Scene {
       this.pickupNoticeUntil = 0;
     if (model.mode !== "playing") touch.cancel();
     const touchFrame = touch.sample(model.player, delta / 1000);
-    model.update(
+    advanceFrame(
+      model,
       delta / 1000,
       on("D", "RIGHT") - on("A", "LEFT"),
       on("S", "DOWN") - on("W", "UP"),
@@ -404,11 +411,20 @@ class FlightScene extends Phaser.Scene {
             ? "beam"
             : "shot",
       );
+    audio.setMusicContext(
+      model.boss?.active
+        ? "boss"
+        : ["recovery", "regroup"].includes(model.section.id)
+          ? "recovery"
+          : model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
+            ? "pressure"
+            : "flight",
+    );
     audio.setIntensity(
       model.boss?.active ||
         model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
         ? 2
-        : model.time >= 56
+        : ["recovery", "regroup"].includes(model.section.id)
           ? 0
           : model.time > 15
             ? 1
@@ -442,14 +458,12 @@ class FlightScene extends Phaser.Scene {
         model.time > 0.1,
     );
     if ((model.boss?.phase ?? 0) > previous.phase) audio.play("phase");
-    previous = {
-      shots: model.shots,
-      kills: model.killCount,
-      hurt: model.damageCount,
-      pickup: model.pickupCount,
-      phase: model.boss?.phase ?? 0,
-      parts: model.partsDestroyed,
-    };
+    previous.shots = model.shots;
+    previous.kills = model.killCount;
+    previous.hurt = model.damageCount;
+    previous.pickup = model.pickupCount;
+    previous.phase = model.boss?.phase ?? 0;
+    previous.parts = model.partsDestroyed;
     audio.update(delta / 1000);
     if ((model.mode === "won" || model.mode === "lost") && !recorded) {
       recorded = true;
@@ -460,7 +474,15 @@ class FlightScene extends Phaser.Scene {
       if (model.mode === "won") panel.style.visibility = "hidden";
       if (model.mode === "won" || model.mode === "lost") audio.play(model.mode);
     }
+    const drawStarted = performance.now();
     this.draw();
+    if (model.mode === "playing")
+      renderMetrics.sample(
+        model,
+        this.visualIndex,
+        this.visuals.length,
+        performance.now() - drawStarted,
+      );
   }
   draw() {
     this.visualIndex = 0;
@@ -477,11 +499,15 @@ class FlightScene extends Phaser.Scene {
     );
     if (section)
       this.sectionNotice.setText(`${section.title}\n${section.hint}`);
-    if (model.mode === "playing" && model.time >= 65 && model.time < 70) {
+    if (
+      model.mode === "playing" &&
+      model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
+      model.time < (stage01.boss?.at ?? Infinity)
+    ) {
       this.sectionNotice
         .setVisible(true)
         .setText(
-          `指揮艦接近 · ${Math.ceil(70 - model.time)}\n保留炸彈，留意兩側砲座`,
+          `指揮艦接近 · ${Math.ceil((stage01.boss?.at ?? 0) - model.time)}\n保留炸彈，留意兩側砲座`,
         );
     }
     this.bossAdvice.setVisible(
@@ -495,7 +521,7 @@ class FlightScene extends Phaser.Scene {
           : "側炮全毀 · 集中攻擊核心",
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
-    for (const image of this.visuals) image.setVisible(false);
+
     graphics.clear();
     overlay.clear();
     this.background.update(
@@ -503,7 +529,7 @@ class FlightScene extends Phaser.Scene {
         ? this.ambience
         : model.time + (model.mode === "won" ? this.endingAge : 0),
     );
-    backgroundInfo = this.background.diagnostics();
+
     if (model.mode !== "menu") {
       for (const b of model.bullets)
         if (b.active) {
@@ -770,6 +796,30 @@ class FlightScene extends Phaser.Scene {
             overlay.fillRect(e.x + 17, e.y, 8, 23);
           }
         }
+      // Amber dashed rays are locked attack forecasts, never damaging beams.
+      // Rays stop at the playfield edge; the gap is intentionally left clear.
+      for (const e of model.enemies) {
+        if (!e.active || (e.telegraph ?? 0) <= 0) continue;
+        const angles =
+          e.behavior === "dive" && e.aimAngle !== undefined
+            ? [e.aimAngle]
+            : (e.attackAngles ?? []);
+        for (const angle of angles) {
+          overlay.lineStyle(1.3, 0xffd179, 0.55);
+          for (let d = 20; d < 480; d += 24) {
+            const x = e.x + Math.sin(angle) * d;
+            const y =
+              e.y + (e.behavior === "heavy" ? 20 : 0) + Math.cos(angle) * d;
+            if (x < 10 || x > 350 || y < 84 || y > 625) break;
+            overlay.lineBetween(
+              x,
+              y,
+              x + Math.sin(angle) * 10,
+              y + Math.cos(angle) * 10,
+            );
+          }
+        }
+      }
       for (const shot of model.enemyBullets)
         if (shot.active) {
           overlay.fillStyle(0xff5f9e);
@@ -837,6 +887,28 @@ class FlightScene extends Phaser.Scene {
               cannon.x - 8,
               cannon.y + 8,
             );
+          }
+        }
+        if (model.boss.attackWarning > 0) {
+          for (const [index, angle] of model.boss.attackAngles.entries()) {
+            if (index === 0 && !model.boss.cannons[0].active) continue;
+            if (
+              index === model.boss.attackAngles.length - 1 &&
+              !model.boss.cannons[1].active
+            )
+              continue;
+            overlay.lineStyle(1.8, 0xffd179, 0.65);
+            for (let d = 40; d < 580; d += 26) {
+              const x = model.boss.x + Math.sin(angle) * d;
+              const y = model.boss.y + 28 + Math.cos(angle) * d;
+              if (x < 10 || x > 350 || y > 625) break;
+              overlay.lineBetween(
+                x,
+                y,
+                x + Math.sin(angle) * 13,
+                y + Math.cos(angle) * 13,
+              );
+            }
           }
         }
         // Reactor pulses convey phase escalation without altering collision bounds.
@@ -995,6 +1067,10 @@ class FlightScene extends Phaser.Scene {
         (1 - Math.min(1, model.bombFlash)) * 700,
       );
     }
+    // Reused slots stay visible; hide only surplus sprites left by the last frame.
+    for (let i = this.visualIndex; i < this.visuals.length; i++) {
+      if (this.visuals[i].visible) this.visuals[i].setVisible(false);
+    }
     if (model.mode === "paused") {
       overlay.fillStyle(0x000000, 0.65);
       overlay.fillRect(0, 70, 360, 570);
@@ -1051,12 +1127,15 @@ Object.defineProperty(window, "__P01__", {
         hp: e.hp,
         maxHp: e.maxHp,
         telegraph: e.telegraph,
+        attackAngles: e.attackAngles,
         attackPattern: e.attackPattern,
         attackLanes: e.attackLanes,
         volleyFired: e.volleyFired,
         visibleSince: e.visibleSince,
         shotsFired: e.shotsFired,
       })),
+    spawnedAir: model.spawnedAir,
+    enteredAir: model.enteredAir,
     shots: model.shots,
     groundShotCount: model.groundShotCount,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
@@ -1080,7 +1159,8 @@ Object.defineProperty(window, "__P01__", {
     audio: audio.diagnostics(),
     lostReason: model.lostReason,
     save: saves.data,
-    background: backgroundInfo,
+    background: readBackgroundInfo(),
+    renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,
   }),
 });

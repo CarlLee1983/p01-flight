@@ -17,6 +17,7 @@ export interface Body {
   hitIds?: number[];
 }
 export interface Enemy extends Body {
+  enteredPlayfield?: boolean;
   maxHp?: number;
   speed: number;
   hp: number;
@@ -40,6 +41,7 @@ export interface Enemy extends Body {
   gateCycle?: number;
   attackPattern?: "left" | "right" | "aim";
   attackLanes?: number[];
+  attackAngles?: number[];
 }
 export interface EnemyBullet extends Body {
   vx: number;
@@ -58,6 +60,9 @@ export interface BossPart {
   active: boolean;
 }
 export interface Boss {
+  attackWarning: number;
+  attackAngles: number[];
+  attackCycle: number;
   cannons: BossPart[];
   phase: 1 | 2 | 3;
   telegraph: number;
@@ -80,10 +85,25 @@ export class FlightModel {
   enemies: Enemy[] = [];
   enemyBullets: EnemyBullet[] = [];
   pickups: Pickup[] = [];
+  emittedEnemyShots = 0;
+  emittedBossShots = 0;
+  private pendingShots: {
+    at: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    source: Enemy | Boss;
+    sourceId?: number;
+    boss: boolean;
+    guard?: BossPart;
+  }[] = [];
   boss: Boss | null = null;
   bossDefeated = false;
   partsDestroyed = 0;
   groundShotCount = 0;
+  spawnedAir = 0;
+  enteredAir = 0;
   weaponTime = 0; // Compatibility field: 1 while permanently upgraded.
   weaponLevel = 1;
   weaponMode: "spread" | "beam" | "missile" = "spread";
@@ -115,11 +135,16 @@ export class FlightModel {
     this.bullets = [];
     this.enemies = [];
     this.enemyBullets = [];
+    this.pendingShots = [];
+    this.emittedEnemyShots = 0;
+    this.emittedBossShots = 0;
     this.pickups = [];
     this.boss = null;
     this.bossDefeated = false;
     this.partsDestroyed = 0;
     this.groundShotCount = 0;
+    this.spawnedAir = 0;
+    this.enteredAir = 0;
     this.weaponTime = 0;
     this.weaponLevel = 1;
     this.weaponMode = "spread";
@@ -182,6 +207,7 @@ export class FlightModel {
     this.bombFlash = 0.65;
     this.invincible = Math.max(this.invincible, 2);
     for (const b of this.enemyBullets) b.active = false;
+    this.pendingShots = [];
     for (const e of this.enemies)
       if (this.interactable(e)) {
         e.hp -= 12;
@@ -199,10 +225,15 @@ export class FlightModel {
     return true;
   }
   private interactable(e: Enemy): boolean {
+    const ground =
+      e.behavior === "groundBattery" || e.behavior === "groundDepot";
+    // Let an aircraft enter below the HUD / inside the side edge before it can
+    // be hit or missile-locked. This also makes entrances observable at low FPS.
     return (
       e.active &&
-      (!(e.behavior === "groundBattery" || e.behavior === "groundDepot") ||
-        (e.y >= GROUND_VISIBLE_Y && e.y <= this.stage.height + 26))
+      e.y >= GROUND_VISIBLE_Y &&
+      e.y <= this.stage.height + 26 &&
+      (ground || (e.x >= 18 && e.x <= this.stage.width - 18))
     );
   }
   private destroyEnemy(e: Enemy) {
@@ -235,7 +266,43 @@ export class FlightModel {
     this.effects.push({ x: this.boss.x, y: this.boss.y, life: 0.6 });
     if (this.mode === "playing") this.mode = "won";
   }
-  private shootEnemy(x: number, y: number, vx: number, vy: number) {
+  // A burst repeats the same warned trajectory, not a wider impassable fan.
+  // Tails follow the live emitter; destruction/bomb/phase changes cancel them.
+  private shootEnemy(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    source: Enemy | Boss,
+    guard?: BossPart,
+  ) {
+    const boss = source === this.boss;
+    const count = boss
+      ? (this.stage.boss?.burstShots ?? 1)
+      : (this.stage.enemyBurstShots ?? 1);
+    this.emitEnemyBullet(x, y, vx, vy, boss);
+    for (let i = 1; i < count; i++)
+      this.pendingShots.push({
+        at: this.time + i * 0.12,
+        x: x - source.x,
+        y: y - source.y,
+        vx,
+        vy,
+        source,
+        sourceId: "id" in source ? source.id : undefined,
+        boss,
+        guard,
+      });
+  }
+  private emitEnemyBullet(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    boss: boolean,
+  ) {
+    if (boss) this.emittedBossShots++;
+    else this.emittedEnemyShots++;
     let b = this.enemyBullets.find((b) => !b.active);
     if (!b) {
       b = { id: ++this.serial, x, y, vx, vy, active: true };
@@ -391,6 +458,12 @@ export class FlightModel {
       this.stage.waves[this.nextWave].at <= this.time
     ) {
       const w = this.stage.waves[this.nextWave++];
+      if (
+        !["groundBattery", "groundDepot", "gatekeeper"].includes(
+          w.behavior ?? "straight",
+        )
+      )
+        this.spawnedAir++;
       let e = this.enemies.find((e) => !e.active);
       if (!e) {
         e = {
@@ -423,6 +496,7 @@ export class FlightModel {
           aimAngle: undefined,
           shotsFired: 0,
           visibleSince: undefined,
+          enteredPlayfield: false,
           formationPhase: w.formationPhase ?? 0,
           volleyFired: false,
           holdFor: w.holdFor,
@@ -430,6 +504,7 @@ export class FlightModel {
           gateCycle: 0,
           attackPattern: undefined,
           attackLanes: [],
+          attackAngles: [],
           direction: w.direction ?? 1,
           diveAngle: undefined,
         },
@@ -457,6 +532,9 @@ export class FlightModel {
             }))
           : [],
         phase: 1,
+        attackWarning: 0,
+        attackAngles: [],
+        attackCycle: 0,
         telegraph: 1.2,
         x: this.stage.width / 2,
         y: -60,
@@ -562,10 +640,11 @@ export class FlightModel {
                     e.y + 24,
                     Math.sin(e.aimAngle ?? 0) * 180,
                     Math.cos(e.aimAngle ?? 0) * 180,
+                    e,
                   );
                 else
                   for (const x of e.attackLanes)
-                    this.shootEnemy(x, e.y + 24, 0, 180);
+                    this.shootEnemy(x, e.y + 24, 0, 180, e);
                 e.gateCycle = (e.gateCycle ?? 0) + 1;
                 e.fireCooldown = e.fireEvery ?? 2.2;
                 e.aimAngle = undefined;
@@ -581,12 +660,14 @@ export class FlightModel {
           }
         }
         if (e.behavior === "dive") {
-          if (e.age >= 1 && e.age < 1.7) e.telegraph = 1.7 - e.age;
-          if (e.age >= 1.7 && e.diveAngle === undefined) {
+          if (e.age >= 1 && e.diveAngle === undefined)
             e.diveAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
-            e.telegraph = 0;
+          if (e.age >= 1 && e.age < 1.7) {
+            e.telegraph = 1.7 - e.age;
+            e.aimAngle = e.diveAngle;
           }
-          if (e.diveAngle !== undefined) {
+          if (e.age >= 1.7) e.telegraph = 0;
+          if (e.age >= 1.7 && e.diveAngle !== undefined) {
             e.x += Math.sin(e.diveAngle) * 260 * dt;
             e.y += Math.cos(e.diveAngle) * 260 * dt;
           } else if (e.age < 1) e.y += e.speed * dt;
@@ -606,6 +687,7 @@ export class FlightModel {
                   e.y + 20,
                   Math.sin(e.aimAngle + spread) * 155,
                   Math.cos(e.aimAngle + spread) * 155,
+                  e,
                 );
               e.volleyFired = true;
               e.telegraph = 0;
@@ -634,6 +716,18 @@ export class FlightModel {
         )
           e.y += e.speed * dt;
         if (
+          !ground &&
+          e.behavior !== "gatekeeper" &&
+          !e.enteredPlayfield &&
+          e.x >= 0 &&
+          e.x <= this.stage.width &&
+          e.y >= 80 &&
+          e.y <= this.stage.height
+        ) {
+          e.enteredPlayfield = true;
+          this.enteredAir++;
+        }
+        if (
           e.fireEvery &&
           this.interactable(e) &&
           e.behavior !== "gatekeeper" &&
@@ -647,6 +741,14 @@ export class FlightModel {
             e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
           e.telegraph =
             e.fireCooldown > 0 && e.fireCooldown <= 0.6 ? e.fireCooldown : 0;
+          if (
+            e.behavior === "heavy" &&
+            e.fireCooldown <= 0.6 &&
+            !e.attackAngles?.length
+          ) {
+            const lean = (e.shotsFired ?? 0) % 2 ? 0.14 : -0.14;
+            e.attackAngles = [-0.4, 0, 0.4].map((a) => a + lean);
+          }
           if (e.fireCooldown <= 0) {
             const aim = e.aimAngle ?? 0;
             if (e.behavior === "turret" || e.behavior === "groundBattery") {
@@ -656,20 +758,23 @@ export class FlightModel {
                   e.y + 20,
                   Math.sin(aim + a) * 145,
                   Math.cos(aim + a) * 145,
+                  e,
                 );
             } else if (e.behavior === "heavy") {
-              for (const a of [-0.4, 0, 0.4])
+              for (const a of e.attackAngles ?? [-0.4, 0, 0.4])
                 this.shootEnemy(
                   e.x,
                   e.y + 20,
                   Math.sin(a) * 135,
                   Math.cos(a) * 135,
+                  e,
                 );
-            } else this.shootEnemy(e.x, e.y + 20, 0, 155);
+            } else this.shootEnemy(e.x, e.y + 20, 0, 155, e);
             e.shotsFired = (e.shotsFired ?? 0) + 1;
             if (e.behavior === "groundBattery") this.groundShotCount++;
             e.fireCooldown = e.fireEvery;
             e.aimAngle = undefined;
+            e.attackAngles = [];
           }
         }
         if (
@@ -690,8 +795,11 @@ export class FlightModel {
         boss.phase = phase;
         boss.telegraph = 1.2;
         boss.fireCooldown = 0.4;
+        boss.attackAngles = [];
+        boss.attackWarning = 0;
         // A clear transition instead of stacking the preceding phase's bullets.
         for (const b of this.enemyBullets) b.active = false;
+        this.pendingShots = [];
       }
       boss.telegraph = Math.max(0, boss.telegraph - dt);
       boss.x =
@@ -702,15 +810,34 @@ export class FlightModel {
         part.x = boss.x + part.side * 68;
         part.y = boss.y + 20;
       }
-      if (boss.telegraph <= 0) boss.fireCooldown -= dt;
+      if (boss.y >= 105 && boss.telegraph <= 0) boss.fireCooldown -= dt;
+      if (
+        boss.y >= 105 &&
+        boss.telegraph <= 0.65 &&
+        boss.fireCooldown <= 0.65
+      ) {
+        if (!boss.attackAngles.length) {
+          // Entry can finish after the phase banner; never shorten its first tell.
+          boss.fireCooldown = Math.max(
+            boss.fireCooldown,
+            0.65 - boss.telegraph,
+          );
+          const aim = Math.atan2(
+            this.player.x - boss.x,
+            this.player.y - boss.y,
+          );
+          const sweep = boss.attackCycle % 2 ? 0.1 : -0.1;
+          boss.attackAngles =
+            phase === 1
+              ? [-0.25, 0.25].map((a) => a + aim)
+              : phase === 2
+                ? [-0.5, -0.25, 0, 0.25, 0.5].map((a) => a + sweep)
+                : [-0.3, 0, 0.3].map((a) => a + aim);
+        }
+        boss.attackWarning = Math.max(0, boss.telegraph + boss.fireCooldown);
+      }
       if (boss.y >= 105 && boss.telegraph <= 0 && boss.fireCooldown <= 0) {
-        const aim = Math.atan2(this.player.x - boss.x, this.player.y - boss.y);
-        const angles =
-          phase === 1
-            ? [-0.25, 0.25].map((a) => a + aim)
-            : phase === 2
-              ? [-0.5, -0.25, 0, 0.25, 0.5]
-              : [-0.3, 0, 0.3].map((a) => a + aim);
+        const angles = boss.attackAngles;
         for (const [index, a] of angles.entries()) {
           const side = index === 0 ? -1 : index === angles.length - 1 ? 1 : 0;
           const cannon = boss.cannons.find((p) => p.side === side);
@@ -720,11 +847,33 @@ export class FlightModel {
             boss.y + 28,
             Math.sin(a) * this.stage.boss.bulletSpeed,
             Math.cos(a) * this.stage.boss.bulletSpeed,
+            boss,
+            cannon,
           );
         }
         boss.fireCooldown = this.stage.boss.fireEvery * (phase === 3 ? 0.7 : 1);
+        boss.attackCycle++;
+        boss.attackWarning = 0;
+        boss.attackAngles = [];
       }
     }
+    this.pendingShots = this.pendingShots.filter((shot) => {
+      if (
+        !shot.source.active ||
+        shot.guard?.active === false ||
+        ("id" in shot.source && shot.source.id !== shot.sourceId)
+      )
+        return false;
+      if (shot.at > this.time + 1e-9) return true;
+      this.emitEnemyBullet(
+        shot.source.x + shot.x,
+        shot.source.y + shot.y,
+        shot.vx,
+        shot.vy,
+        shot.boss,
+      );
+      return false;
+    });
     for (const b of this.enemyBullets)
       if (b.active) {
         b.x += b.vx * dt;
@@ -779,10 +928,7 @@ export class FlightModel {
           if (
             e.active &&
             !b.hitIds?.includes(e.id) &&
-            (!(
-              e.behavior === "groundBattery" || e.behavior === "groundDepot"
-            ) ||
-              this.interactable(e)) &&
+            this.interactable(e) &&
             Math.abs(b.x - e.x) < 22 + (b.width ?? 0) / 2 &&
             Math.abs(b.y - e.y) < 25
           ) {

@@ -6,14 +6,63 @@ import {
   COAST_SCROLL,
   coastalScrollState,
   coastalAreaState,
-  COAST_AREAS,
+  COAST_AREAS as CURRENT_AREAS,
   type CoastalAreaConfig,
   COAST_LANDMARKS,
   coastalLandmarkY,
   type CoastalLandmarkConfig,
 } from "../src/game/background";
 
+import { STAGE01_SCENERY } from "../src/data/scenery";
+// Keep the old short-stage fixture to verify backward-compatible caller configs.
+const COAST_AREAS: readonly CoastalAreaConfig[] = [
+  ...CURRENT_AREAS.slice(0, 4),
+  { id: "harbor-exit", label: "突破港區", at: 50, fade: 3, scenery: "exit" },
+  { id: "approach", label: "補給水域", at: 56, fade: 4, scenery: "approach" },
+  { id: "command", label: "指揮艦區", at: 70, fade: 5, scenery: "command" },
+];
+const SHORT_TIMELINE = {
+  ...STAGE01_SCENERY,
+  artworkBlocks: [],
+  exitAt: 53,
+  duration: 115,
+  areas: COAST_AREAS,
+};
+const shortExitY = (time: number) => harborExitY(time, 720, 53);
 describe("continuous coastal background", () => {
+  it("configures the extended stage and keeps exit opaque through 170 seconds", () => {
+    const object: any = new Proxy({}, { get: () => () => object });
+    const scene: any = {
+      add: { graphics: () => object, image: () => object },
+      textures: {
+        exists: () => true,
+        get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
+      },
+    };
+    const background = new CoastalBackground(scene);
+    expect(CURRENT_AREAS.map((a) => a.at)).toEqual([
+      0, 15, 32, 40, 50, 56, 62, 78, 96, 102, 121, 125,
+    ]);
+    for (const time of [62, 78, 96, 102, 108, 121, 125, 170]) {
+      background.update(time);
+      const d = background.diagnostics();
+      expect(d.distance).toBe(time * 32);
+      expect(d.exitY).toBe((time - 108) * 32 - 720);
+      expect(d.exitAt).toBe(108);
+    }
+    expect(background.diagnostics().exitWorldY).toBe(-56);
+    expect(background.diagnostics().exitAlpha).toBe(1);
+    background.update(60);
+    expect(background.diagnostics().artworkBlocks[0].y).toBe(-720);
+    background.update(78);
+    expect(background.diagnostics().artworkBlocks[0].y).toBe(-144);
+    background.update(95);
+    expect(background.diagnostics().artworkBlocks[0].y).toBe(400);
+    background.update(103);
+    expect(background.diagnostics().artworkBlocks[0].y).toBe(656);
+    expect(harborExitY(108)).toBe(-720);
+    expect(harborExitY(125)).toBe(-176);
+  });
   it("overlaps original port artwork without uncovered top or bottom and reuses coordinates", () => {
     for (const height of [640, 720, 768, 1024]) {
       const state = harborArtState(0, height);
@@ -66,7 +115,12 @@ describe("continuous coastal background", () => {
         get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
       },
     };
-    const background = new CoastalBackground(scene);
+    const background = new CoastalBackground(
+      scene,
+      COAST_AREAS,
+      undefined,
+      SHORT_TIMELINE,
+    );
     expect(created).toBe(27);
     background.update(44);
     expect(background.diagnostics().harborArtImages).toBe(4);
@@ -122,7 +176,12 @@ describe("continuous coastal background", () => {
         get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
       },
     };
-    const background = new CoastalBackground(scene);
+    const background = new CoastalBackground(
+      scene,
+      COAST_AREAS,
+      undefined,
+      SHORT_TIMELINE,
+    );
     expect(created).toBe(28);
     expect(background.diagnostics().exitReady).toBe(true);
     expect(background.diagnostics().exitSeaImages).toBe(0);
@@ -145,56 +204,75 @@ describe("continuous coastal background", () => {
     background.update(0);
     expect(background.diagnostics().exitAlpha).toBe(0);
   });
-  it("precomposes an opaque <=4096px exit strip without stretching water samples", () => {
-    const textures = new Set(["harbor-exit"]);
-    const draws: any[][] = [],
-      gradients: number[][] = [],
-      sizes: number[][] = [];
-    const object: any = new Proxy({}, { get: () => () => object });
-    const context: any = {
-      globalAlpha: 1,
-      globalCompositeOperation: "source-over",
-      drawImage: (...args: any[]) => draws.push(args),
-      fillRect: () => {},
-      createLinearGradient: (...args: number[]) => {
-        gradients.push(args);
-        return { addColorStop: () => {} };
-      },
-    };
-    const scene: any = {
-      add: { graphics: () => object, image: () => object },
-      textures: {
-        exists: (key: string) => textures.has(key),
-        get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
-        createCanvas: (key: string, width: number, height: number) => {
-          sizes.push([width, height]);
-          textures.add(key);
-          return { getContext: () => context, refresh: () => {} };
+  it.each(["harbor-exit", "harbor-refinery"])(
+    "precomposes opaque <=4096px %s without stretching water samples",
+    (texture) => {
+      const textures = new Set([texture]);
+      const draws: any[][] = [],
+        gradients: number[][] = [],
+        sizes: number[][] = [];
+      const object: any = new Proxy({}, { get: () => () => object });
+      const context: any = {
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over",
+        drawImage: (...args: any[]) => draws.push(args),
+        fillRect: () => {},
+        createLinearGradient: (...args: number[]) => {
+          gradients.push(args);
+          return { addColorStop: () => {} };
         },
-      },
-    };
-    const background = new CoastalBackground(scene);
-    expect(sizes).toEqual([[720, 4080]]);
-    // Every sampled strip is copied at natural pixel scale before the whole world
-    // is uniformly scaled to logical width 360. Only its south edge gets a mask.
-    for (const draw of draws) {
-      expect(draw[3]).toBe(draw[7]);
-      expect(draw[4]).toBe(draw[8]);
-    }
-    expect(gradients).toEqual([[0, 3900, 0, 4080]]);
-    expect(context.globalAlpha).toBe(1);
-    expect(context.globalCompositeOperation).toBe("source-over");
-    background.update(115);
-    expect(background.diagnostics().exitWorldY).toBe(-56);
-  });
+      };
+      const scene: any = {
+        add: { graphics: () => object, image: () => object },
+        textures: {
+          exists: (key: string) => textures.has(key),
+          get: () => ({ getSourceImage: () => ({ width: 720, height: 1440 }) }),
+          createCanvas: (key: string, width: number, height: number) => {
+            sizes.push([width, height]);
+            textures.add(key);
+            return { getContext: () => context, refresh: () => {} };
+          },
+        },
+      };
+      const background = new CoastalBackground(
+        scene,
+        COAST_AREAS,
+        undefined,
+        texture === "harbor-exit" ? SHORT_TIMELINE : STAGE01_SCENERY,
+      );
+      expect(sizes).toEqual([[720, 4080]]);
+      // Every sampled strip is copied at natural pixel scale before the whole world
+      // is uniformly scaled to logical width 360. Only its south edge gets a mask.
+      for (const draw of draws) {
+        expect(draw[3]).toBe(draw[7]);
+        expect(draw[4]).toBe(draw[8]);
+      }
+      expect(gradients).toEqual([[0, 3900, 0, 4080]]);
+      expect(context.globalAlpha).toBe(1);
+      expect(context.globalCompositeOperation).toBe("source-over");
+      background.update(115);
+      if (texture === "harbor-exit")
+        expect(background.diagnostics().exitWorldY).toBe(-56);
+      else {
+        for (const time of [88, 95, 100, 105, 108, 112, 123]) {
+          background.update(time);
+          const block = background.diagnostics().artworkBlocks[0];
+          expect(block.worldY).toBe((time - 60) * 32 - 2040);
+          expect(block.worldY).toBeLessThan(0);
+          expect(block.worldY + block.worldHeight - 90).toBeGreaterThan(640);
+          expect(block.opaqueNorth).toBe(true);
+        }
+      }
+    },
+  );
   it("introduces the exit warehouses spatially, not as a whole-screen fade", () => {
-    expect(harborExitY(53)).toBe(-720);
-    expect(harborExitY(64)).toBe(-368);
-    expect(harborExitY(70)).toBe(-176);
-    expect(harborExitY(75)).toBe(-16);
+    expect(shortExitY(53)).toBe(-720);
+    expect(shortExitY(64)).toBe(-368);
+    expect(shortExitY(70)).toBe(-176);
+    expect(shortExitY(75)).toBe(-16);
     for (const time of [50, 53, 56, 64, 69, 70, 75, 95, 115]) {
-      expect(harborExitY(time + 1) - harborExitY(time)).toBe(32);
-      expect(harborExitY(time)).toBe(harborExitY(time));
+      expect(shortExitY(time + 1) - shortExitY(time)).toBe(32);
+      expect(shortExitY(time)).toBe(shortExitY(time));
     }
   });
   it("moves at 32 pixels per second and returns to its overlap cycle", () => {
@@ -228,25 +306,29 @@ describe("continuous coastal background", () => {
   });
   it("progresses through configured areas without resetting scroll distance", () => {
     expect(COAST_AREAS.map((a) => a.at)).toEqual([0, 15, 32, 40, 50, 56, 70]);
-    expect(coastalAreaState(14).area).toBe("offshore");
-    expect(coastalAreaState(20).area).toBe("channel");
-    expect(coastalAreaState(39).area).toBe("harbor");
-    expect(coastalAreaState(44).area).toBe("elite-basin");
-    expect(coastalAreaState(53).area).toBe("harbor-exit");
-    expect(coastalAreaState(62).area).toBe("approach");
-    expect(coastalAreaState(76).area).toBe("command");
+    expect(coastalAreaState(14, COAST_AREAS).area).toBe("offshore");
+    expect(coastalAreaState(20, COAST_AREAS).area).toBe("channel");
+    expect(coastalAreaState(39, COAST_AREAS).area).toBe("harbor");
+    expect(coastalAreaState(44, COAST_AREAS).area).toBe("elite-basin");
+    expect(coastalAreaState(53, COAST_AREAS).area).toBe("harbor-exit");
+    expect(coastalAreaState(62, COAST_AREAS).area).toBe("approach");
+    expect(coastalAreaState(76, COAST_AREAS).area).toBe("command");
     for (const area of COAST_AREAS.slice(1)) {
-      expect(coastalAreaState(area.at).transition).toBe(0);
-      expect(coastalAreaState(area.at + area.fade / 2).transition).toBeCloseTo(
-        0.5,
-      );
-      expect(coastalAreaState(area.at + area.fade).transition).toBe(1);
+      expect(coastalAreaState(area.at, COAST_AREAS).transition).toBe(0);
+      expect(
+        coastalAreaState(area.at + area.fade / 2, COAST_AREAS).transition,
+      ).toBeCloseTo(0.5);
+      expect(
+        coastalAreaState(area.at + area.fade, COAST_AREAS).transition,
+      ).toBe(1);
       expect(
         coastalScrollState(area.at + 0.01).distance -
           coastalScrollState(area.at - 0.01).distance,
       ).toBeCloseTo(0.64);
     }
-    expect(coastalAreaState(NaN)).toEqual(coastalAreaState(0));
+    expect(coastalAreaState(NaN, COAST_AREAS)).toEqual(
+      coastalAreaState(0, COAST_AREAS),
+    );
   });
   it("allows the same scenery components to be retimed, reordered and repeated", () => {
     const areas: CoastalAreaConfig[] = [
@@ -278,7 +360,9 @@ describe("continuous coastal background", () => {
       add: { graphics: () => object, image: () => object },
       textures: {
         exists: (key: string) =>
-          key !== "harbor-battlefield" && key !== "harbor-exit",
+          key !== "harbor-battlefield" &&
+          key !== "harbor-exit" &&
+          key !== "harbor-refinery",
       },
     };
     const background = new CoastalBackground(scene, areas);
@@ -360,7 +444,9 @@ describe("continuous coastal background", () => {
       add: { graphics: object, image: object },
       textures: {
         exists: (key: string) =>
-          key !== "harbor-battlefield" && key !== "harbor-exit",
+          key !== "harbor-battlefield" &&
+          key !== "harbor-exit" &&
+          key !== "harbor-refinery",
       },
     };
     const landmarks: CoastalLandmarkConfig[] = [
@@ -441,10 +527,17 @@ describe("continuous coastal background", () => {
       add: { graphics: object, image: object },
       textures: {
         exists: (key: string) =>
-          key !== "harbor-battlefield" && key !== "harbor-exit",
+          key !== "harbor-battlefield" &&
+          key !== "harbor-exit" &&
+          key !== "harbor-refinery",
       },
     };
-    const background = new CoastalBackground(scene);
+    const background = new CoastalBackground(
+      scene,
+      COAST_AREAS,
+      undefined,
+      SHORT_TIMELINE,
+    );
     expect(objects).toHaveLength(23);
     for (let i = 0; i < 1000; i++) background.update(i / 60);
     expect(objects).toHaveLength(23);

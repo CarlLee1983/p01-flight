@@ -100,3 +100,14 @@ Visually inspected: distinct new composition that progresses from industrial sho
 
 Hash:
 006c92972e52e13af1c966cb0e1e27763e7ee9de384952b803f4056af8ad69e2 p01-flight/public/assets/original/harbor-exit.png
+
+## Refinery harbor midsection (2026-11-16)
+
+`public/assets/original/harbor-refinery.png`: 720 × 1440 RGB. New original production game terrain generated with the built-in OpenAI image tool; existing original harbor-battlefield.png used solely for shared art style and ocean/material palette. This is a new refinery layout, not a flip or recolor of the existing scene. Existing assets unchanged.
+
+Prompt: tall 1:2 directly overhead industrial refinery harbor canal, clear central 65% dark teal water, side clusters of round fuel tank roofs, connecting pipes, pump buildings, processing roofs, service roads, cooling structures and short jetties on irregular rocky shoreline. Upper-left daylight; gray/ochre/olive materials and muted teal water matched to existing harbor. No structures bridging center, no ships/aircraft/enemies, no firing, smoke, UI, text or logos. Actual scrolling ground texture, not a poster.
+
+Visually inspected: distinct tank cluster at upper-left, pipe galleries and processing sheds along right, smaller refinery structures lower-left; clear continuous center water. The terrain is suitable for the middle industrial segment. It is not claimed pixel-seamless; runtime joins/overlap and integrated motion readability still require inspection. Mechanical resize only after generation. Its gameplay duration and world placement are owned by stage data, not baked into the art.
+
+Hash:
+4d4e7db7394c819e6d8d19fbecd6e86e11356ed5a4c6ce95d2995947c3a67a9f p01-flight/public/assets/original/harbor-refinery.png

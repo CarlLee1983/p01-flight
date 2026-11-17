@@ -1,3 +1,5 @@
+import { musicTone, scheduleTone } from "./music-synth";
+import { MUSIC_STEP, scoreStep, sectionFor, type MusicSection } from "./music";
 export type FlightSound =
   | "missile"
   | "beam"
@@ -23,9 +25,22 @@ export class FlightAudio {
   private volumes = { music: 0.6, sfx: 0.8 };
   private playing = false;
   private intensity: 0 | 1 | 2 = 0;
+  private musicContext: "flight" | "pressure" | "recovery" | "boss" | null =
+    null;
+  private notesScheduled = 0;
+  private sectionTransitionCount = 0;
   private warningUntil = 0;
   private beat = 0;
-  private untilBeat = 0;
+  private section: MusicSection = "intro";
+  private sectionBar = 0;
+  private nextStepAt: number | null = null;
+  private scheduler: ReturnType<typeof setInterval> | null = null;
+  private queuedSteps: {
+    time: number;
+    beat: number;
+    section: MusicSection;
+    bar: number;
+  }[] = [];
   private lastSound = new Map<FlightSound, number>();
   private failed = false;
   private readonly visibility = () => {
@@ -66,46 +81,116 @@ export class FlightAudio {
     if (this.sfxBus) this.sfxBus.gain.value = this.volumes.sfx * 0.32;
   }
   setPlaying(value: boolean) {
-    if (value && !this.playing) {
-      this.beat = 0;
-      this.untilBeat = 0;
-      this.warningUntil = 0;
-      this.lastSound.clear();
-    }
     this.playing = value;
-    if (!value) this.stopVoices();
+    if (value && !this.scheduler)
+      this.scheduler = setInterval(() => this.scheduleMusic(), 25);
+    if (!value) {
+      if (this.scheduler) clearInterval(this.scheduler);
+      this.scheduler = null;
+      const future = this.queuedSteps.find(
+        (s) => s.time > (this.context?.currentTime ?? 0),
+      );
+      if (future) {
+        this.beat = future.beat;
+        this.section = future.section;
+        this.sectionBar = future.bar;
+      }
+      this.queuedSteps = [];
+      this.nextStepAt = null;
+      this.stopVoices();
+    }
   }
-  /** Changes the next pulse, never restarts the graph or interrupts an envelope. */
+  /** New run only. Pauses retain position; call before setPlaying(true). */
+  resetMusic() {
+    this.stopVoices();
+    this.beat = 0;
+    this.nextStepAt = null;
+    this.queuedSteps = [];
+    this.section = "intro";
+    this.sectionBar = 0;
+    this.intensity = 0;
+    this.musicContext = null;
+    this.notesScheduled = 0;
+    this.sectionTransitionCount = 0;
+    this.warningUntil = 0;
+    this.lastSound.clear();
+  }
+  /** Section changes are quantized to the next bar; existing notes finish. */
   setIntensity(level: 0 | 1 | 2) {
     this.intensity = level === 2 ? 2 : level === 1 ? 1 : 0;
   }
-  update(dt: number) {
+  /** Explicit encounter context; takes precedence over legacy intensity. */
+  setMusicContext(context: "flight" | "pressure" | "recovery" | "boss") {
+    this.musicContext = context;
+  }
+  update(_dt: number) {
+    this.scheduleMusic();
+  }
+  private scheduleMusic() {
     if (
       !this.playing ||
       !this.ready() ||
       (typeof document !== "undefined" && document.hidden)
     )
       return;
-    this.untilBeat -= Math.min(Math.max(Number.isFinite(dt) ? dt : 0, 0), 0.1);
-    if (this.untilBeat > 0) return;
-    this.untilBeat = [0.24, 0.21, 0.18][this.intensity];
-    // Original eight-step motifs, not a transcription of a game soundtrack.
-    // Bass / kick anchor the beat; upper notes leave space for combat cues.
-    const bass = [82.41, 82.41, 98, 73.42][Math.floor(this.beat / 8) % 4];
-    const duck = this.context!.currentTime < this.warningUntil ? 0.2 : 1;
-    if (this.beat % 2 === 0) {
-      this.tone(bass, bass, 0.17, "triangle", 0.28 * duck, true);
-      this.tone(95, 37, 0.11, "sine", 0.35 * duck, true);
+    const now = this.context!.currentTime;
+    this.queuedSteps = this.queuedSteps.filter((s) => s.time > now);
+    if (this.nextStepAt === null) this.nextStepAt = now + 0.01;
+    // A stalled JS thread cannot play past notes. Skip rather than burst or
+    // slow the musical clock; normal 25ms scheduling is independent of RAF.
+    if (this.nextStepAt < now) {
+      const missed = Math.ceil((now - this.nextStepAt) / MUSIC_STEP);
+      this.beat += missed;
+      this.nextStepAt += missed * MUSIC_STEP;
     }
-    const patterns = [
-      [2, 3, 4, 3, 2, 4, 3, 2],
-      [2, 4, 3, 6, 4, 3, 2, 3],
-      [2, 3, 4, 6, 4, 3, 6, 4],
-    ];
-    const ratio = patterns[this.intensity][this.beat % 8];
-    this.tone(bass * ratio, bass * ratio, 0.09, "sine", 0.11 * duck, true);
-    if (this.intensity > 0 && this.beat % 2 === 1)
-      this.tone(1800, 1100, 0.025, "triangle", 0.035 * duck, true);
+    let scheduledSteps = 0;
+    while (this.nextStepAt < now + 0.15 && scheduledSteps++ < 3) {
+      this.queuedSteps.push({
+        time: this.nextStepAt,
+        beat: this.beat,
+        section: this.section,
+        bar: this.sectionBar,
+      });
+      this.scheduleStep(this.nextStepAt);
+      this.nextStepAt += MUSIC_STEP;
+    }
+  }
+  private scheduleStep(when: number) {
+    const step = this.beat % 16;
+    if (step === 0) {
+      const bar = Math.floor(this.beat / 16);
+      const next =
+        this.musicContext === "boss"
+          ? "boss"
+          : this.musicContext === "recovery"
+            ? "breather"
+            : this.musicContext === "pressure"
+              ? "assault"
+              : sectionFor(
+                  bar,
+                  this.musicContext === "flight" ? 0 : this.intensity,
+                );
+      if (next !== this.section) {
+        this.section = next;
+        this.sectionBar = 0;
+        this.sectionTransitionCount++;
+      } else if (this.beat > 0) this.sectionBar++;
+    }
+    const duck = this.context!.currentTime < this.warningUntil ? 0.2 : 1;
+    for (const note of scoreStep(this.section, this.sectionBar, step)) {
+      const tone = musicTone(note);
+      this.tone(
+        tone.from,
+        tone.to,
+        tone.duration,
+        tone.type,
+        tone.level * duck,
+        true,
+        tone.attack,
+        tone.sustain,
+        when,
+      );
+    }
     this.beat++;
   }
   play(kind: FlightSound) {
@@ -198,35 +283,29 @@ export class FlightAudio {
     level: number,
     music = false,
     attack = 0.006,
+    sustain = false,
+    when = this.context?.currentTime ?? 0,
   ) {
     if (
       !this.ready() ||
-      this.voices.size >= (music ? 14 : 16) ||
+      this.voices.size >= (music ? 12 : 16) ||
       (music ? this.volumes.music : this.volumes.sfx) === 0
     )
       return;
     const ctx = this.context!;
     let voice: Voice | null = null;
     try {
-      const oscillator = ctx.createOscillator(),
-        gain = ctx.createGain();
+      const { oscillator, gain } = scheduleTone(
+        ctx,
+        music ? this.musicBus! : this.sfxBus!,
+        when,
+        { from, to, duration, type, level, attack, sustain },
+      );
       voice = { oscillator, gain, music };
       this.voices.add(voice);
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(from, ctx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(
-        to,
-        ctx.currentTime + duration,
-      );
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(level, ctx.currentTime + attack);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-      oscillator.connect(gain);
-      gain.connect(music ? this.musicBus! : this.sfxBus!);
       const complete = voice;
       oscillator.onended = () => this.release(complete);
-      oscillator.start();
-      oscillator.stop(ctx.currentTime + duration + 0.01);
+      if (music) this.notesScheduled++;
     } catch {
       if (voice) this.release(voice);
       this.failed = true;
@@ -253,6 +332,13 @@ export class FlightAudio {
       state: this.context?.state ?? "locked",
       playing: this.playing,
       intensity: this.intensity,
+      musicContext: this.musicContext,
+      musicSection: this.section,
+      notesScheduled: this.notesScheduled,
+      sectionTransitionCount: this.sectionTransitionCount,
+      musicBar: Math.floor(this.beat / 16),
+      musicStep: this.beat,
+      queuedMusicSteps: this.queuedSteps.length,
       activeVoices: this.voices.size,
       musicVolume: this.volumes.music,
       sfxVolume: this.volumes.sfx,

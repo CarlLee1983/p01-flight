@@ -1,16 +1,10 @@
 import { test, expect } from "@playwright/test";
-const state = (page: any) => page.evaluate(() => (window as any).__P01__());
-// Read-only diagnostics; every gameplay action is a real keyboard event.
-const waitGameTime = (page: any, seconds: number) =>
-  expect
-    .poll(async () => (await state(page)).time, {
-      timeout: 135000,
-      intervals: [50],
-    })
-    .toBeGreaterThanOrEqual(seconds);
+import { state, waitGameTime, keyboardShoreCounterattack } from "./gameplay";
+import { stage01 } from "../../src/data/stage";
+const BOSS_AT = stage01.boss!.at;
 test.use({ video: { mode: "on", size: { width: 500, height: 450 } } });
 test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
-  test.setTimeout(180000);
+  test.setTimeout(600000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
@@ -36,6 +30,7 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     "carrier",
     "harbor-battlefield",
     "harbor-exit",
+    "harbor-refinery",
     "ground-battery",
     "ground-depot",
   ]) {
@@ -93,18 +88,37 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await waitGameTime(page, 58);
   expect((await state(page)).section.at).toBe(56);
   await page.screenshot({ path: "docs/resupply-approach.png" });
+  await keyboardShoreCounterattack(page);
+  for (const t of [78, 88, 100, 105, 112, 123]) {
+    await waitGameTime(page, t);
+    await page.screenshot({ path: `docs/sortie-${t}.png` });
+  }
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
   await page.screenshot({ path: "docs/boss.png" });
-  await waitGameTime(page, 77);
+  await expect
+    .poll(async () => (await state(page)).boss?.attackWarning ?? 0, {
+      timeout: 7000,
+      intervals: [20],
+    })
+    .toBeGreaterThan(0);
+  const warning = (await state(page)).boss;
+  expect(warning.attackAngles.length).toBeGreaterThanOrEqual(2);
+  await page.screenshot({ path: "docs/boss-attack-forecast.png" });
+  await expect
+    .poll(async () => (await state(page)).audio.musicSection, { timeout: 5000 })
+    .toBe("boss");
+  expect((await state(page)).audio.notesScheduled).toBeGreaterThan(100);
+  expect((await state(page)).audio.sectionTransitionCount).toBeGreaterThan(2);
+  await waitGameTime(page, BOSS_AT + 7);
   await expect.poll(async () => (await state(page)).partsDestroyed).toBe(2);
   await page.screenshot({ path: "docs/boss-cannons-destroyed.png" });
-  await waitGameTime(page, 85);
+  await waitGameTime(page, BOSS_AT + 15);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(1);
   await page.screenshot({ path: "docs/bomb.png" });
-  await waitGameTime(page, 91);
+  await waitGameTime(page, BOSS_AT + 21);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(0);
   await expect
@@ -122,9 +136,26 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .toBe("won");
   await page.keyboard.up("Space");
   const won = await state(page);
-  expect(won.time).toBeGreaterThanOrEqual(70);
-  expect(won.time).toBeLessThanOrEqual(115);
+  expect(won.time).toBeGreaterThanOrEqual(BOSS_AT);
+  expect(won.time).toBeLessThanOrEqual(stage01.duration);
   expect(won.bossDefeated).toBe(true);
+  expect(won.spawnedAir).toBeGreaterThanOrEqual(396);
+  expect(
+    won.enteredAir -
+      stage01.waves.filter((w) => w.behavior === "carrier").length,
+  ).toBeGreaterThanOrEqual(396);
+  expect(won.renderMetrics.peakAirEnemies).toBeGreaterThanOrEqual(8);
+  expect(won.renderMetrics.peakEnemies).toBeLessThanOrEqual(64);
+  expect(won.renderMetrics.peakEnemyBullets).toBeLessThanOrEqual(80);
+  expect(won.renderMetrics.spritePool).toBeLessThanOrEqual(500);
+  console.log(
+    "FULL_SORTIE_DENSITY",
+    JSON.stringify({
+      spawned: won.spawnedAir,
+      entered: won.enteredAir,
+      performance: won.renderMetrics,
+    }),
+  );
   expect(won.score).toBeGreaterThan(0);
   expect(won.save.stages["stage-01"].clearCount).toBe(1);
   await expect(
@@ -178,7 +209,7 @@ test("corrupt save and blocked storage are safe", async ({ page }) => {
   expect((await state(page)).mode).toBe("playing");
 });
 test("browser closes and reopens with persisted settings and record", async () => {
-  test.setTimeout(180000);
+  test.setTimeout(600000);
   const { chromium } = await import("@playwright/test");
   const { mkdtemp, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
@@ -192,15 +223,16 @@ test("browser closes and reopens with persisted settings and record", async () =
     await page.goto("http://127.0.0.1:4173");
     await page.getByRole("button", { name: "開始飛行" }).click();
     await page.keyboard.down("Space");
-    await waitGameTime(page, 70);
+    await keyboardShoreCounterattack(page);
+    await waitGameTime(page, BOSS_AT);
     await page.keyboard.press("c");
     await expect.poll(async () => (await state(page)).weaponMode).toBe("beam");
     expect((await state(page)).weaponLevel).toBe(3);
     await page.screenshot({ path: "docs/beam-boss.png" });
-    await waitGameTime(page, 85);
+    await waitGameTime(page, BOSS_AT + 15);
     await page.keyboard.press("x");
     await expect.poll(async () => (await state(page)).bombs).toBe(1);
-    await waitGameTime(page, 91);
+    await waitGameTime(page, BOSS_AT + 21);
     await page.keyboard.press("x");
     await expect.poll(async () => (await state(page)).bombs).toBe(0);
     await expect
@@ -283,6 +315,18 @@ test("audio unlock, mute persistence and bomb edge trigger", async ({
   await expect
     .poll(async () => (await state(page)).audio.state)
     .toBe("running");
+  await expect
+    .poll(async () => (await state(page)).audio.notesScheduled)
+    .toBeGreaterThan(0);
+  await page.keyboard.press("p");
+  const pausedMusic = (await state(page)).audio.musicStep;
+  await page.waitForTimeout(400);
+  expect((await state(page)).audio.musicStep).toBe(pausedMusic);
+  expect((await state(page)).audio.activeVoices).toBe(0);
+  await page.keyboard.press("p");
+  await expect
+    .poll(async () => (await state(page)).audio.musicStep)
+    .toBeGreaterThan(pausedMusic);
   await page.keyboard.down("x");
   await page.waitForTimeout(1000);
   expect((await state(page)).bombs).toBe(1);
@@ -582,7 +626,7 @@ test("ground batteries visibly warn and fire during continuous normal shooting",
     expect(snapshot.background.harborArtAlpha).toBeGreaterThan(0.8);
     expect(snapshot.background.exitReady).toBe(true);
     expect(snapshot.background.exitY).toBeCloseTo(
-      (snapshot.time - 53) * 32 - 720,
+      (snapshot.time - 108) * 32 - 720,
       0,
     );
     await page.screenshot({ path: `docs/approach-continuous-${time}.png` });
