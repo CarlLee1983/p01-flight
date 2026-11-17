@@ -53,10 +53,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
   Context.instances = [];
 });
-describe("original procedural audio", () => {
+describe("archived procedural audio and current SFX", () => {
   it("does not construct audio until explicit gesture unlock; pauses stop and disconnect voices", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     a.setPlaying(true);
     a.update(1);
     a.play("shot");
@@ -77,7 +77,7 @@ describe("original procedural audio", () => {
   });
   it("applies volume to live buses, zero mutes without schema changes, and throttles rapid sounds", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     a.setVolumes(0.2, 0.3);
     await a.unlock();
     const ctx = Context.instances[0];
@@ -100,7 +100,7 @@ describe("original procedural audio", () => {
   });
   it("caps voices and cleans nodes on natural end", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     const ctx = Context.instances[0];
     for (let i = 0; i < 20; i++) {
@@ -115,7 +115,7 @@ describe("original procedural audio", () => {
   });
   it("unsupported or denied audio does not throw and can retry unlock", async () => {
     vi.stubGlobal("AudioContext", undefined);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await expect(a.unlock()).resolves.toBeUndefined();
     a.play("shot");
     expect(a.diagnostics().unavailable).toBe(true);
@@ -126,7 +126,7 @@ describe("original procedural audio", () => {
       });
     }
     vi.stubGlobal("AudioContext", Denied);
-    const b = new FlightAudio();
+    const b = new FlightAudio(false);
     await expect(b.unlock()).resolves.toBeUndefined();
     expect(b.diagnostics().unavailable).toBe(true);
     b.play("won");
@@ -146,7 +146,7 @@ describe("original procedural audio", () => {
       removeEventListener: vi.fn(),
     });
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     a.setPlaying(true);
     a.update(0.1);
@@ -160,7 +160,7 @@ describe("original procedural audio", () => {
   });
   it("beam is a layered sustained buzz rather than the shot chirp", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     const ctx = Context.instances[0];
     a.play("shot");
@@ -181,7 +181,7 @@ describe("original procedural audio", () => {
   });
   it("score changes section on a bar boundary and pauses retain musical position", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     const ctx = Context.instances[0];
     a.setPlaying(true);
@@ -213,7 +213,7 @@ describe("original procedural audio", () => {
   });
   it("leaves warning voice space during fire and temporarily suppresses routine sounds", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     const ctx = Context.instances[0];
     for (let i = 0; i < 20; i++) {
@@ -238,7 +238,7 @@ describe("original procedural audio", () => {
   });
   it("missile uses a low rising launch cue with its own cooldown and mute", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     const ctx = Context.instances[0];
     a.play("missile");
@@ -265,7 +265,7 @@ describe("original procedural audio", () => {
     "score tempo stays stable at %i FPS and all ended nodes release",
     async (fps) => {
       vi.stubGlobal("AudioContext", Context);
-      const a = new FlightAudio();
+      const a = new FlightAudio(false);
       await a.unlock();
       const ctx = Context.instances[0];
       a.setPlaying(true);
@@ -291,7 +291,7 @@ describe("original procedural audio", () => {
   );
   it("explicit encounter context overrides legacy intensity and exposes actual scheduled notes", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     a.setPlaying(true);
     a.setIntensity(2);
@@ -336,7 +336,7 @@ describe("original procedural audio", () => {
       vi.useFakeTimers();
       vi.setSystemTime(0);
       vi.stubGlobal("AudioContext", Context);
-      const a = new FlightAudio();
+      const a = new FlightAudio(false);
       await a.unlock();
       const ctx = Context.instances[0];
       Object.defineProperty(ctx, "currentTime", {
@@ -383,7 +383,7 @@ describe("original procedural audio", () => {
   );
   it("a blocked main thread skips expired notes without catch-up burst", async () => {
     vi.stubGlobal("AudioContext", Context);
-    const a = new FlightAudio();
+    const a = new FlightAudio(false);
     await a.unlock();
     const ctx = Context.instances[0];
     a.setPlaying(true);

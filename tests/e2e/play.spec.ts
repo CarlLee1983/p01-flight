@@ -162,10 +162,12 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     page.screenshot({ path: "docs/boss-charge-no-guides.png", timeout: 15000 }),
   );
   await expect
-    .poll(async () => (await state(page)).audio.musicSection, { timeout: 5000 })
+    .poll(async () => (await state(page)).audio.recorded?.activeTrack, {
+      timeout: 10000,
+    })
     .toBe("boss");
-  expect((await state(page)).audio.notesScheduled).toBeGreaterThan(100);
-  expect((await state(page)).audio.sectionTransitionCount).toBeGreaterThan(2);
+  expect((await state(page)).audio.recorded.activeSources).toBeGreaterThan(0);
+  expect((await state(page)).audio.recorded.loadedTracks).toContain("boss");
   await evadeUntil(page, BOSS_AT + 7);
   await expect.poll(async () => (await state(page)).partsDestroyed).toBe(2);
   await withKeyboardPilot(page, () =>
@@ -405,16 +407,19 @@ test("audio unlock, mute persistence and bomb edge trigger", async ({
     .poll(async () => (await state(page)).audio.state)
     .toBe("running");
   await expect
-    .poll(async () => (await state(page)).audio.notesScheduled)
+    .poll(async () => (await state(page)).audio.recorded?.activeSources, {
+      timeout: 10000,
+    })
     .toBeGreaterThan(0);
   await page.keyboard.press("p");
-  const pausedMusic = (await state(page)).audio.musicStep;
+  const pausedMusic = (await state(page)).audio.recorded.positionSeconds;
   await page.waitForTimeout(400);
-  expect((await state(page)).audio.musicStep).toBe(pausedMusic);
+  expect((await state(page)).audio.recorded.positionSeconds).toBe(pausedMusic);
   expect((await state(page)).audio.activeVoices).toBe(0);
+  expect((await state(page)).audio.recorded?.activeSources ?? 0).toBe(0);
   await page.keyboard.press("p");
   await expect
-    .poll(async () => (await state(page)).audio.musicStep)
+    .poll(async () => (await state(page)).audio.recorded.positionSeconds)
     .toBeGreaterThan(pausedMusic);
   await page.keyboard.down("x");
   await page.waitForTimeout(1000);
@@ -425,6 +430,7 @@ test("audio unlock, mute persistence and bomb edge trigger", async ({
   expect((await state(page)).audio.sfxVolume).toBe(0);
   await page.keyboard.press("p");
   expect((await state(page)).audio.activeVoices).toBe(0);
+  expect((await state(page)).audio.recorded?.activeSources ?? 0).toBe(0);
   await page.reload();
   expect((await state(page)).save.settings).toEqual({
     musicVolume: 0,
