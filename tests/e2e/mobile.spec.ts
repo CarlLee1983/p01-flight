@@ -1,6 +1,6 @@
 import { test, expect, webkit } from "@playwright/test";
 test.setTimeout(30000);
-import { state, waitGameTime } from "./gameplay";
+import { state, waitGameTime, dodgeInput } from "./gameplay";
 import { stage01 } from "../../src/data/stage";
 const BOSS_AT = stage01.boss!.at;
 const point = (x: number, y: number, id = 1) => ({
@@ -184,7 +184,27 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     type: "touchStart",
     touchPoints: [first],
   });
-  await waitGameTime(page, 70);
+  const initialPointerX = first.x;
+  const touchEvadeUntil = async (seconds: number) => {
+    const start = await state(page);
+    const deadline =
+      Date.now() + Math.max(15000, (seconds - start.time) * 3000 + 20000);
+    while (Date.now() < deadline) {
+      const s = await state(page);
+      if (s.time >= seconds) return;
+      expect(s.mode).toBe("playing");
+      const dx = dodgeInput(s);
+      const target = Math.max(18, Math.min(342, s.player.x + dx * 16));
+      first.x = initialPointerX + ((target - 180) * box.width) / 360;
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [first],
+      });
+      await page.waitForTimeout(30);
+    }
+    throw new Error(`Touch pilot did not reach ${seconds}s`);
+  };
+  await touchEvadeUntil(70);
   await expect
     .poll(
       async () =>
@@ -225,7 +245,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     .toBe(false);
   await moveTo(180);
   for (const time of [BOSS_AT + 15, BOSS_AT + 21]) {
-    await waitGameTime(page, time);
+    await touchEvadeUntil(time);
     const b = (await page.locator("#touch-bomb").boundingBox())!;
     const second = point(b.x + b.width / 2, b.y + b.height / 2, 2);
     await cdp.send("Input.dispatchTouchEvent", {

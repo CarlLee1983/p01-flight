@@ -260,9 +260,10 @@ class FlightScene extends Phaser.Scene {
     label = this.add
       .text(16, 14, "", {
         fontFamily: "monospace",
-        fontSize: "15px",
+        fontSize: "14px",
         color: "#d7f9ff",
       })
+      .setLineSpacing(-2)
       .setDepth(5);
     this.keys = this.input.keyboard!.addKeys(
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Z,ENTER,P,X,C,SHIFT",
@@ -658,12 +659,43 @@ class FlightScene extends Phaser.Scene {
               graphics.fillRoundedRect(e.x - 31, e.y - 29, 62, 58, 5);
               graphics.lineStyle(2, 0x698487);
               graphics.strokeRoundedRect(e.x - 28, e.y - 26, 56, 52, 4);
+              graphics.fillStyle(0x0b1d27, 0.75);
+              graphics.fillTriangle(
+                e.x - 31,
+                e.y + 25,
+                e.x + 31,
+                e.y + 25,
+                e.x + 24,
+                e.y + 35,
+              );
+              graphics.fillTriangle(
+                e.x - 31,
+                e.y + 25,
+                e.x - 24,
+                e.y + 35,
+                e.x + 24,
+                e.y + 35,
+              );
+              graphics.lineStyle(2, 0xb2aaa0);
+              graphics.lineBetween(e.x - 25, e.y - 25, e.x + 23, e.y - 25);
               graphics.fillStyle(0x42585e);
               graphics.fillRect(e.x - 23, e.y - 21, 46, 42);
               for (const side of [-1, 1]) {
                 graphics.fillStyle(0xc4a376);
                 graphics.fillRect(e.x + side * 23 - 3, e.y - 24, 6, 5);
                 graphics.fillRect(e.x + side * 23 - 3, e.y + 19, 6, 5);
+              }
+              graphics.fillStyle(0x6c7976);
+              for (const side of [-1, 1]) {
+                graphics.fillRect(e.x + side * 22 - 5, e.y - 16, 10, 11);
+                graphics.fillRect(e.x + side * 22 - 5, e.y + 5, 10, 11);
+                graphics.lineStyle(1, 0x263c43);
+                graphics.lineBetween(
+                  e.x + side * 22 - 4,
+                  e.y - 4,
+                  e.x + side * 22 + 4,
+                  e.y - 4,
+                );
               }
               graphics.fillStyle(0x182d36);
               graphics.fillCircle(e.x, e.y, 19);
@@ -689,6 +721,13 @@ class FlightScene extends Phaser.Scene {
                   muzzle.y + py,
                 );
               }
+              // Twin rails support one central bore: projectile and flash use its opening.
+              graphics.lineStyle(7, 0x788d91);
+              graphics.lineBetween(e.x, e.y, muzzle.x, muzzle.y);
+              graphics.lineStyle(2, 0xc7c7b8);
+              graphics.lineBetween(e.x, e.y, muzzle.x, muzzle.y);
+              graphics.fillStyle(0x142731);
+              graphics.fillCircle(muzzle.x, muzzle.y, 3);
               graphics.fillStyle(0x60777c);
               graphics.fillCircle(e.x, e.y, 10);
               graphics.fillStyle(0xe9b877);
@@ -1311,6 +1350,7 @@ Object.defineProperty(window, "__P01__", {
     audio: audio.diagnostics(),
     lostReason: model.lostReason,
     save: saves.data,
+    hudBottom: label.y + label.height,
     background: readBackgroundInfo(),
     renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,

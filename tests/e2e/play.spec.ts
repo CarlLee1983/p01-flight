@@ -95,13 +95,18 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await page.screenshot({ path: "docs/resupply-approach.png" });
   await keyboardShoreCounterattack(page);
   for (const t of [78, 88, 100, 105, 112, 123]) {
-    await waitGameTime(page, t);
+    await evadeUntil(page, t);
     await page.screenshot({ path: `docs/sortie-${t}.png` });
   }
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
+  expect((await state(page)).hudBottom).toBeLessThan(63);
   await page.screenshot({ path: "docs/boss.png" });
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect((await state(page)).hudBottom).toBeLessThan(63);
+  await page.screenshot({ path: "docs/boss-320.png" });
+  await page.setViewportSize({ width: 1000, height: 900 });
   // Capture warning and angles from one frame. A second page.evaluate can run
   // after the volley fired and legitimately cleared its forecast.
   let warning: any;
@@ -126,14 +131,14 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .toBe("boss");
   expect((await state(page)).audio.notesScheduled).toBeGreaterThan(100);
   expect((await state(page)).audio.sectionTransitionCount).toBeGreaterThan(2);
-  await waitGameTime(page, BOSS_AT + 7);
+  await evadeUntil(page, BOSS_AT + 7);
   await expect.poll(async () => (await state(page)).partsDestroyed).toBe(2);
   await page.screenshot({ path: "docs/boss-cannons-destroyed.png" });
-  await waitGameTime(page, BOSS_AT + 15);
+  await evadeUntil(page, BOSS_AT + 15);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(1);
   await page.screenshot({ path: "docs/bomb.png" });
-  await waitGameTime(page, BOSS_AT + 21);
+  await evadeUntil(page, BOSS_AT + 21);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(0);
   await expect
@@ -635,7 +640,7 @@ test("ground batteries visibly warn and fire during continuous normal shooting",
   await page.keyboard.up(back);
   await evadeUntil(page, 56);
   for (const time of [56, 64, 66, 69]) {
-    await waitGameTime(page, time);
+    await evadeUntil(page, time);
     const snapshot = await state(page);
     expect(snapshot.mode).toBe("playing");
     expect(snapshot.background.harborArtAlpha).toBeGreaterThan(0.8);
