@@ -1285,7 +1285,7 @@ Object.defineProperty(window, "__P01__", {
     audio: audio.diagnostics(),
     lostReason: model.lostReason,
     save: saves.data,
-    hudBottom: label.y + label.height,
+    hudBottom: label ? label.y + label.height : null,
     background: readBackgroundInfo(),
     renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,

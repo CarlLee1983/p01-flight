@@ -79,24 +79,29 @@ export async function evadeUntil(page: Page, seconds: number) {
   const start = await state(page);
   const deadline =
     Date.now() + Math.max(15000, (seconds - start.time) * 3000 + 20000);
-  let held = "";
   try {
     while (Date.now() < deadline) {
       const s = await state(page);
       if (s.time >= seconds) return s;
-      expect(s.mode).toBe("playing");
+      expect(
+        s.mode,
+        JSON.stringify({
+          time: s.time,
+          hp: s.hp,
+          player: s.player,
+          fps: s.measuredFps,
+        }),
+      ).toBe("playing");
       const dx = dodgeInput(s);
       const key = dx < 0 ? "ArrowLeft" : dx > 0 ? "ArrowRight" : "";
-      if (key !== held) {
-        if (held) await page.keyboard.up(held);
-        if (key) await page.keyboard.down(key);
-        held = key;
-      }
-      await page.waitForTimeout(30);
+      // A bounded real key pulse cannot remain held across a slow screenshot/evaluate.
+      if (key) await page.keyboard.press(key, { delay: 30 });
+      else await page.waitForTimeout(20);
     }
     throw new Error(`Evading pilot did not reach ${seconds}s`);
   } finally {
-    if (held) await page.keyboard.up(held);
+    await page.keyboard.up("ArrowLeft");
+    await page.keyboard.up("ArrowRight");
   }
 }
 
