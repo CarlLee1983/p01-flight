@@ -1176,10 +1176,10 @@ const game = new Phaser.Game({
   parent: "game",
   backgroundColor: "#0c2035",
   scene: [FlightScene],
-  // Keep the sampler set deterministic while diagnosing intermittent partial
-  // sprites across image/text batches. No visual/effect or simulation reduction.
-  // Validate framebuffer captures and full-route CPU cost before shipping.
-  render: { pixelArt: false, antialias: true, maxTextures: 1 },
+  // Diagnostic compatibility setting: isolate each quad while investigating
+  // partial image/text batches. Sampler limiting alone did not resolve it.
+  // Keep content and simulation unchanged; validate framebuffers and CPU cost.
+  render: { pixelArt: false, antialias: true, batchSize: 1 },
   fps: { target: 60 },
 });
 document.addEventListener("visibilitychange", () => {
@@ -1272,6 +1272,7 @@ Object.defineProperty(window, "__P01__", {
     background: readBackgroundInfo(),
     renderer: {
       type: game.renderer.type,
+      batchSize: game.config.batchSize,
       maxTextures:
         "maxTextures" in game.renderer ? game.renderer.maxTextures : 0,
     },
@@ -1296,4 +1297,9 @@ Object.defineProperty(window, "__P01_CAPTURE__", {
         else reject(new Error("Expected a rendered image"));
       });
     }),
+});
+
+// Original 2D text canvas for distinguishing source drawing from GPU output.
+Object.defineProperty(window, "__P01_HUD_SOURCE__", {
+  value: () => label.canvas.toDataURL("image/png"),
 });

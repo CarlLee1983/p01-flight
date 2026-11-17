@@ -37,6 +37,7 @@ function route(
   old = false,
   fps = 60,
   jitter = false,
+  shoreMission = false,
 ) {
   const m = new FlightModel(stage01);
   m.start();
@@ -47,10 +48,25 @@ function route(
     b2 = false,
     hp = 3,
     sample = 0;
+  let phase = "wait",
+    shore: (typeof m.enemies)[number] | undefined,
+    shoreDestroyed = false;
   const hits: number[] = [];
   for (let frame = 0; frame < 175 * fps && m.mode === "playing"; frame++) {
     if (m.time >= 140 && !b1) b1 = m.useBomb();
     if (m.time >= 146 && !b2) b2 = m.useBomb();
+    if (shoreMission && m.time >= 70 && phase === "wait") {
+      shore = m.enemies.find(
+        (e) =>
+          e.active && e.behavior === "groundBattery" && (e.telegraph ?? 0) > 0,
+      );
+      if (shore) phase = "attack";
+    }
+    if (phase === "attack" && !shore?.active) {
+      shoreDestroyed = (shore?.hp ?? 1) <= 0;
+      phase = "back";
+    }
+    if (phase === "back" && Math.abs(m.player.x - 180) < 12) phase = "done";
     if (pending && m.time >= pending.at) {
       target = pending.x;
       pending = undefined;
@@ -63,14 +79,33 @@ function route(
       };
       pending = {
         at: m.time + (jitter ? [0.05, 0.2, 0.1, 0.15][sample++ % 4] : latency),
-        x: old ? immediateOnly(s, target) : chooseTouchTarget(s, target),
+        x: old
+          ? immediateOnly(s, target)
+          : chooseTouchTarget(
+              s,
+              target,
+              0.2,
+              phase === "attack"
+                ? shore!.x
+                : phase === "back"
+                  ? 180
+                  : undefined,
+            ),
       };
     }
     advanceFrame(m, 1 / fps, 0, 0, true, false, { x: target, y: 540 });
     if (m.hp < hp) hits.push(Number(m.time.toFixed(2)));
     hp = m.hp;
   }
-  return { mode: m.mode, time: m.time, hp: m.hp, bombs: m.bombs, hits };
+  return {
+    mode: m.mode,
+    time: m.time,
+    hp: m.hp,
+    bombs: m.bombs,
+    hits,
+    phase,
+    shoreDestroyed,
+  };
 }
 it("reproduces pre-fix stale-command defeat without modifying gameplay", () => {
   const old = route(0.2, 0, true);
@@ -93,5 +128,18 @@ it.each([10, 30, 120])("variable50–200ms delivery at %iFPS", (fps) => {
   const result = route(0.2, 0.013, false, fps, true);
   console.log("jittered delivery", { fps, ...result });
   expect(result.mode).toBe("won");
+  expect(result.bombs).toBe(0);
+});
+
+it.each(
+  [10, 30, 60, 120].flatMap((fps) =>
+    [false, true].map((jitter) => ({ fps, jitter })),
+  ),
+)("goal-directed shore mission $fps FPS jitter=$jitter", ({ fps, jitter }) => {
+  const result = route(0.2, 0.013, false, fps, jitter, true);
+  console.log("goal mission", { fps, jitter, ...result });
+  expect(result.mode).toBe("won");
+  expect(result.shoreDestroyed).toBe(true);
+  expect(result.phase).toBe("done");
   expect(result.bombs).toBe(0);
 });

@@ -55,6 +55,7 @@ export function clearance(
 export function chooseAction(
   s: PilotSnapshot,
   currentKey: Steering = 0,
+  goalX?: number,
 ): Steering {
   const width = s.width ?? 360;
   const actions: Steering[] = [0, -1, 1];
@@ -63,10 +64,11 @@ export function chooseAction(
   );
   const distance = new Map(allowed.map((d) => [d, clearance(s, d)]));
   // Centering is optional, never a reason to cross a bullet's swept path.
-  const toward = Math.sign(width / 2 - s.player.x) as Steering;
+  const goal = Math.max(18, Math.min(width - 18, goalX ?? width / 2));
+  const toward = Math.sign(goal - s.player.x) as Steering;
   if (distance.get(0)! >= 32) {
     if (
-      Math.abs(width / 2 - s.player.x) > 48 &&
+      Math.abs(goal - s.player.x) > (goalX === undefined ? 48 : 8) &&
       (distance.get(toward) ?? 0) >= 48
     )
       return toward;

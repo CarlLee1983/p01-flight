@@ -51,18 +51,15 @@ it.each(
     if (phase === "attack" && !shore?.active) phase = "back";
     if (phase === "back" && Math.abs(m.player.x - 180) < 12) phase = "done";
     if (m.time >= next) {
-      target =
-        phase === "attack"
-          ? shore!.x
-          : phase === "back"
-            ? 180
-            : chooseTouchTarget(
-                snap(
-                  m.player.x,
-                  m.enemyBullets.filter((b) => b.active),
-                ),
-                target,
-              );
+      target = chooseTouchTarget(
+        snap(
+          m.player.x,
+          m.enemyBullets.filter((b) => b.active),
+        ),
+        target,
+        0.2,
+        phase === "attack" ? shore!.x : phase === "back" ? 180 : undefined,
+      );
       next =
         m.time + (jitter ? [0.05, 0.12, 0.08, 0.18, 0.1][samples++ % 5] : 0.1);
     }
@@ -81,4 +78,11 @@ it.each(
   expect(phase).toBe("done");
   expect(m.bombs).toBe(0);
   expect(m.enteredAir).toBe(405);
+});
+
+it("waits rather than crossing a bullet to reach a requested goal, then resumes", () => {
+  const dangerous = snap(64, [{ x: 100, y: 512, vx: 0, vy: 140 }]);
+  expect(chooseTouchTarget(dangerous, 64, 0.2, 180)).toBe(64);
+  expect(chooseTouchTarget(snap(64, []), 64, 0.2, 180)).toBe(136);
+  expect(chooseTouchTarget(snap(136, []), 136, 0.2, 180)).toBe(180);
 });

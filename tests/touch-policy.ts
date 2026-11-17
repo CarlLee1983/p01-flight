@@ -53,22 +53,35 @@ export function chooseTouchTarget(
   s: PilotSnapshot,
   previousTarget = s.player.x,
   latencySeconds = 0.2,
+  goalX?: number,
 ): number {
   const width = s.width ?? 360,
     x = s.player.x;
   const clamp = (v: number) => Math.max(18, Math.min(width - 18, v));
-  const center = clamp(x + Math.max(-72, Math.min(72, width / 2 - x)));
+  const goal = clamp(goalX ?? width / 2);
+  const center = clamp(x + Math.max(-72, Math.min(72, goal - x)));
   const safe = (target: number) =>
     delayedTouchClearance(s, target, previousTarget, latencySeconds);
   const stay = safe(x);
   if (stay >= 32) {
-    return Math.abs(width / 2 - x) > 48 && safe(center) >= 48 ? center : x;
+    return Math.abs(goal - x) > (goalX === undefined ? 48 : 4) &&
+      safe(center) >= 48
+      ? center
+      : x;
   }
   const candidates = [
     ...new Set(
-      [x, previousTarget, x - 24, x + 24, x - 48, x + 48, x - 72, x + 72].map(
-        clamp,
-      ),
+      [
+        x,
+        previousTarget,
+        center,
+        x - 24,
+        x + 24,
+        x - 48,
+        x + 48,
+        x - 72,
+        x + 72,
+      ].map(clamp),
     ),
   ];
   let best = x,
@@ -77,7 +90,10 @@ export function chooseTouchTarget(
     const value =
       Math.min(60, safe(target)) +
       (Math.abs(target - previousTarget) < 1 ? 4 : 0) -
-      Math.abs(target - x) * 0.015;
+      Math.abs(target - x) * 0.015 +
+      (goalX === undefined
+        ? 0
+        : (Math.abs(goal - x) - Math.abs(goal - target)) * 0.02);
     if (value > score) {
       best = target;
       score = value;

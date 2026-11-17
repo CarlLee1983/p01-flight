@@ -160,3 +160,9 @@ or declare a damaged image asset. The next experiment constrains Phaser's
 public `render.maxTextures` to1, keeping content/effects/simulation unchanged,
 and captures8 native frames. Retain only after full-route CI, visual and CPU
 cost checks; it is a compatibility experiment, not a proven upstream root cause.
+
+Single-sampler experiment020cb918 did **not** remove HUD rectangle losses in
+native framebuffer images. Do not retain that setting as a claimed fix. The
+next isolated test restores the normal sampler limit and uses public
+`render.batchSize:1` to separate quad batches; the same eight-frame inspection
+and full-route checks remain required before any deployment.

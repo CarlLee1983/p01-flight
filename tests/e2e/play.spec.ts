@@ -4,6 +4,7 @@ import {
   state,
   waitGameTime,
   keyboardShoreCounterattack,
+  keyboardMoveTo,
   evadeUntil,
 } from "./gameplay";
 import { stage01 } from "../../src/data/stage";
@@ -180,13 +181,20 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   // original screenshot/video as evidence; never replace a failed image silently.
   const renderer = (await state(page)).renderer;
   console.log("FRAME_RENDERER", JSON.stringify(renderer));
-  expect(renderer.maxTextures).toBe(1);
+  expect(renderer.batchSize).toBe(1);
   for (let i = 0; i < 8; i++) {
     const png = await page.evaluate(() => (window as any).__P01_CAPTURE__());
     expect(png).toMatch(/^data:image\/png;base64,/);
     await writeFile(
       `docs/boss-phase3-framebuffer-${i}.png`,
       Buffer.from(png.split(",")[1], "base64"),
+    );
+    const source = await page.evaluate(() =>
+      (window as any).__P01_HUD_SOURCE__(),
+    );
+    await writeFile(
+      `docs/boss-phase3-hud-source-${i}.png`,
+      Buffer.from(source.split(",")[1], "base64"),
     );
   }
   await expect
@@ -212,6 +220,8 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
       spawned: won.spawnedAir,
       entered: won.enteredAir,
       performance: won.renderMetrics,
+      measuredFps: won.measuredFps,
+      renderer: won.renderer,
     }),
   );
   expect(won.score).toBeGreaterThan(0);
@@ -647,14 +657,7 @@ test("ground batteries visibly warn and fire during continuous normal shooting",
   );
   await page.screenshot({ path: "docs/ground-continuous-fire-warning.png" });
   // Dodge the fixed aim and turn the main gun onto the visible shore battery.
-  const direction = target.x < warning.player.x ? "ArrowLeft" : "ArrowRight";
-  await page.keyboard.down(direction);
-  await expect
-    .poll(async () => Math.abs((await state(page)).player.x - target.x), {
-      intervals: [20],
-    })
-    .toBeLessThan(18);
-  await page.keyboard.up(direction);
+  await keyboardMoveTo(page, target.x, 18);
   await expect
     .poll(async () => (await state(page)).groundShotCount, { timeout: 5000 })
     .toBeGreaterThan(0);
@@ -667,15 +670,7 @@ test("ground batteries visibly warn and fire during continuous normal shooting",
     )
     .toBe(false);
   // Return to the supply lane using input, never mutate the game model.
-  const current = await state(page);
-  const back = current.player.x < 180 ? "ArrowRight" : "ArrowLeft";
-  await page.keyboard.down(back);
-  await expect
-    .poll(async () => Math.abs((await state(page)).player.x - 180), {
-      intervals: [20],
-    })
-    .toBeLessThan(12);
-  await page.keyboard.up(back);
+  await keyboardMoveTo(page, 180, 12);
   await evadeUntil(page, 56);
   for (const time of [56, 64, 66, 69]) {
     await evadeUntil(page, time);

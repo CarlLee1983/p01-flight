@@ -48,14 +48,7 @@ export async function keyboardShoreCounterattack(page: Page) {
     (e: any) =>
       e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
   );
-  const key = target.x < s.player.x ? "ArrowLeft" : "ArrowRight";
-  await page.keyboard.down(key);
-  await expect
-    .poll(async () => Math.abs((await state(page)).player.x - target.x), {
-      intervals: [20],
-    })
-    .toBeLessThan(18);
-  await page.keyboard.up(key);
+  await keyboardMoveTo(page, target.x, 18);
   await page.screenshot({ path: "docs/second-shore-counterattack.png" });
   await expect
     .poll(
@@ -64,14 +57,67 @@ export async function keyboardShoreCounterattack(page: Page) {
       { timeout: 15000 },
     )
     .toBe(false);
-  const back = (await state(page)).player.x < 180 ? "ArrowRight" : "ArrowLeft";
-  await page.keyboard.down(back);
-  await expect
-    .poll(async () => Math.abs((await state(page)).player.x - 180), {
-      intervals: [20],
-    })
-    .toBeLessThan(12);
-  await page.keyboard.up(back);
+  await keyboardMoveTo(page, 180, 12);
+}
+
+/** Closed-loop goal steering. Never leave a key held until a narrow position
+ * poll succeeds: a delayed snapshot may already have crossed that position. */
+export async function keyboardMoveTo(
+  page: Page,
+  goalX: number,
+  tolerance = 12,
+) {
+  const start = await state(page);
+  const deadline = Date.now() + 30000;
+  let held: Steering = 0;
+  const trace: unknown[] = [];
+  const release = async () => {
+    await page.keyboard.up("ArrowLeft");
+    await page.keyboard.up("ArrowRight");
+    held = 0;
+  };
+  try {
+    while (Date.now() < deadline) {
+      const s = await state(page);
+      trace.push({
+        time: s.time,
+        x: s.player.x,
+        hp: s.hp,
+        mode: s.mode,
+        held,
+        goalX,
+      });
+      if (trace.length > 64) trace.shift();
+      expect(s.mode, JSON.stringify(trace)).toBe("playing");
+      if (Math.abs(s.player.x - goalX) < tolerance) {
+        await release();
+        // key-up transport can itself move the ship. Verify its settled position.
+        const settled = await state(page);
+        expect(settled.mode, JSON.stringify(trace)).toBe("playing");
+        if (Math.abs(settled.player.x - goalX) < tolerance) return settled;
+        continue;
+      }
+      if (s.time - start.time > 8)
+        throw new Error(
+          `Keyboard goal did not converge: ${JSON.stringify(trace)}`,
+        );
+      const next = chooseAction(s, held, goalX);
+      if (next !== held) {
+        await release();
+        if (next)
+          await page.keyboard.down(next < 0 ? "ArrowLeft" : "ArrowRight");
+        held = next;
+      }
+      // Re-read position and hazards even while a key is held; reverse after
+      // overshoot rather than continuing toward the boundary indefinitely.
+      await page.waitForTimeout(20);
+    }
+    throw new Error(
+      `Keyboard goal wall-time bound exceeded: ${JSON.stringify(trace)}`,
+    );
+  } finally {
+    await release();
+  }
 }
 
 /** Real-key pilot for survival waits. Reads visible projectile positions only;
