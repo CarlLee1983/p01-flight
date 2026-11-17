@@ -92,10 +92,10 @@ export async function evadeUntil(page: Page, seconds: number) {
           fps: s.measuredFps,
         }),
       ).toBe("playing");
-      const dx = dodgeInput(s);
+      const dx = dodgeInput(s, 160, 44);
       const key = dx < 0 ? "ArrowLeft" : dx > 0 ? "ArrowRight" : "";
       // A 30ms press can fall entirely between software-rendered frames.
-      // Keep the real key down only until the visible ship has moved 6px,
+      // Keep the real key down only until the visible ship has moved 16px,
       // then release before another decision or screenshot. No model writes.
       if (key) {
         await page.keyboard.down(key);
@@ -105,7 +105,7 @@ export async function evadeUntil(page: Page, seconds: number) {
               const current = (window as any).__P01__();
               return (
                 current.mode !== "playing" ||
-                (current.player.x - x) * direction >= 6
+                (current.player.x - x) * direction >= 16
               );
             },
             { x: s.player.x, direction: dx },
@@ -124,14 +124,17 @@ export async function evadeUntil(page: Page, seconds: number) {
 }
 
 /** Same visible-projectile policy as model-route tests, no hidden future data. */
-export function dodgeInput(s: any): number {
+export function dodgeInput(s: any, lookahead = 100, clearance = 32): number {
   const incoming = s.hostileProjectiles.filter(
-    (b: any) => b.vy > 0 && b.y < s.player.y + 12 && b.y > s.player.y - 100,
+    (b: any) =>
+      b.vy > 0 && b.y < s.player.y + 12 && b.y > s.player.y - lookahead,
   );
   const danger = (x: number) =>
     incoming.reduce((sum: number, b: any) => {
       const t = Math.max(0, (s.player.y - b.y) / b.vy);
-      return sum + Math.max(0, 32 - Math.abs(b.x + b.vx * t - x)) / (0.3 + t);
+      return (
+        sum + Math.max(0, clearance - Math.abs(b.x + b.vx * t - x)) / (0.3 + t)
+      );
     }, 0);
   const stay = danger(s.player.x);
   let dx = 0;
