@@ -40,11 +40,27 @@ describe("render metrics", () => {
     const keys = Object.keys(metrics);
     for (let i = 0; i < 20000; i++) metrics.sample(population, 0, 32, NaN);
     expect(Object.keys(metrics)).toEqual(keys);
-    expect(Object.values(metrics).every((v) => typeof v === "number")).toBe(
-      true,
-    );
+    expect(
+      Object.entries(metrics)
+        .filter(([k]) => k !== "enemyCoverage")
+        .every(([, v]) => typeof v === "number"),
+    ).toBe(true);
+    expect(metrics.snapshot().enemyCoverage).toEqual({});
+    for (let i = 0; i < 20000; i++)
+      metrics.sample(
+        {
+          enemies: [{ active: true, behavior: `unknown-${i}`, y: 100 }],
+          bullets: [],
+          enemyBullets: [],
+        },
+        1,
+        32,
+        0,
+      );
+    expect(Object.keys(metrics.snapshot().enemyCoverage)).toEqual(["straight"]);
+    expect(metrics.snapshot().enemyCoverage.straight.frames).toBe(20000);
     expect(metrics.snapshot()).toMatchObject({
-      frames: 20000,
+      frames: 40000,
       meanDrawCpuMs: 0,
       spritePool: 32,
     });

@@ -1,3 +1,5 @@
+import { enemyMount, enemyBank } from "./game/enemy-mounts";
+import { createEnemyModuleTextures } from "./game/enemy-modules-art";
 import { drawImpact } from "./game/impact-art";
 import {
   createPickupLabelTextures,
@@ -243,7 +245,7 @@ class FlightScene extends Phaser.Scene {
         model.time,
       );
       this.presentedHits.set(damageBody, hit);
-      if (flash) image.setTint(0xfff1cb).setTintMode(Phaser.TintModes.FILL);
+      if (flash) image.setTint(0x70513a).setTintMode(Phaser.TintModes.ADD);
     }
     return image;
   }
@@ -260,6 +262,7 @@ class FlightScene extends Phaser.Scene {
     createPickupTextures(this);
     createPickupLabelTextures(this);
     createCannonTextures(this);
+    createEnemyModuleTextures(this);
     createRaiderTextures(this);
     this.pickupNotice = this.add
       .text(180, 90, "", {
@@ -398,6 +401,7 @@ class FlightScene extends Phaser.Scene {
       model.mode === "won" && this.endingAge < 1.2 ? "hidden" : "visible";
     if (
       model.mode === "playing" &&
+      !this.pickupNotice.visible &&
       model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
       model.time < (stage01.boss?.at ?? Infinity) &&
       !this.bossWarningPlayed
@@ -534,6 +538,7 @@ class FlightScene extends Phaser.Scene {
       model.mode === "playing" &&
         !model.boss?.active &&
         !patrol &&
+        !this.pickupNotice.visible &&
         !!section &&
         model.time - section.at < 3.2,
     );
@@ -541,6 +546,7 @@ class FlightScene extends Phaser.Scene {
       this.sectionNotice.setText(`${section.title}\n${section.hint}`);
     if (
       model.mode === "playing" &&
+      !this.pickupNotice.visible &&
       model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
       model.time < (stage01.boss?.at ?? Infinity)
     ) {
@@ -632,17 +638,10 @@ class FlightScene extends Phaser.Scene {
             grounded ? 40 : 20,
           );
           if (e.behavior === "gatekeeper") {
-            // A broad patrol corvette has a distinct silhouette and readable lane warning.
-            overlay.fillStyle(0x182d3d);
-            overlay.fillRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
-            overlay.lineStyle(2, 0xdcb878, 0.95);
-            overlay.strokeRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
-            this.sprite("heavy", e.x, e.y, 68, 70, 1, 0, e).setDepth(4);
-            for (const side of [-1, 1]) {
-              overlay.fillStyle(0x354f60);
-              overlay.fillRect(e.x + side * 39 - 7, e.y - 17, 14, 45);
-              overlay.fillStyle(0xffd08a);
-              overlay.fillRect(e.x + side * 39 - 3, e.y + 18, 6, 18);
+            this.sprite("enemy-patrol", e.x, e.y, 104, 76, 1, 0, e).setDepth(
+              1.5,
+            );
+            for (const side of [-1, 1])
               this.sprite(
                 "fire03",
                 e.x + side * 31,
@@ -650,8 +649,7 @@ class FlightScene extends Phaser.Scene {
                 8,
                 15,
                 0.75,
-              ).setDepth(4);
-            }
+              ).setDepth(1.7);
             overlay.fillStyle(0x1c2830);
             overlay.fillRect(e.x - 44, e.y - 39, 88, 4);
             overlay.fillStyle(0xffc775);
@@ -693,12 +691,6 @@ class FlightScene extends Phaser.Scene {
             }
             // Subtle base rim distinguishes interactive targets from painted scenery.
             if (e.y >= GROUND_VISIBLE_Y) {
-              overlay.lineStyle(
-                1,
-                e.behavior === "groundBattery" ? 0xf4ba72 : 0x88e1ca,
-                0.7,
-              );
-              overlay.strokeEllipse(e.x, e.y + 10, 64, 44);
               if (e.hp < (e.maxHp ?? e.hp)) {
                 overlay.fillStyle(0x10232a, 0.9);
                 overlay.fillRect(e.x - 24, e.y - 39, 48, 3);
@@ -714,45 +706,21 @@ class FlightScene extends Phaser.Scene {
             if ((e.telegraph ?? 0) > 0) {
               const angle = e.aimAngle ?? 0;
               const muzzle = groundMuzzle(e, angle);
-              overlay.lineStyle(2, 0xffbc73, 0.9);
-              overlay.strokeCircle(
-                muzzle.x,
-                muzzle.y,
-                11 + Math.sin(model.time * 20) * 3,
-              );
+              overlay.fillStyle(0xffbc73, 0.55);
+              overlay.fillCircle(muzzle.x, muzzle.y, 5);
+              overlay.fillStyle(0xfff2d1, 0.9);
+              overlay.fillCircle(muzzle.x, muzzle.y, 2);
             }
             continue;
           }
           if (e.behavior === "escort") {
-            this.sprite("scout", e.x, e.y, 47, 40, 1, 0, e).setDepth(4);
-            overlay.fillStyle(0x697b8c);
-            overlay.fillTriangle(
-              e.x - 35,
-              e.y + 15,
-              e.x - 17,
-              e.y - 15,
-              e.x - 13,
-              e.y + 20,
+            this.sprite("enemy-escort", e.x, e.y, 70, 44, 1, 0, e).setDepth(
+              1.5,
             );
-            overlay.fillTriangle(
-              e.x + 35,
-              e.y + 15,
-              e.x + 17,
-              e.y - 15,
-              e.x + 13,
-              e.y + 20,
-            );
-            overlay.lineStyle(2, 0x9ee5dd, 0.9);
-            overlay.lineBetween(e.x - 34, e.y + 14, e.x - 19, e.y - 11);
-            overlay.lineBetween(e.x + 34, e.y + 14, e.x + 19, e.y - 11);
-            for (const side of [-1, 1]) {
-              overlay.fillStyle(e.volleyFired ? 0x4d7478 : 0xffd28a);
-              overlay.fillCircle(e.x + side * 23, e.y + 11, 3);
-            }
             if ((e.telegraph ?? 0) > 0) {
               overlay.fillStyle(0xffcc80, 0.8);
-              for (const side of [-1, 1])
-                overlay.fillCircle(e.x + side * 23, e.y + 11, 4);
+              const socket = enemyMount(e);
+              overlay.fillCircle(socket.x, socket.y, 4);
             }
             continue;
           }
@@ -780,13 +748,15 @@ class FlightScene extends Phaser.Scene {
             continue;
           }
           this.sprite(
-            e.behavior === "carrier"
-              ? "carrier"
-              : e.behavior === "dive" || e.behavior === "cross"
-                ? "interceptor"
-                : e.behavior === "heavy" || e.behavior === "turret"
-                  ? "heavy"
-                  : "scout",
+            e.behavior === "turret"
+              ? "enemy-gunship"
+              : e.behavior === "carrier"
+                ? "carrier"
+                : e.behavior === "dive" || e.behavior === "cross"
+                  ? "interceptor"
+                  : e.behavior === "heavy"
+                    ? "heavy"
+                    : "scout",
             e.x,
             e.y,
             e.behavior === "carrier"
@@ -795,9 +765,11 @@ class FlightScene extends Phaser.Scene {
                 ? 70
                 : e.behavior === "turret"
                   ? 56
-                  : e.behavior === "dive" || e.behavior === "cross"
-                    ? 28
-                    : 42,
+                  : e.behavior === "cross"
+                    ? 32
+                    : e.behavior === "dive"
+                      ? 28
+                      : 42,
             e.behavior === "carrier"
               ? 56
               : e.behavior === "heavy"
@@ -808,39 +780,32 @@ class FlightScene extends Phaser.Scene {
                     ? 42
                     : 36,
             1,
-            e.behavior === "carrier"
-              ? -(e.direction ?? 1) * 90
-              : e.behavior === "cross"
-                ? -(e.direction ?? 1) * 72
-                : e.behavior === "dive"
-                  ? (-(e.diveAngle ?? 0) * 180) / Math.PI
-                  : e.behavior === "weave"
-                    ? Math.sin((e.age ?? 0) * 2.6) * 18
-                    : 0,
+            enemyBank(e),
             e,
-          ).setTint(
-            e.behavior === "turret"
-              ? 0xd890ff
-              : e.behavior === "weave"
-                ? 0xffd18c
-                : 0xffffff,
-          );
-          if (this.visuals[this.visualIndex - 1].tintMode === Phaser.TintModes.FILL)
+          ).setTint(e.behavior === "weave" ? 0xffd18c : 0xffffff);
+          if (
+            this.visuals[this.visualIndex - 1].tintMode === Phaser.TintModes.ADD
+          )
             this.visuals[this.visualIndex - 1]
-              .setTint(0xfff1cb)
-              .setTintMode(Phaser.TintModes.FILL);
+              .setTint(0x70513a)
+              .setTintMode(Phaser.TintModes.ADD);
           if ((e.telegraph ?? 0) > 0) {
-            overlay.lineStyle(2, 0xffbd69, 0.8);
-            overlay.strokeCircle(
-              e.x,
-              e.y + 17,
-              9 + Math.sin(model.time * 20) * 3,
-            );
-          }
-          if (e.behavior === "turret") {
-            overlay.fillStyle(0x937bd8);
-            overlay.fillRect(e.x - 25, e.y, 8, 23);
-            overlay.fillRect(e.x + 17, e.y, 8, 23);
+            for (
+              let i = 0;
+              i <
+              (e.behavior === "turret" ||
+              e.behavior === "dive" ||
+              e.behavior === "heavy"
+                ? 1
+                : 2);
+              i++
+            ) {
+              const socket = enemyMount(e, i);
+              overlay.fillStyle(0xffbd69, 0.5);
+              overlay.fillEllipse(socket.x, socket.y, 7, 10);
+              overlay.fillStyle(0xfff2d1, 0.9);
+              overlay.fillCircle(socket.x, socket.y, 2);
+            }
           }
         }
       // Enemy attacks retain their charge timing, but never draw trajectory guides.
@@ -932,7 +897,7 @@ class FlightScene extends Phaser.Scene {
             32,
             1,
             Math.sin(model.time * 3) * 4,
-          ).setDepth(4);
+          ).setDepth(2);
           if (pickup.y >= 88) {
             this.sprite(
               pickupLabel(pickup.kind).key,
@@ -957,7 +922,7 @@ class FlightScene extends Phaser.Scene {
           20,
           20,
           1 - moduleAge * 1.6,
-        ).setDepth(4);
+        ).setDepth(2);
         overlay.lineStyle(1, art.color, 1 - moduleAge * 2);
         overlay.lineBetween(
           x,
@@ -967,6 +932,13 @@ class FlightScene extends Phaser.Scene {
         );
       }
       if (model.boss?.active) {
+        this.sprite(
+          "boss-support",
+          model.boss.x,
+          model.boss.y,
+          184,
+          100,
+        ).setDepth(0.8);
         this.sprite(
           "boss",
           model.boss.x,
@@ -978,27 +950,6 @@ class FlightScene extends Phaser.Scene {
           model.boss,
         );
         for (const cannon of model.boss.cannons) {
-          graphics.lineStyle(13, 0x243b4e);
-          graphics.lineBetween(
-            model.boss.x + cannon.side * 40,
-            model.boss.y + 5,
-            cannon.x,
-            cannon.y,
-          );
-          graphics.lineStyle(6, cannon.active ? 0x789399 : 0x3b4b53);
-          graphics.lineBetween(
-            model.boss.x + cannon.side * 40,
-            model.boss.y + 5,
-            cannon.x,
-            cannon.y,
-          );
-          graphics.lineStyle(2, 0xb8a275);
-          graphics.lineBetween(
-            model.boss.x + cannon.side * 40,
-            model.boss.y + 8,
-            cannon.x,
-            cannon.y + 3,
-          );
           this.sprite(
             cannon.active ? "boss-cannon" : "boss-cannon-broken",
             cannon.x,

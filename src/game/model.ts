@@ -1,3 +1,4 @@
+import { enemyMount } from "./enemy-mounts";
 import { raiderMuzzle } from "./raider-geometry";
 import {
   groundMuzzle,
@@ -731,15 +732,24 @@ export class FlightModel {
               if (e.fireCooldown <= 0) {
                 if (e.attackPattern === "aim")
                   this.shootEnemy(
-                    e.x,
-                    e.y + 24,
+                    enemyMount(e, 0).x,
+                    enemyMount(e, 0).y,
                     Math.sin(e.aimAngle ?? 0) * 180,
                     Math.cos(e.aimAngle ?? 0) * 180,
                     e,
                   );
                 else
-                  for (const x of e.attackLanes)
-                    this.shootEnemy(x, e.y + 24, 0, 180, e);
+                  for (const [i, x] of e.attackLanes.entries()) {
+                    const socket = enemyMount(e, i);
+                    const angle = Math.atan2(x - socket.x, 540 - socket.y);
+                    this.shootEnemy(
+                      socket.x,
+                      socket.y,
+                      Math.sin(angle) * 180,
+                      Math.cos(angle) * 180,
+                      e,
+                    );
+                  }
                 e.gateCycle = (e.gateCycle ?? 0) + 1;
                 e.fireCooldown = e.fireEvery ?? 2.2;
                 e.aimAngle = undefined;
