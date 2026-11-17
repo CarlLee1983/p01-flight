@@ -24,3 +24,5 @@ export function turnToward(current: number, target: number, dt: number) {
   );
   return current + Math.max(-dt * 3, Math.min(dt * 3, delta));
 }
+/** Settled hull stays below the 72px HUD even at maximum bank. */
+export const BOSS_BODY = { width: 120, height: 62, bankDegrees: 1 } as const;

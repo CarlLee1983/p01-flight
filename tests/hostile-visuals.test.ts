@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  BOSS_BODY,
   hostileStyle,
   groundMuzzle,
   turnToward,
@@ -69,3 +70,14 @@ it.each([30, 60, 120])(
     expect(m.enemyBullets).toEqual([]);
   },
 );
+
+it("settled Boss outline clears the HUD throughout its bank", () => {
+  for (const deg of [-BOSS_BODY.bankDegrees, 0, BOSS_BODY.bankDegrees]) {
+    const r = (deg * Math.PI) / 180;
+    expect(
+      105 -
+        (Math.abs(Math.cos(r)) * BOSS_BODY.height) / 2 -
+        (Math.abs(Math.sin(r)) * BOSS_BODY.width) / 2,
+    ).toBeGreaterThan(72);
+  }
+});

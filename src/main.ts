@@ -1,4 +1,4 @@
-import { groundMuzzle } from "./game/hostile-visuals";
+import { groundMuzzle, BOSS_BODY } from "./game/hostile-visuals";
 import { bossMuzzle } from "./game/boss-muzzles";
 import Phaser from "phaser";
 import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
@@ -961,10 +961,10 @@ class FlightScene extends Phaser.Scene {
           "boss",
           model.boss.x,
           model.boss.y,
-          120,
-          62,
+          BOSS_BODY.width,
+          BOSS_BODY.height,
           1,
-          Math.sin(model.time * 1.8) * 2,
+          Math.sin(model.time * 1.8) * BOSS_BODY.bankDegrees,
         );
         for (const cannon of model.boss.cannons) {
           graphics.lineStyle(13, 0x243b4e);
@@ -1280,6 +1280,8 @@ Object.defineProperty(window, "__P01__", {
         volleyFired: e.volleyFired,
         visibleSince: e.visibleSince,
         shotsFired: e.shotsFired,
+        turretAngle: e.turretAngle,
+        aimAngle: e.aimAngle,
       })),
     spawnedAir: model.spawnedAir,
     enteredAir: model.enteredAir,
