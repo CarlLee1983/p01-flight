@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { state, withKeyboardPilot } from "./gameplay";
+import {
+  installStage02Sampler,
+  saveStage02Sampler,
+  captureStage02Frame,
+} from "./stage02-render-evidence";
 import { SAVE_KEY } from "../../src/storage/save";
 test.use({ video: { mode: "on", size: { width: 500, height: 700 } } });
 
@@ -29,27 +34,48 @@ test("stage selection is locked for a new player", async ({ page }) => {
 });
 test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(660000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  await installStage02Sampler(page);
   await unlockStage02(page);
   await page.screenshot({ path: "docs/stage02-menu.png" });
   await page.locator("#start").click();
   await page.keyboard.down("Space");
   let first = false,
-    second = false;
+    second = false,
+    observingBossEntry = false;
   await withKeyboardPilot(page, async () => {
     let captured = false,
       bridge = false,
       mine = false,
-      dam = false;
+      dam = false,
+      bossCaptured = false;
     const deadline = Date.now() + 550000;
     while (Date.now() < deadline) {
       const s = await state(page);
       if (s.mode !== "playing") {
         expect(s.mode).toBe("won");
         break;
+      }
+      // Ordinary fire release makes the intact hull inspectable. Movement and
+      // enemy damage continue normally, no pause/health/time mutation is used.
+      if (s.time >= 144 && !observingBossEntry) {
+        await page.keyboard.up("Space");
+        observingBossEntry = true;
+      }
+      if (s.time >= 146.8 && s.boss?.active && !bossCaptured) {
+        expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(2);
+        bossCaptured = true;
+        // The parallel keyboard pilot continues ordinary steering during captures.
+        await captureStage02Frame(page, "stage02-boss-desktop");
+        await page.setViewportSize({ width: 320, height: 700 });
+        const narrow = await state(page);
+        expect(narrow.boss?.active).toBe(true);
+        await captureStage02Frame(page, "stage02-boss-320");
+        await page.setViewportSize({ width: 1000, height: 900 });
+        await page.keyboard.down("Space");
       }
       if (s.time > 151 && !first) {
         await page.keyboard.press("x");
@@ -87,6 +113,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     .toBe("won");
   const done = await state(page);
   expect(done.bossDefeated).toBe(true);
+  await saveStage02Sampler(page, testInfo);
   expect(done.save.stages["stage-02"].cleared).toBe(true);
   expect(done.save.stages["stage-01"].bestScore).toBe(2000);
   await page.screenshot({ path: "docs/stage02-clear.png" });
@@ -102,53 +129,127 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
   expect(errors).toEqual([]);
 });
 test("Stage02 mobile selection, touch, pause, reset and retry preserve controls", async ({
-  page,
-  browserName,
-}) => {
-  test.skip(browserName !== "chromium", "CDP touch uses Chromium");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await unlockStage02(page);
-  await page.locator("#start").click();
-  const box = await page.locator("canvas").boundingBox();
-  expect(box).not.toBeNull();
-  const cdp = await page.context().newCDPSession(page);
-  const start = { x: box!.x + box!.width * 0.5, y: box!.y + box!.height * 0.8 };
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [{ ...start, id: 0 }],
-  });
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [{ x: start.x + 30, y: start.y, id: 0 }],
-  });
-  await page.waitForTimeout(600);
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchEnd",
-    touchPoints: [],
-  });
-  expect((await state(page)).shots).toBeGreaterThan(0);
-  await page.locator("#touch-pause").click();
-  expect((await state(page)).mode).toBe("paused");
-  await page.screenshot({ path: "docs/stage02-mobile.png" });
-  await page.locator("#touch-pause").click();
-  expect((await state(page)).mode).toBe("playing");
-  await page.locator("#menu").click();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.locator("#reset").click();
-  await expect(
-    page.locator('#stage-select option[value="stage-02"]'),
-  ).toBeDisabled();
-  expect((await state(page)).stageId).toBe("stage-01");
-});
-
-test("Stage02 full CDP touch sortie clears and preserves its result", async ({
   browser,
-}) => {
-  test.setTimeout(660000);
+}, testInfo) => {
   const context = await browser.newContext({
+    baseURL: "http://127.0.0.1:4173",
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    recordVideo: {
+      dir: testInfo.outputPath("mobile-layout-video"),
+      size: { width: 390, height: 844 },
+    },
+  });
+  const page = await context.newPage();
+  try {
+    await unlockStage02(page);
+    await page.locator("#start").click();
+    const box = await page.locator("canvas").boundingBox();
+    expect(box).not.toBeNull();
+    const cdp = await page.context().newCDPSession(page);
+    const start = {
+      x: box!.x + box!.width * 0.5,
+      y: box!.y + box!.height * 0.8,
+    };
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ ...start, id: 0 }],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: start.x + 30, y: start.y, id: 0 }],
+    });
+    await page.waitForTimeout(600);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    expect((await state(page)).shots).toBeGreaterThan(0);
+    await page.locator("#touch-pause").click();
+    expect((await state(page)).mode).toBe("paused");
+    await page.screenshot({ path: "docs/stage02-mobile.png" });
+    for (const viewport of [
+      { width: 844, height: 390 },
+      { width: 320, height: 700 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const bounds = await page.locator("canvas").boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.y).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(
+        viewport.height + 1,
+      );
+      for (const id of ["touch-bomb", "touch-weapon", "touch-pause"]) {
+        const b = await page.locator("#" + id).boundingBox();
+        expect(b!.width).toBeGreaterThanOrEqual(44);
+        expect(b!.height).toBeGreaterThanOrEqual(44);
+        expect(b!.x + b!.width).toBeLessThanOrEqual(viewport.width + 1);
+      }
+      await page.screenshot({
+        path: `docs/stage02-layout-${viewport.width}.png`,
+      });
+    }
+    await page.locator("#touch-pause").click();
+    expect((await state(page)).mode).toBe("playing");
+    const restored = (await page.locator("canvas").boundingBox())!;
+    const before = await state(page);
+    const renewed = {
+      x: restored.x + restored.width * 0.5,
+      y: restored.y + restored.height * 0.8,
+      id: 3,
+    };
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [renewed],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ ...renewed, x: renewed.x + 35 }],
+    });
+    await expect
+      .poll(async () => (await state(page)).player.x)
+      .toBeGreaterThan(before.player.x + 10);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    // Touch mode deliberately hides the desktop in-flight menu. Pause exposes the
+    // ordinary menu; do not force-click a hidden control.
+    await page.locator("#touch-pause").click();
+    expect((await state(page)).mode).toBe("paused");
+    await page.locator("#menu").click();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator("#reset").click();
+    await expect(
+      page.locator('#stage-select option[value="stage-02"]'),
+    ).toBeDisabled();
+    expect((await state(page)).stageId).toBe("stage-01");
+  } finally {
+    await context.close();
+  }
+});
+
+test("Stage02 full CDP touch sortie clears and preserves its result", async ({}, testInfo) => {
+  test.setTimeout(660000);
+  const { chromium } = await import("@playwright/test");
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const profile = await mkdtemp(tmpdir() + "/p01-stage02-profile-");
+  let context = await chromium.launchPersistentContext(profile, {
+    baseURL: "http://127.0.0.1:4173",
+    headless: true,
+    executablePath: process.env.CHROMIUM_PATH,
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    recordVideo: {
+      dir: testInfo.outputPath("stage02-touch-video"),
+      size: { width: 390, height: 844 },
+    },
   });
   const page = await context.newPage();
   try {
@@ -223,8 +324,23 @@ test("Stage02 full CDP touch sortie clears and preserves its result", async ({
       .poll(async () => (await state(page)).save.stages["stage-02"]?.cleared)
       .toBe(true);
     await page.screenshot({ path: "docs/stage02-touch-clear.png" });
+    const stored = structuredClone((await state(page)).save);
+    await context.close();
+    context = await chromium.launchPersistentContext(profile, {
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH,
+    });
+    const reopened = await context.newPage();
+    await reopened.goto("http://127.0.0.1:4173/");
+    await reopened.locator("#stage-select").selectOption("stage-02");
+    const restored = await state(reopened);
+    expect(restored.save.stages["stage-02"]).toEqual(stored.stages["stage-02"]);
+    expect(restored.save.stages["stage-01"]).toEqual(stored.stages["stage-01"]);
+    expect(restored.save.settings).toEqual(stored.settings);
+    await reopened.screenshot({ path: "docs/stage02-browser-reopened.png" });
   } finally {
     await context.close();
+    await rm(profile, { recursive: true, force: true });
   }
 });
 
