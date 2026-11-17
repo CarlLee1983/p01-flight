@@ -145,3 +145,18 @@ video also contains transient rectangles in HUD/menus. No cropping/masking is
 used in the sprite pool. Add post-render framebuffer captures alongside the
 original compositor screenshots before attributing this to assets or declaring
 it fixed. Preserve original evidence, not just a better-looking replacement.
+
+### Renderer/control follow-up (after84560eb9)
+
+The PR run passed342/23. The push touch route reached the Boss but failed an
+unconditional primary-touch assertion after the second bomb. `useBomb` can
+synchronously finish the Boss; the next UI update must clear touch and persist
+victory. The revised test distinguishes continued play from verified victory,
+rejects all other states, and retains the independent multi-touch test.
+
+Native post-render `readPixels` captures also showed transient missing
+rectangles in text/projectiles. This is not sufficient to blame the compositor
+or declare a damaged image asset. The next experiment constrains Phaser's
+public `render.maxTextures` to1, keeping content/effects/simulation unchanged,
+and captures8 native frames. Retain only after full-route CI, visual and CPU
+cost checks; it is a compatibility experiment, not a proven upstream root cause.

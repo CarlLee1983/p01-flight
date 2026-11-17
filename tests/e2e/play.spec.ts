@@ -178,7 +178,10 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await page.screenshot({ path: "docs/boss-phase3.png" });
   // Independent post-render snapshots diagnose compositor rectangles. Keep the
   // original screenshot/video as evidence; never replace a failed image silently.
-  for (let i = 0; i < 3; i++) {
+  const renderer = (await state(page)).renderer;
+  console.log("FRAME_RENDERER", JSON.stringify(renderer));
+  expect(renderer.maxTextures).toBe(1);
+  for (let i = 0; i < 8; i++) {
     const png = await page.evaluate(() => (window as any).__P01_CAPTURE__());
     expect(png).toMatch(/^data:image\/png;base64,/);
     await writeFile(

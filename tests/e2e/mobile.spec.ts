@@ -298,7 +298,48 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     await expect
       .poll(async () => (await state(page)).bombs)
       .toBe(time === BOSS_AT + 15 ? 1 : 0);
-    expect((await state(page)).touchTarget).toBeTruthy();
+    const afterBomb = await state(page);
+    await testInfo.attach(`touch-after-bomb-${time}`, {
+      body: JSON.stringify(
+        {
+          time: afterBomb.time,
+          mode: afterBomb.mode,
+          hp: afterBomb.hp,
+          bombs: afterBomb.bombs,
+          touchTarget: afterBomb.touchTarget,
+          boss: afterBomb.boss,
+          bossDefeated: afterBomb.bossDefeated,
+          save: afterBomb.save,
+          inputTrace: JSON.parse(inputTrace.json()),
+        },
+        null,
+        2,
+      ),
+      contentType: "application/json",
+    });
+    if (afterBomb.mode === "won") {
+      // Bomb damage can synchronously defeat the Boss. The next render update
+      // correctly clears input and saves victory; retaining a touch would be a bug.
+      expect(afterBomb.bossDefeated).toBe(true);
+      await expect
+        .poll(async () => (await state(page)).touchTarget)
+        .toBeFalsy();
+      await expect
+        .poll(
+          async () => (await state(page)).save.stages["stage-01"]?.clearCount,
+        )
+        .toBe(1);
+      break;
+    }
+    expect(
+      afterBomb.mode,
+      JSON.stringify({
+        time: afterBomb.time,
+        hp: afterBomb.hp,
+        reason: afterBomb.lostReason,
+      }),
+    ).toBe("playing");
+    expect(afterBomb.touchTarget).toBeTruthy();
   }
   await touchEvadeUntil(170, true);
   expect((await state(page)).mode).toBe("won");

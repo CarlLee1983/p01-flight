@@ -1176,7 +1176,10 @@ const game = new Phaser.Game({
   parent: "game",
   backgroundColor: "#0c2035",
   scene: [FlightScene],
-  render: { pixelArt: false, antialias: true },
+  // Keep the sampler set deterministic while diagnosing intermittent partial
+  // sprites across image/text batches. No visual/effect or simulation reduction.
+  // Validate framebuffer captures and full-route CPU cost before shipping.
+  render: { pixelArt: false, antialias: true, maxTextures: 1 },
   fps: { target: 60 },
 });
 document.addEventListener("visibilitychange", () => {
@@ -1267,6 +1270,11 @@ Object.defineProperty(window, "__P01__", {
         ? bossChargeSources(model.boss)
         : [],
     background: readBackgroundInfo(),
+    renderer: {
+      type: game.renderer.type,
+      maxTextures:
+        "maxTextures" in game.renderer ? game.renderer.maxTextures : 0,
+    },
     renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,
   }),
