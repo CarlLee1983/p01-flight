@@ -985,11 +985,17 @@ export class FlightModel {
           );
           const sweep = boss.attackCycle % 2 ? 0.1 : -0.1;
           boss.attackAngles =
-            phase === 1
-              ? bossSideAngles(boss, this.player.x, this.player.y)
-              : phase === 2
-                ? [-0.5, -0.25, 0, 0.25, 0.5].map((a) => a + sweep)
-                : [-0.3, 0, 0.3].map((a) => a + aim);
+            this.stage.boss.pattern === "canyon"
+              ? phase === 1
+                ? [-0.45, -0.15, 0.15, 0.45].map((a) => a + sweep)
+                : phase === 2
+                  ? [-0.38, -0.19, 0.19, 0.38].map((a) => a + aim)
+                  : [-0.62, -0.31, 0, 0.31, 0.62].map((a) => a - sweep)
+              : phase === 1
+                ? bossSideAngles(boss, this.player.x, this.player.y)
+                : phase === 2
+                  ? [-0.5, -0.25, 0, 0.25, 0.5].map((a) => a + sweep)
+                  : [-0.3, 0, 0.3].map((a) => a + aim);
         }
         boss.attackWarning = Math.max(0, boss.telegraph + boss.fireCooldown);
       }

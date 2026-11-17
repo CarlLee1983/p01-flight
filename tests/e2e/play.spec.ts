@@ -252,11 +252,15 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Stage 01 通關" }),
   ).toBeVisible();
+  await expect(page.locator("#next-stage")).toBeVisible();
   await page.screenshot({ path: "docs/won.png" });
   await page.waitForTimeout(1000);
   expect((await state(page)).save.stages["stage-01"].clearCount).toBe(1);
   await page.reload();
   await expect(page.getByText("已通關 · 通關 1 次")).toBeVisible();
+  await expect(
+    page.locator('#stage-select option[value="stage-02"]'),
+  ).toBeEnabled();
   for (let i = 0; i < 10; i++) {
     await page.getByRole("button", { name: "開始飛行" }).click();
     await page.waitForTimeout(100);
@@ -338,6 +342,9 @@ test("browser closes and reopens with persisted settings and record", async () =
     page = await context.newPage();
     await page.goto("http://127.0.0.1:4173");
     await expect(page.getByText("已通關 · 通關 1 次")).toBeVisible();
+    await expect(
+      page.locator('#stage-select option[value="stage-02"]'),
+    ).toBeEnabled();
     expect((await state(page)).save.stages["stage-01"].bestScore).toBe(score);
   } finally {
     await context.close();

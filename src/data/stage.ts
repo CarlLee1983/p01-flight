@@ -62,6 +62,7 @@ export interface StageConfig {
     bulletSpeed: number;
     burstShots?: number;
     sideCannonHp?: number;
+    pattern?: "canyon";
     points: number;
   };
 }

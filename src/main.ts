@@ -21,6 +21,14 @@ import {
 } from "./game/combat-presentation";
 import { groundMuzzle, BOSS_BODY } from "./game/hostile-visuals";
 import Phaser from "phaser";
+import { createStage02 } from "./data/stage02";
+import {
+  stageUnlocked,
+  nextStage,
+  newStageSeed,
+  type StageId,
+} from "./game/stage-selection";
+import { CanyonBackground } from "./game/canyon-background";
 import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
@@ -36,6 +44,15 @@ try {
   storage = window.localStorage;
 } catch {}
 const saves = new BrowserSaveRepository(storage);
+let selectedStage: StageId = "stage-01";
+const seedText = new URLSearchParams(location.search).get("seed");
+const pinnedSeed =
+  seedText !== null &&
+  /^\d{1,10}$/.test(seedText) &&
+  Number(seedText) <= 0xffffffff
+    ? Number(seedText)
+    : null;
+let stageSeed = pinnedSeed ?? newStageSeed();
 const model = new FlightModel(stage01);
 const audio = new FlightAudio();
 const touch = new TouchInput();
@@ -70,7 +87,11 @@ function bindTouchAction(id: string, action: () => void) {
     if (event.detail === 0 && !button.disabled) action();
   });
 }
-function start() {
+function start(fresh = false) {
+  if (!stageUnlocked(selectedStage, saves.data)) return;
+  if (fresh) stageSeed = pinnedSeed ?? newStageSeed();
+  model.stage =
+    selectedStage === "stage-01" ? stage01 : createStage02(stageSeed);
   touch.cancel();
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
@@ -81,6 +102,14 @@ function start() {
   renderPanel();
 }
 function renderPanel() {
+  const stageNumber = selectedStage === "stage-01" ? "01" : "02";
+  document.querySelector(".masthead h1")!.textContent = model.stage.title;
+  document.querySelector(".masthead span")!.textContent =
+    `STAGE ${stageNumber}`;
+  document
+    .querySelector("#game")!
+    .setAttribute("aria-label", `${model.stage.title}遊戲畫面`);
+  document.title = `${model.stage.title} · COASTLINE ASSAULT`;
   panel.dataset.mode = model.mode;
   if (model.mode !== "playing") touch.cancel();
   for (const id of ["touch-bomb", "touch-weapon"]) {
@@ -98,18 +127,41 @@ function renderPanel() {
       model.mode === "paused" ? "繼續遊戲" : "暫停遊戲",
     );
   }
-  const record = saves.data.stages[stage01.id];
+  const record = saves.data.stages[model.stage.id];
+  const seedLabel =
+    selectedStage === "stage-02"
+      ? `<p class="help">編隊代碼 ${stageSeed} · 再飛一次保留相同編隊</p>`
+      : "";
   const warning = saves.warning
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">授權街機配樂與原創音效，Boss 戰切換戰鬥曲。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / ${selectedStage === "stage-01" ? "01" : "02"}</p><h2>${selectedStage === "stage-01" ? "雲際航線" : "赤岩峽谷"}</h2><p class="brief">${selectedStage === "stage-01" ? "穿越沿岸防線，擊破重裝指揮艦。" : "沿赤岩河谷越過鐵橋、礦區與水壩，擊破峽谷守衛。"}</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><label>選擇關卡<select id="stage-select"><option value="stage-01" ${selectedStage === "stage-01" ? "selected" : ""}>Stage 01 雲際航線</option><option value="stage-02" ${selectedStage === "stage-02" ? "selected" : ""} ${stageUnlocked("stage-02", saves.data) ? "" : "disabled"}>Stage 02 赤岩峽谷${stageUnlocked("stage-02", saves.data) ? "" : "（第一關通關後解鎖）"}</option></select></label><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">授權街機配樂與原創音效，Boss 戰切換戰鬥曲。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
     panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
-    panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${stage01.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
-  document.querySelector("#start")?.addEventListener("click", start);
-  document.querySelector("#retry")?.addEventListener("click", start);
+    panel.innerHTML = `<h2>${model.mode === "won" ? `${selectedStage === "stage-01" ? "Stage 01" : "Stage 02"} 通關` : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${model.stage.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p>${model.mode === "won" && nextStage(selectedStage) ? '<button id="next-stage">前往第二關</button>' : ""}<button id="retry">再飛一次</button>${selectedStage === "stage-02" ? '<button id="new-sortie" class="secondary">重新編隊出擊</button>' : ""}<button id="menu" class="secondary">返回標題</button>${warning}`;
+  document
+    .querySelector("#stage-select")
+    ?.addEventListener("change", (event) => {
+      const id = (event.target as HTMLSelectElement).value as StageId;
+      if (!stageUnlocked(id, saves.data)) return;
+      selectedStage = id;
+      model.stage = id === "stage-01" ? stage01 : createStage02(stageSeed);
+      renderPanel();
+    });
+  document.querySelector("#next-stage")?.addEventListener("click", () => {
+    selectedStage = "stage-02";
+    start(true);
+  });
+  document.querySelector("#new-sortie")?.addEventListener("click", () => {
+    stageSeed = newStageSeed();
+    start();
+  });
+  document
+    .querySelector("#start")
+    ?.addEventListener("click", () => start(true));
+  document.querySelector("#retry")?.addEventListener("click", () => start());
   document.querySelector("#pause")?.addEventListener("click", () => {
     model.pause();
     renderPanel();
@@ -141,6 +193,8 @@ function renderPanel() {
   document.querySelector("#reset")?.addEventListener("click", () => {
     if (confirm("清除本機最高分、通關與設定？")) {
       saves.reset();
+      selectedStage = "stage-01";
+      model.stage = stage01;
       renderPanel();
     }
   });
@@ -160,6 +214,7 @@ function renderPanel() {
     renderPanel();
   };
   panel.append(mute);
+  if (seedLabel) panel.insertAdjacentHTML("beforeend", seedLabel);
   audio.setVolumes(
     saves.data.settings.musicVolume,
     saves.data.settings.sfxVolume,
@@ -169,6 +224,8 @@ function renderPanel() {
 }
 class FlightScene extends Phaser.Scene {
   background!: CoastalBackground;
+  canyon!: CanyonBackground;
+  coastalObjects: Phaser.GameObjects.GameObject[] = [];
   pickupGuide: Phaser.GameObjects.Text[] = [];
   pickupNotice!: Phaser.GameObjects.Text;
   pickupNoticeUntil = 0;
@@ -263,8 +320,16 @@ class FlightScene extends Phaser.Scene {
         configureTextureBatch,
       );
     });
+    const beforeBackground = new Set(this.children.list);
     this.background = new CoastalBackground(this);
-    readBackgroundInfo = () => this.background.diagnostics();
+    this.coastalObjects = this.children.list.filter(
+      (item) => !beforeBackground.has(item),
+    );
+    this.canyon = new CanyonBackground(this);
+    readBackgroundInfo = () =>
+      selectedStage === "stage-02"
+        ? this.canyon.diagnostics()
+        : this.background.diagnostics();
     readCombatLayer = () =>
       Math.max(
         3,
@@ -364,7 +429,10 @@ class FlightScene extends Phaser.Scene {
           event.clientY,
           model.player.x,
           model.player.y,
-          { x: rect.width / stage01.width, y: rect.height / stage01.height },
+          {
+            x: rect.width / model.stage.width,
+            y: rect.height / model.stage.height,
+          },
         )
       ) {
         canvas.setPointerCapture(event.pointerId);
@@ -415,8 +483,8 @@ class FlightScene extends Phaser.Scene {
     if (
       model.mode === "playing" &&
       !this.pickupNotice.visible &&
-      model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
-      model.time < (stage01.boss?.at ?? Infinity) &&
+      model.time >= (model.stage.boss?.at ?? Infinity) - 5 &&
+      model.time < (model.stage.boss?.at ?? Infinity) &&
       !this.bossWarningPlayed
     ) {
       this.bossWarningPlayed = true;
@@ -476,7 +544,7 @@ class FlightScene extends Phaser.Scene {
     audio.setMusicContext(
       model.boss?.active
         ? "boss"
-        : ["recovery", "regroup"].includes(model.section.id)
+        : ["recovery", "regroup", "rest", "supply"].includes(model.section.id)
           ? "recovery"
           : model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
             ? "pressure"
@@ -486,7 +554,7 @@ class FlightScene extends Phaser.Scene {
       model.boss?.active ||
         model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
         ? 2
-        : ["recovery", "regroup"].includes(model.section.id)
+        : ["recovery", "regroup", "rest", "supply"].includes(model.section.id)
           ? 0
           : model.time > 15
             ? 1
@@ -523,7 +591,7 @@ class FlightScene extends Phaser.Scene {
     audio.update(delta / 1000);
     if ((model.mode === "won" || model.mode === "lost") && !recorded) {
       recorded = true;
-      saves.record(stage01.id, model.score, model.mode === "won");
+      saves.record(model.stage.id, model.score, model.mode === "won");
     }
     if (model.mode !== lastMode) {
       renderPanel();
@@ -560,13 +628,13 @@ class FlightScene extends Phaser.Scene {
     if (
       model.mode === "playing" &&
       !this.pickupNotice.visible &&
-      model.time >= (stage01.boss?.at ?? Infinity) - 5 &&
-      model.time < (stage01.boss?.at ?? Infinity)
+      model.time >= (model.stage.boss?.at ?? Infinity) - 5 &&
+      model.time < (model.stage.boss?.at ?? Infinity)
     ) {
       this.sectionNotice
         .setVisible(true)
         .setText(
-          `指揮艦接近 · ${Math.ceil((stage01.boss?.at ?? 0) - model.time)}\n保留炸彈，留意兩側砲座`,
+          `${selectedStage === "stage-02" ? "峽谷守衛" : "指揮艦"}接近 · ${Math.ceil((model.stage.boss?.at ?? 0) - model.time)}\n保留炸彈，留意兩側砲座`,
         );
     }
     this.bossAdvice.setVisible(
@@ -586,11 +654,19 @@ class FlightScene extends Phaser.Scene {
     impacts.clear();
     renderedImpactPrimitives = 0;
     hud.clear();
-    this.background.update(
-      model.mode === "menu"
-        ? this.ambience
-        : model.time + (model.mode === "won" ? this.endingAge : 0),
-    );
+    for (const item of this.coastalObjects) {
+      if ("setVisible" in item)
+        (item as Phaser.GameObjects.Image).setVisible(
+          selectedStage === "stage-01",
+        );
+    }
+    this.canyon.update(model.time, selectedStage === "stage-02");
+    if (selectedStage === "stage-01")
+      this.background.update(
+        model.mode === "menu"
+          ? this.ambience
+          : model.time + (model.mode === "won" ? this.endingAge : 0),
+      );
 
     if (model.mode !== "menu") {
       for (const b of model.bullets)
@@ -1132,7 +1208,7 @@ class FlightScene extends Phaser.Scene {
       }
     }
     if (model.mode !== "menu") {
-      const sections = model.boss?.active ? [] : (stage01.sections ?? []);
+      const sections = model.boss?.active ? [] : (model.stage.sections ?? []);
       sections.forEach((section, i) => {
         const active = model.time >= section.at;
         hud.fillStyle(active ? 0x8ce5d0 : 0x314b58, active ? 0.9 : 0.55);
@@ -1143,7 +1219,7 @@ class FlightScene extends Phaser.Scene {
     label.setText(
       model.mode === "menu"
         ? ""
-        : `分數 ${String(model.score).padStart(6, "0")}   生命 ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? `指揮艦 P${model.boss.phase} · ${Math.ceil(stage01.duration - model.time)}s` : (model.section?.title ?? "STAGE 01")}\n${model.weaponMode === "missile" ? "追蹤" : model.weaponMode === "beam" ? "貫穿" : "散射"} ${model.weaponLevel}/3   炸彈 ${model.bombs}${model.supportTime > 0 ? "  僚機 " + Math.ceil(model.supportTime) + "s" : ""}`,
+        : `分數 ${String(model.score).padStart(6, "0")}   生命 ${"♥".repeat(Math.max(0, model.hp))}\n${model.mode === "won" ? "STAGE CLEAR" : model.mode === "lost" ? "MISSION FAILED" : model.boss?.active ? `${selectedStage === "stage-02" ? "峽谷守衛" : "指揮艦"} P${model.boss.phase} · ${Math.ceil(model.stage.duration - model.time)}s` : (model.section?.title ?? "STAGE 01")}\n${model.weaponMode === "missile" ? "追蹤" : model.weaponMode === "beam" ? "貫穿" : "散射"} ${model.weaponLevel}/3   炸彈 ${model.bombs}${model.supportTime > 0 ? "  僚機 " + Math.ceil(model.supportTime) + "s" : ""}`,
     );
     if (model.mode === "won" && this.endingAge < 1.2 && model.boss) {
       const t = this.endingAge / 1.2;
@@ -1204,6 +1280,8 @@ document.addEventListener("visibilitychange", () => {
 // Read-only diagnostics used by browser tests; no bypass of damage or stage time.
 Object.defineProperty(window, "__P01__", {
   value: () => ({
+    stageId: model.stage.id,
+    seed: stageSeed,
     mode: model.mode,
     touchTarget: touch.target,
     time: model.time,
