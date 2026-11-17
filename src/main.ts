@@ -1,4 +1,4 @@
-import { METAL_SPRITES } from "./game/metal-sprites";
+import { METAL_SPRITES, METAL_EXHAUST } from "./game/metal-sprites";
 import { enemyMount, enemyBank } from "./game/enemy-mounts";
 import {
   configureTextureBatch,
@@ -11,7 +11,7 @@ import {
   pickupLabel,
   pickupMessage,
 } from "./game/pickup-labels";
-import { RAIDER_GEOMETRY, raiderMuzzle } from "./game/raider-geometry";
+import { raiderMuzzle } from "./game/raider-geometry";
 import { createRaiderTextures, RAIDER_ART } from "./game/raider-art";
 import { createCannonTextures } from "./game/cannon-art";
 import {
@@ -756,8 +756,8 @@ class FlightScene extends Phaser.Scene {
             for (const side of [-1, 1])
               this.sprite(
                 "fire03",
-                e.x + side * 31,
-                e.y - 35,
+                e.x + side * METAL_EXHAUST.gatekeeper.x,
+                e.y + METAL_EXHAUST.gatekeeper.y,
                 8,
                 15,
                 0.75,
@@ -842,8 +842,8 @@ class FlightScene extends Phaser.Scene {
             for (const side of [-1, 1]) {
               this.sprite(
                 "fire03",
-                e.x + side * RAIDER_GEOMETRY.engineX,
-                e.y + RAIDER_GEOMETRY.engineY - 4,
+                e.x + side * METAL_EXHAUST[e.behavior].x,
+                e.y + METAL_EXHAUST[e.behavior].y,
                 4,
                 e.behavior === "brakeRaider" ? 8 : 12,
                 0.75,

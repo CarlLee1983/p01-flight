@@ -10,3 +10,11 @@ export const METAL_SPRITES = [
   { key: "enemy-escort", file: "enemy-escort-metal", width: 280, height: 176 },
   { key: "enemy-gunship", file: "enemy-gunship-metal", width: 224, height: 196 },
 ].map(spec => ({...spec, path: `assets/original/${spec.file}.webp` }));
+
+/** Cosmetic exhaust centres measured against imported rear nozzles.
+ * Combat gun sockets remain in raider-geometry/enemy-mounts. */
+export const METAL_EXHAUST = {
+  hookWing: { x: 9, y: -22 },
+  brakeRaider: { x: 7.5, y: -24 },
+  gatekeeper: { x: 39, y: -41 },
+} as const;
