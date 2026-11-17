@@ -54,7 +54,7 @@ npm run test:e2e
 
 完整出擊在 Chromium 驗證；Firefox/WebKit 為啟動、輸入或音訊 smoke，不冒稱完整跨瀏覽器通關。
 
-目前測試規模為 459 unit 與 33 E2E；最後精確提交的結果看 [PR #11](https://github.com/CarlLee1983/p01-flight/pull/11) checks 與 artifact。舊版少量測試或先前 CI 不代替本版。手機模擬不等於實體手機手感；音訊解碼通過不等於人工聆聽驗收。遊戲趣味與獨立視覺覆核仍需分開記錄。
+目前測試規模為 461 unit 與 33 E2E；最後精確提交的結果看 [PR #11](https://github.com/CarlLee1983/p01-flight/pull/11) checks 與 artifact。舊版少量測試或先前 CI 不代替本版。手機模擬不等於實體手機手感；音訊解碼通過不等於人工聆聽驗收。遊戲趣味與獨立視覺覆核仍需分開記錄。
 
 全域 batchSize 維持 4096，只對 Image/Text 使用 QuadSingle；第二關素材只在載入時烘焙接縫與段落透明邊，不逐幀重建大圖。效能以真 WebGL 提交與 RAF 間隔觀測，不把 CPU 繪圖命令時間稱作 GPU 時間。詳見 [渲染紀錄](docs/render-batching-performance.md)。
 

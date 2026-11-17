@@ -42,12 +42,14 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
   await unlockStage02(page);
   await page.screenshot({ path: "docs/stage02-menu.png" });
   await page.locator("#start").click();
+  expect((await state(page)).metalSprites.every((a: any) => a.ready && a.bitmap)).toBe(true);
   await page.keyboard.down("Space");
   const roleFrames: {role: string; id: number; requestedGameTime: number; completedGameTime: number; file: string}[] = [];
   const photographed = new Set<string>();
   let first = false,
     second = false,
-    observingBossEntry = false;
+    observingBossEntry = false,
+    brokenCaptured = false;
   await withKeyboardPilot(page, async () => {
     let captured = false,
       bridge = false,
@@ -87,6 +89,10 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
         await page.setViewportSize({ width: 1000, height: 900 });
         await page.keyboard.down("Space");
       }
+      if (s.boss?.active && s.boss.cannons.some((c: any) => !c.active) && !brokenCaptured) {
+        brokenCaptured = true;
+        await captureStage02Frame(page, "stage02-boss-damaged");
+      }
       if (s.time > 151 && !first) {
         await page.keyboard.press("x");
         first = true;
@@ -123,6 +129,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     .toBe("won");
   const done = await state(page);
   expect(done.bossDefeated).toBe(true);
+  expect(brokenCaptured, "damaged Boss pods were captured during normal combat").toBe(true);
   const presentation = done.renderMetrics.presentationCoverage;
   for (const role of ["straight", "weave", "cross", "brakeRaider", "hookWing", "carrier", "groundBattery", "groundDepot", "gatekeeper"]) expect(presentation[role]?.visible, role + " actually appeared").toBeTruthy();
   await testInfo.attach("stage02-actual-enemy-presentation", {body: JSON.stringify({presentation, roleFrames, note: "Source timing indexes are observations, not a claim every role fired or died. Match the full video and screenshot before accepting visual quality."}, null, 2), contentType: "application/json"});

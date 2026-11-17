@@ -1,3 +1,4 @@
+import { METAL_SPRITES } from "./game/metal-sprites";
 import { enemyMount, enemyBank } from "./game/enemy-mounts";
 import {
   configureTextureBatch,
@@ -243,6 +244,8 @@ class FlightScene extends Phaser.Scene {
   visuals: Phaser.GameObjects.Image[] = [];
   visualIndex = 0;
   preload() {
+    for (const sprite of METAL_SPRITES)
+      this.load.image(sprite.key, import.meta.env.BASE_URL + sprite.path);
     for (const file of [
       "player",
       "scout",
@@ -1381,6 +1384,7 @@ Object.defineProperty(window, "__P01__", {
         ? bossChargeSources(model.boss)
         : [],
     background: readBackgroundInfo(),
+    metalSprites: METAL_SPRITES.map(({key}) => ({key, ready: game.textures.exists(key), bitmap: game.textures.get(key).source[0]?.image instanceof HTMLImageElement})),
     renderer: {
       type: game.renderer.type,
       batchSize: game.config.batchSize,
