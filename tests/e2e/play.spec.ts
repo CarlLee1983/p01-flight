@@ -104,6 +104,8 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
   expect((await state(page)).hudBottom).toBeLessThan(63);
+  const layers = await state(page);
+  expect(layers.hudLayer).toBeGreaterThan(layers.combatMaxLayer);
   await page.screenshot({ path: "docs/boss.png" });
   await page.setViewportSize({ width: 320, height: 700 });
   expect((await state(page)).hudBottom).toBeLessThan(63);
@@ -127,6 +129,11 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .toBe(true);
   expect(warning.attackWarning).toBeGreaterThan(0);
   expect(warning.attackAngles.length).toBeGreaterThanOrEqual(2);
+  const sources = (await state(page)).bossChargeSources;
+  expect(sources.length).toBeLessThanOrEqual(3);
+  expect(new Set(sources.map((p: any) => `${p.x}:${p.y}`)).size).toBe(
+    sources.length,
+  );
   await page.screenshot({ path: "docs/boss-attack-forecast.png" });
   await expect
     .poll(async () => (await state(page)).audio.musicSection, { timeout: 5000 })

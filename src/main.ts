@@ -1,3 +1,9 @@
+import { createCannonTextures } from "./game/cannon-art";
+import {
+  bossChargeSources,
+  CANNON_ART,
+  PRESENTATION_LAYERS,
+} from "./game/combat-presentation";
 import { groundMuzzle, BOSS_BODY } from "./game/hostile-visuals";
 import { bossMuzzle } from "./game/boss-muzzles";
 import Phaser from "phaser";
@@ -26,6 +32,8 @@ let recorded = false;
 let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
+let hud: Phaser.GameObjects.Graphics;
+let readCombatLayer = () => 0;
 let readBackgroundInfo: () => Record<string, unknown> = () => ({});
 const renderMetrics = new RenderMetrics();
 let frameCount = 0,
@@ -217,7 +225,15 @@ class FlightScene extends Phaser.Scene {
   create() {
     this.background = new CoastalBackground(this);
     readBackgroundInfo = () => this.background.diagnostics();
+    readCombatLayer = () =>
+      Math.max(
+        3,
+        ...this.visuals
+          .filter((image) => image.visible)
+          .map((image) => image.depth),
+      );
     createPickupTextures(this);
+    createCannonTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
         this.add
@@ -259,6 +275,7 @@ class FlightScene extends Phaser.Scene {
       .setDepth(5);
     graphics = this.add.graphics();
     overlay = this.add.graphics().setDepth(3);
+    hud = this.add.graphics().setDepth(PRESENTATION_LAYERS.hud);
     label = this.add
       .text(16, 14, "", {
         fontFamily: "monospace",
@@ -529,6 +546,7 @@ class FlightScene extends Phaser.Scene {
 
     graphics.clear();
     overlay.clear();
+    hud.clear();
     this.background.update(
       model.mode === "menu"
         ? this.ambience
@@ -962,44 +980,47 @@ class FlightScene extends Phaser.Scene {
             cannon.x,
             cannon.y + 3,
           );
-          overlay.fillStyle(cannon.active ? 0x513745 : 0x16222c);
-          overlay.fillRoundedRect(cannon.x - 13, cannon.y - 14, 26, 30, 4);
-          overlay.lineStyle(1.5, cannon.active ? 0xffce83 : 0x526676);
-          overlay.strokeRoundedRect(cannon.x - 13, cannon.y - 14, 26, 30, 4);
+          this.sprite(
+            cannon.active ? "boss-cannon" : "boss-cannon-broken",
+            cannon.x,
+            cannon.y,
+            CANNON_ART.width,
+            CANNON_ART.height,
+          ).setDepth(2);
           if (cannon.active) {
-            overlay.fillStyle(0xffd98b);
-            overlay.fillRect(cannon.x - 3, cannon.y + 4, 6, 18);
-            overlay.fillStyle(0x28343e);
-            overlay.fillRect(cannon.x - 14, cannon.y - 20, 28, 3);
+            overlay.fillStyle(0x182630);
+            overlay.fillRect(cannon.x - 12, cannon.y - 24, 24, 2);
             overlay.fillStyle(0xffc779);
             overlay.fillRect(
-              cannon.x - 14,
-              cannon.y - 20,
-              (28 * cannon.hp) / cannon.maxHp,
-              3,
+              cannon.x - 12,
+              cannon.y - 24,
+              (24 * cannon.hp) / cannon.maxHp,
+              2,
             );
           } else {
-            // Retain a torn mounting collar instead of a floating crossed box.
-            overlay.fillStyle(0x101d28);
-            overlay.fillCircle(cannon.x, cannon.y, 9);
-            overlay.lineStyle(2, 0x75818a);
-            overlay.lineBetween(
-              cannon.x - 10,
-              cannon.y + 8,
-              cannon.x - 6,
-              cannon.y - 4,
-            );
-            overlay.lineBetween(
-              cannon.x + 9,
-              cannon.y - 8,
-              cannon.x + 5,
-              cannon.y + 3,
-            );
-            overlay.fillStyle(0xe28c59, 0.5 + Math.sin(model.time * 9) * 0.2);
-            overlay.fillCircle(cannon.x, cannon.y + 4, 2);
+            overlay.fillStyle(0xe28c59, 0.45 + Math.sin(model.time * 9) * 0.15);
+            overlay.fillCircle(cannon.x, cannon.y + 4, 1.5);
           }
         }
         if (model.boss.attackWarning > 0) {
+          // Three centre rays are one charging reactor, not three stacked rings.
+          for (const source of bossChargeSources(model.boss)) {
+            overlay.fillStyle(0xffd179, 0.85);
+            overlay.fillCircle(source.x, source.y, 3);
+            overlay.lineStyle(1.5, 0xffd179, 0.9);
+            overlay.lineBetween(
+              source.x - 6,
+              source.y + 2,
+              source.x - 3,
+              source.y + 6,
+            );
+            overlay.lineBetween(
+              source.x + 6,
+              source.y + 2,
+              source.x + 3,
+              source.y + 6,
+            );
+          }
           for (const [index, angle] of model.boss.attackAngles.entries()) {
             const muzzle = bossMuzzle(
               model.boss,
@@ -1007,15 +1028,6 @@ class FlightScene extends Phaser.Scene {
               model.boss.attackAngles.length,
             );
             if (!muzzle.active) continue;
-            // The charging source is readable even when the long ray exits the view.
-            overlay.fillStyle(0xffd179, 0.75);
-            overlay.fillCircle(muzzle.x, muzzle.y, 4);
-            overlay.lineStyle(1.5, 0xffd179, 0.7);
-            overlay.strokeCircle(
-              muzzle.x,
-              muzzle.y,
-              8 + Math.sin(model.time * 18),
-            );
             overlay.lineStyle(1.8, 0xffd179, 0.65);
             for (let d = 40; d < 580; d += 26) {
               const x = muzzle.x + Math.sin(angle) * d;
@@ -1038,12 +1050,18 @@ class FlightScene extends Phaser.Scene {
           3 + Math.sin(model.time * 12),
         );
         if (model.boss.telegraph > 0) {
-          overlay.lineStyle(3, 0xffd179, 0.8);
-          overlay.strokeCircle(
-            model.boss.x,
-            model.boss.y,
-            48 + Math.sin(model.time * 20) * 5,
-          );
+          // Phase transition brackets sit outside the hull instead of covering it.
+          overlay.lineStyle(2, 0xffd179, 0.85);
+          for (const side of [-1, 1]) {
+            const x = model.boss.x + side * 88;
+            overlay.lineBetween(x, model.boss.y - 18, x, model.boss.y + 12);
+            overlay.lineBetween(
+              x,
+              model.boss.y - 18,
+              x - side * 8,
+              model.boss.y - 18,
+            );
+          }
         }
       }
       for (const drone of model.supportDrones) {
@@ -1133,13 +1151,13 @@ class FlightScene extends Phaser.Scene {
       this.sprite("fire03", 180, 127, 10, 20, 0.9, 180);
     }
     if (model.mode !== "menu") {
-      overlay.fillStyle(0x0c2133, 0.96);
-      overlay.fillRect(0, 0, 360, 72);
+      hud.fillStyle(0x0c2133, 1);
+      hud.fillRect(0, 0, 360, 72);
       if (model.boss?.active) {
-        overlay.fillStyle(0x421f3c);
-        overlay.fillRect(16, 63, 328, 6);
-        overlay.fillStyle(0xff83b9);
-        overlay.fillRect(
+        hud.fillStyle(0x421f3c);
+        hud.fillRect(16, 63, 328, 6);
+        hud.fillStyle(0xff83b9);
+        hud.fillRect(
           16,
           63,
           328 * Math.max(0, model.boss.hp / model.boss.maxHp),
@@ -1151,9 +1169,9 @@ class FlightScene extends Phaser.Scene {
       const sections = model.boss?.active ? [] : (stage01.sections ?? []);
       sections.forEach((section, i) => {
         const active = model.time >= section.at;
-        overlay.fillStyle(active ? 0x8ce5d0 : 0x314b58, active ? 0.9 : 0.55);
+        hud.fillStyle(active ? 0x8ce5d0 : 0x314b58, active ? 0.9 : 0.55);
         const segment = 328 / Math.max(1, sections.length);
-        overlay.fillRect(16 + i * segment, 67, segment - 5, 3);
+        hud.fillRect(16 + i * segment, 67, segment - 5, 3);
       });
     }
     label.setText(
@@ -1286,6 +1304,12 @@ Object.defineProperty(window, "__P01__", {
     lostReason: model.lostReason,
     save: saves.data,
     hudBottom: label ? label.y + label.height : null,
+    hudLayer: hud?.depth ?? null,
+    combatMaxLayer: readCombatLayer(),
+    bossChargeSources:
+      model.boss?.active && model.boss.attackWarning > 0
+        ? bossChargeSources(model.boss)
+        : [],
     background: readBackgroundInfo(),
     renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,
