@@ -63,5 +63,18 @@
     ],
     "source": "OpenAI built-in image_gen; original generated terrain; 2026-11-17",
     "processing": "Downsampled and encoded WebP quality88; no external source art"
+  },
+  {
+    "name": "river-supply-barge",
+    "prompt": "Use case: stylized-concept. One ORIGINAL production 2D arcade shooter sprite: a non-combat river resupply barge, broad low armored pontoon hull with visibly buoyant steel perimeter, rounded chamfered bow pointing upward, a few secured cargo crates and two compact fuel tanks on deck, short mooring cleats and deck grilles. Coherent single vehicle, NOT a house floating without a hull. Straight orthographic top-down camera, detailed painted pixel-art-like pre-rendered arcade material, muted bronze/gray steel, ochre supplies, upper-left lighting and shaded side thickness, readable silhouette at 70x48 game pixels. Landscape 3:2 image, isolated centered entire barge, transparent background including all outer space. No water, ground, cast ground shadow, people, guns, bullets, thrusters, writing, logos, UI, border or watermark. Do not crop any part of the hull; modest transparent margin.",
+    "file": "public/assets/original/river-supply-barge.webp",
+    "sha256": "3f61b145538351364c9fed7a72723120531539c2e5c2078dc8f8fe3ac80d41f6",
+    "bytes": 24282,
+    "dimensions": [
+      280,
+      192
+    ],
+    "source": "OpenAI built-in image_gen; original generated non-combat supply pontoon; 2026-11-17",
+    "processing": "Transparent alpha hull trimmed with margin, rotated sideways as moored pontoon and encoded WebP; display70x48 preserves existing model bounds"
   }
 ]

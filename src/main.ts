@@ -265,6 +265,7 @@ class FlightScene extends Phaser.Scene {
       );
     for (const kind of ["river", "bridge", "mine", "dam", "reservoir"])
       this.load.image("canyon-" + kind, import.meta.env.BASE_URL + "assets/original/canyon-" + kind + ".webp");
+    this.load.image("river-supply-barge", import.meta.env.BASE_URL + "assets/original/river-supply-barge.webp");
     for (const file of [
       "playerShip1_blue",
       "enemyRed1",
@@ -780,7 +781,7 @@ class FlightScene extends Phaser.Scene {
           }
           if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
             if (e.behavior === "groundDepot") {
-              this.sprite("ground-depot", e.x, e.y, 70, 48, 1, 0, e).setDepth(
+              this.sprite(selectedStage === "stage-02" ? "river-supply-barge" : "ground-depot", e.x, e.y, 70, 48, 1, 0, e).setDepth(
                 0,
               );
             } else {
