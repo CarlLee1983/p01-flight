@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { state, waitGameTime, keyboardShoreCounterattack } from "./gameplay";
+import {
+  state,
+  waitGameTime,
+  keyboardShoreCounterattack,
+  evadeUntil,
+} from "./gameplay";
 import { stage01 } from "../../src/data/stage";
 const BOSS_AT = stage01.boss!.at;
 test.use({ video: { mode: "on", size: { width: 500, height: 450 } } });
@@ -234,15 +239,15 @@ test("browser closes and reopens with persisted settings and record", async () =
     await page.getByRole("button", { name: "開始飛行" }).click();
     await page.keyboard.down("Space");
     await keyboardShoreCounterattack(page);
-    await waitGameTime(page, BOSS_AT);
+    await evadeUntil(page, BOSS_AT);
     await page.keyboard.press("c");
     await expect.poll(async () => (await state(page)).weaponMode).toBe("beam");
     expect((await state(page)).weaponLevel).toBe(3);
     await page.screenshot({ path: "docs/beam-boss.png" });
-    await waitGameTime(page, BOSS_AT + 15);
+    await evadeUntil(page, BOSS_AT + 15);
     await page.keyboard.press("x");
     await expect.poll(async () => (await state(page)).bombs).toBe(1);
-    await waitGameTime(page, BOSS_AT + 21);
+    await evadeUntil(page, BOSS_AT + 21);
     await page.keyboard.press("x");
     await expect.poll(async () => (await state(page)).bombs).toBe(0);
     await expect
@@ -628,7 +633,7 @@ test("ground batteries visibly warn and fire during continuous normal shooting",
     })
     .toBeLessThan(12);
   await page.keyboard.up(back);
-  await waitGameTime(page, 56);
+  await evadeUntil(page, 56);
   for (const time of [56, 64, 66, 69]) {
     await waitGameTime(page, time);
     const snapshot = await state(page);

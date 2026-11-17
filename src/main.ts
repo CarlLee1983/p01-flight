@@ -1157,6 +1157,9 @@ Object.defineProperty(window, "__P01__", {
     shots: model.shots,
     groundShotCount: model.groundShotCount,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
+    hostileProjectiles: model.enemyBullets
+      .filter((b) => b.active)
+      .map(({ x, y, vx, vy }) => ({ x, y, vx, vy })),
     pickups: model.pickups.filter((p) => p.active).length,
     activePickups: model.pickups
       .filter((p) => p.active)
