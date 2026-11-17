@@ -54,7 +54,7 @@ it.each([10, 15, 20, 30, 60])(
         if (!b1 && m.time >= 140) b1 = m.useBomb();
         if (!b2 && m.time >= 146) b2 = m.useBomb();
         if (weapon === "missile" && m.time >= 149 && m.time < 149.5) dx = 1;
-        if (m.boss?.active) dx = dodgeDirection(m, dx);
+        dx = dodgeDirection(m, dx);
         advanceFrame(
           m,
           1 / fps,

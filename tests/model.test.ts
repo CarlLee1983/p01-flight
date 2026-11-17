@@ -1,3 +1,4 @@
+import { dodgeDirection } from "./dodge-route";
 import { describe, it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
 import { stage01 } from "../src/data/stage";
@@ -185,7 +186,7 @@ describe("Stage 01 playthrough fixtures", () => {
     for (let i = 0; i < 171 * 60; i++) {
       if (!bomb1 && m.time >= 140) bomb1 = m.useBomb();
       if (!bomb2 && m.time >= 146) bomb2 = m.useBomb();
-      m.update(1 / 60, 0, 0, true);
+      m.update(1 / 60, dodgeDirection(m, 0), 0, true);
     }
     expect(m.mode).toBe("won");
     expect(m.hp).toBeGreaterThan(0);

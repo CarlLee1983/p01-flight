@@ -1,3 +1,9 @@
+import {
+  groundMuzzle,
+  hostileStyle,
+  turnToward,
+  type HostileStyle,
+} from "./hostile-visuals";
 import { bossMuzzle, bossSideAngles } from "./boss-muzzles";
 import { fastAttackAngles, isFastShooter } from "./enemy-patterns";
 import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
@@ -31,6 +37,8 @@ export interface Enemy extends Body {
   fireEvery?: number;
   shotsFired?: number;
   visibleSince?: number;
+  turretAngle?: number;
+  turretHoldUntil?: number;
   drop?: PickupKind;
   telegraph?: number;
   aimAngle?: number;
@@ -46,6 +54,10 @@ export interface Enemy extends Body {
   attackAngles?: number[];
 }
 export interface EnemyBullet extends Body {
+  visual?: HostileStyle;
+  bornAt?: number;
+  muzzleX?: number;
+  muzzleY?: number;
   vx: number;
   vy: number;
 }
@@ -98,6 +110,7 @@ export class FlightModel {
     source: Enemy | Boss;
     sourceId?: number;
     boss: boolean;
+    visual: HostileStyle;
     guard?: BossPart;
   }[] = [];
   boss: Boss | null = null;
@@ -279,6 +292,10 @@ export class FlightModel {
     guard?: BossPart,
   ) {
     const boss = source === this.boss;
+    const visual = hostileStyle(
+      boss,
+      "behavior" in source ? source.behavior : undefined,
+    );
     const count = boss
       ? (this.stage.boss?.burstShots ?? 1)
       : (this.stage.enemyBurstShots ?? 1);
@@ -304,11 +321,12 @@ export class FlightModel {
           Math.sin(angle) * speed,
           Math.cos(angle) * speed,
           false,
+          visual,
         );
       });
       return;
     }
-    this.emitEnemyBullet(x, y, vx, vy, boss);
+    this.emitEnemyBullet(x, y, vx, vy, boss, visual);
     // Slow emitters use genuinely separated pulses. The earlier 0.12s train
     // was visually merged; Boss now has 30.8px nominal separation, not 16.8px.
     const spacing = boss
@@ -326,6 +344,7 @@ export class FlightModel {
         source,
         sourceId: "id" in source ? source.id : undefined,
         boss,
+        visual,
         guard,
       });
   }
@@ -335,6 +354,7 @@ export class FlightModel {
     vx: number,
     vy: number,
     boss: boolean,
+    visual: HostileStyle,
   ) {
     if (boss) this.emittedBossShots++;
     else this.emittedEnemyShots++;
@@ -343,7 +363,17 @@ export class FlightModel {
       b = { id: ++this.serial, x, y, vx, vy, active: true };
       this.enemyBullets.push(b);
     }
-    Object.assign(b, { x, y, vx, vy, active: true });
+    Object.assign(b, {
+      x,
+      y,
+      vx,
+      vy,
+      active: true,
+      visual,
+      bornAt: this.time,
+      muzzleX: x,
+      muzzleY: y,
+    });
   }
   private drop(x: number, y: number, kind: PickupKind) {
     let p = this.pickups.find((p) => !p.active);
@@ -529,6 +559,8 @@ export class FlightModel {
               : (w.firstFireDelay ?? w.fireEvery ?? 999),
           telegraph: 0,
           aimAngle: undefined,
+          turretAngle: 0,
+          turretHoldUntil: 0,
           shotsFired: 0,
           visibleSince: undefined,
           enteredPlayfield: false,
@@ -772,8 +804,20 @@ export class FlightModel {
           e.y < 400
         ) {
           e.fireCooldown = (e.fireCooldown ?? e.fireEvery) - dt;
+          if (e.behavior === "groundBattery") {
+            const target =
+              e.aimAngle ??
+              Math.atan2(this.player.x - e.x, this.player.y - e.y);
+            if (this.time >= (e.turretHoldUntil ?? 0))
+              e.turretAngle = turnToward(e.turretAngle ?? 0, target, dt);
+          }
           if (e.fireCooldown <= 0.6 && e.aimAngle === undefined)
             e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
+          if (e.behavior === "groundBattery" && e.aimAngle !== undefined) {
+            // Lock the current barrel heading, never snap to a new target.
+            if ((e.telegraph ?? 0) <= 0) e.aimAngle = e.turretAngle ?? 0;
+            e.turretAngle = e.aimAngle;
+          }
           e.telegraph =
             e.fireCooldown > 0 && e.fireCooldown <= 0.6 ? e.fireCooldown : 0;
           if (
@@ -797,10 +841,16 @@ export class FlightModel {
           if (e.fireCooldown <= 0) {
             const aim = e.aimAngle ?? 0;
             if (e.behavior === "turret" || e.behavior === "groundBattery") {
+              if (e.behavior === "groundBattery")
+                e.turretHoldUntil = this.time + 0.35;
+              const muzzle =
+                e.behavior === "groundBattery"
+                  ? groundMuzzle(e, aim)
+                  : { x: e.x, y: e.y + 20 };
               for (const a of [0])
                 this.shootEnemy(
-                  e.x,
-                  e.y + 20,
+                  muzzle.x,
+                  muzzle.y,
                   Math.sin(aim + a) * 145,
                   Math.cos(aim + a) * 145,
                   e,
@@ -915,6 +965,7 @@ export class FlightModel {
         shot.vx,
         shot.vy,
         shot.boss,
+        shot.visual,
       );
       return false;
     });

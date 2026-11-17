@@ -36,7 +36,7 @@ describe("combat increment", () => {
             (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
         )
           bomb2 = m.useBomb();
-        m.update(1 / fps, m.boss?.active ? dodgeDirection(m, 0) : 0, 0, true);
+        m.update(1 / fps, dodgeDirection(m, 0), 0, true);
         if (m.partsDestroyed > cannonTimes.length) cannonTimes.push(m.time);
         sawBoss ||= !!m.boss?.active;
         sawEnemyBullet ||= m.enemyBullets.some((b) => b.active);
@@ -332,7 +332,7 @@ describe("weapon and encounter progression", () => {
         if (!bomb2 && m.time >= 146) {
           bomb2 = m.useBomb();
         }
-        m.update(1 / fps, m.boss?.active ? dodgeDirection(m, 0) : 0, 0, true);
+        m.update(1 / fps, dodgeDirection(m, 0), 0, true);
       }
       expect(m.mode).toBe("won");
       expect(bomb1 && bomb2).toBe(true);
@@ -1317,7 +1317,7 @@ describe("escort formation density", () => {
 
 describe("ground readability under real continuous fire", () => {
   it.each([30, 60, 120])(
-    "center-fire sees battery warning, firing and then destruction at %i FPS",
+    "normal fire and counterattack sees battery warning, firing and then destruction at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
@@ -1327,7 +1327,12 @@ describe("ground readability under real continuous fire", () => {
         deadAt = 0,
         watchId = 0;
       for (let i = 0; i < 58 * fps; i++) {
-        m.update(1 / fps, 0, 0, true);
+        const target = m.enemies.find((e) => e.id === watchId && e.active);
+        const approach =
+          warning && target && Math.abs(target.x - m.player.x) > 12
+            ? Math.sign(target.x - m.player.x)
+            : 0;
+        m.update(1 / fps, dodgeDirection(m, approach), 0, true);
         const e = m.enemies.find(
           (e) =>
             e.behavior === "groundBattery" && (!watchId || e.id === watchId),

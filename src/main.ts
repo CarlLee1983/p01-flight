@@ -1,3 +1,4 @@
+import { groundMuzzle } from "./game/hostile-visuals";
 import { bossMuzzle } from "./game/boss-muzzles";
 import Phaser from "phaser";
 import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
@@ -649,15 +650,50 @@ class FlightScene extends Phaser.Scene {
             continue;
           }
           if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
-            this.sprite(
-              e.behavior === "groundBattery"
-                ? "ground-battery"
-                : "ground-depot",
-              e.x,
-              e.y,
-              70,
-              e.behavior === "groundBattery" ? 70 : 48,
-            ).setDepth(0);
+            if (e.behavior === "groundDepot") {
+              this.sprite("ground-depot", e.x, e.y, 70, 48).setDepth(0);
+            } else {
+              // Fixed armored plinth; only the turret and barrels rotate.
+              graphics.fillStyle(0x162e36);
+              graphics.fillRoundedRect(e.x - 31, e.y - 29, 62, 58, 5);
+              graphics.lineStyle(2, 0x698487);
+              graphics.strokeRoundedRect(e.x - 28, e.y - 26, 56, 52, 4);
+              graphics.fillStyle(0x42585e);
+              graphics.fillRect(e.x - 23, e.y - 21, 46, 42);
+              for (const side of [-1, 1]) {
+                graphics.fillStyle(0xc4a376);
+                graphics.fillRect(e.x + side * 23 - 3, e.y - 24, 6, 5);
+                graphics.fillRect(e.x + side * 23 - 3, e.y + 19, 6, 5);
+              }
+              graphics.fillStyle(0x182d36);
+              graphics.fillCircle(e.x, e.y, 19);
+              graphics.lineStyle(2, 0x9ba8a2);
+              graphics.strokeCircle(e.x, e.y, 17);
+              const angle = e.turretAngle ?? 0;
+              const muzzle = groundMuzzle(e, angle);
+              for (const offset of [-4, 4]) {
+                const px = Math.cos(angle) * offset,
+                  py = -Math.sin(angle) * offset;
+                graphics.lineStyle(5, 0xc5bca7);
+                graphics.lineBetween(
+                  e.x + px,
+                  e.y + py,
+                  muzzle.x + px,
+                  muzzle.y + py,
+                );
+                graphics.lineStyle(2, 0x354957);
+                graphics.lineBetween(
+                  e.x + px,
+                  e.y + py,
+                  muzzle.x + px,
+                  muzzle.y + py,
+                );
+              }
+              graphics.fillStyle(0x60777c);
+              graphics.fillCircle(e.x, e.y, 10);
+              graphics.fillStyle(0xe9b877);
+              graphics.fillCircle(e.x, e.y, 3);
+            }
             // Subtle base rim distinguishes interactive targets from painted scenery.
             if (e.y >= GROUND_VISIBLE_Y) {
               overlay.lineStyle(
@@ -680,20 +716,21 @@ class FlightScene extends Phaser.Scene {
             }
             if ((e.telegraph ?? 0) > 0) {
               const angle = e.aimAngle ?? 0;
+              const muzzle = groundMuzzle(e, angle);
               overlay.lineStyle(2, 0xffbc73, 0.9);
               overlay.strokeCircle(
-                e.x,
-                e.y + 20,
+                muzzle.x,
+                muzzle.y,
                 11 + Math.sin(model.time * 20) * 3,
               );
               // Locked aim, not a tracking laser: the player can step aside.
               overlay.lineStyle(1.5, 0xffbc73, 0.65);
               for (let distance = 32; distance < 360; distance += 28)
                 overlay.lineBetween(
-                  e.x + Math.sin(angle) * distance,
-                  e.y + 20 + Math.cos(angle) * distance,
-                  e.x + Math.sin(angle) * (distance + 12),
-                  e.y + 20 + Math.cos(angle) * (distance + 12),
+                  muzzle.x + Math.sin(angle) * distance,
+                  muzzle.y + Math.cos(angle) * distance,
+                  muzzle.x + Math.sin(angle) * (distance + 12),
+                  muzzle.y + Math.cos(angle) * (distance + 12),
                 );
             }
             continue;
@@ -831,10 +868,74 @@ class FlightScene extends Phaser.Scene {
       }
       for (const shot of model.enemyBullets)
         if (shot.active) {
-          overlay.fillStyle(0xff5f9e);
-          overlay.fillCircle(shot.x, shot.y, 5);
-          overlay.lineStyle(1.5, 0xffe2ed);
-          overlay.strokeCircle(shot.x, shot.y, 5);
+          const speed = Math.hypot(shot.vx, shot.vy) || 1;
+          const dx = shot.vx / speed,
+            dy = shot.vy / speed;
+          const style = shot.visual ?? "needle";
+          const color =
+            style === "plasma"
+              ? 0xd78dff
+              : style === "shell"
+                ? 0xffbc69
+                : 0xff6d91;
+          // Short, bounded afterimage; collision remains the existing model radius.
+          overlay.lineStyle(3, color, 0.32);
+          overlay.lineBetween(
+            shot.x - dx * 10,
+            shot.y - dy * 10,
+            shot.x,
+            shot.y,
+          );
+          overlay.fillStyle(color);
+          overlay.lineStyle(1.5, 0xfff2e2);
+          if (style === "needle") {
+            overlay.fillTriangle(
+              shot.x + dx * 6,
+              shot.y + dy * 6,
+              shot.x - dx * 4 + dy * 3,
+              shot.y - dy * 4 - dx * 3,
+              shot.x - dx * 4 - dy * 3,
+              shot.y - dy * 4 + dx * 3,
+            );
+            overlay.lineStyle(2, 0xfff2e2);
+            overlay.lineBetween(
+              shot.x - dx * 2,
+              shot.y - dy * 2,
+              shot.x + dx * 3,
+              shot.y + dy * 3,
+            );
+          } else {
+            overlay.fillCircle(shot.x, shot.y, style === "plasma" ? 5 : 4);
+            overlay.strokeCircle(shot.x, shot.y, style === "plasma" ? 5 : 4);
+            if (style === "plasma") {
+              overlay.lineStyle(1, color, 0.6);
+              overlay.strokeCircle(
+                shot.x,
+                shot.y,
+                7 + Math.sin(model.time * 18 + shot.id) * 0.5,
+              );
+            } else {
+              overlay.fillStyle(0xffffff);
+              overlay.fillCircle(shot.x, shot.y, 1.5);
+            }
+          }
+          const age = model.time - (shot.bornAt ?? -1);
+          if (
+            age >= 0 &&
+            age < 0.09 &&
+            shot.muzzleX !== undefined &&
+            shot.muzzleY !== undefined
+          ) {
+            overlay.lineStyle(2, color, 1 - age / 0.09);
+            overlay.lineBetween(
+              shot.muzzleX - dy * 5,
+              shot.muzzleY + dx * 5,
+              shot.muzzleX + dy * 5,
+              shot.muzzleY - dx * 5,
+            );
+            overlay.fillStyle(0xffefc5, 1 - age / 0.09);
+            overlay.fillCircle(shot.muzzleX, shot.muzzleY, 3);
+          }
         }
       for (const pickup of model.pickups)
         if (pickup.active) {
@@ -861,11 +962,32 @@ class FlightScene extends Phaser.Scene {
           model.boss.x,
           model.boss.y,
           120,
-          81,
+          62,
           1,
           Math.sin(model.time * 1.8) * 2,
         );
         for (const cannon of model.boss.cannons) {
+          graphics.lineStyle(13, 0x243b4e);
+          graphics.lineBetween(
+            model.boss.x + cannon.side * 40,
+            model.boss.y + 5,
+            cannon.x,
+            cannon.y,
+          );
+          graphics.lineStyle(6, cannon.active ? 0x789399 : 0x3b4b53);
+          graphics.lineBetween(
+            model.boss.x + cannon.side * 40,
+            model.boss.y + 5,
+            cannon.x,
+            cannon.y,
+          );
+          graphics.lineStyle(2, 0xb8a275);
+          graphics.lineBetween(
+            model.boss.x + cannon.side * 40,
+            model.boss.y + 8,
+            cannon.x,
+            cannon.y + 3,
+          );
           overlay.fillStyle(cannon.active ? 0x513745 : 0x16222c);
           overlay.fillRoundedRect(cannon.x - 13, cannon.y - 14, 26, 30, 4);
           overlay.lineStyle(1.5, cannon.active ? 0xffce83 : 0x526676);
@@ -883,19 +1005,24 @@ class FlightScene extends Phaser.Scene {
               3,
             );
           } else {
-            overlay.lineStyle(2, 0x8a6c60);
+            // Retain a torn mounting collar instead of a floating crossed box.
+            overlay.fillStyle(0x101d28);
+            overlay.fillCircle(cannon.x, cannon.y, 9);
+            overlay.lineStyle(2, 0x75818a);
             overlay.lineBetween(
-              cannon.x - 8,
-              cannon.y - 8,
-              cannon.x + 8,
+              cannon.x - 10,
               cannon.y + 8,
+              cannon.x - 6,
+              cannon.y - 4,
             );
             overlay.lineBetween(
-              cannon.x + 8,
+              cannon.x + 9,
               cannon.y - 8,
-              cannon.x - 8,
-              cannon.y + 8,
+              cannon.x + 5,
+              cannon.y + 3,
             );
+            overlay.fillStyle(0xe28c59, 0.5 + Math.sin(model.time * 9) * 0.2);
+            overlay.fillCircle(cannon.x, cannon.y + 4, 2);
           }
         }
         if (model.boss.attackWarning > 0) {
@@ -944,15 +1071,6 @@ class FlightScene extends Phaser.Scene {
             48 + Math.sin(model.time * 20) * 5,
           );
         }
-        overlay.fillStyle(0x421f3c);
-        overlay.fillRect(16, 76, 328, 7);
-        overlay.fillStyle(0xff83b9);
-        overlay.fillRect(
-          16,
-          76,
-          328 * Math.max(0, model.boss.hp / model.boss.maxHp),
-          7,
-        );
       }
       for (const drone of model.supportDrones) {
         this.sprite("player", drone.x, drone.y, 22, 22, 0.95);
@@ -1043,9 +1161,20 @@ class FlightScene extends Phaser.Scene {
     if (model.mode !== "menu") {
       overlay.fillStyle(0x0c2133, 0.96);
       overlay.fillRect(0, 0, 360, 72);
+      if (model.boss?.active) {
+        overlay.fillStyle(0x421f3c);
+        overlay.fillRect(16, 63, 328, 6);
+        overlay.fillStyle(0xff83b9);
+        overlay.fillRect(
+          16,
+          63,
+          328 * Math.max(0, model.boss.hp / model.boss.maxHp),
+          7,
+        );
+      }
     }
     if (model.mode !== "menu") {
-      const sections = stage01.sections ?? [];
+      const sections = model.boss?.active ? [] : (stage01.sections ?? []);
       sections.forEach((section, i) => {
         const active = model.time >= section.at;
         overlay.fillStyle(active ? 0x8ce5d0 : 0x314b58, active ? 0.9 : 0.55);
