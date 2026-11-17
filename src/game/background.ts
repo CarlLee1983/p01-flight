@@ -1,3 +1,4 @@
+import { CLOUD_ART, createCloudTextures } from "./cloud-art";
 import type Phaser from "phaser";
 import {
   STAGE01_SCENERY,
@@ -188,7 +189,7 @@ export class CoastalBackground {
   private exitHeight = 720;
   private exitY = -2416;
   private currents: Phaser.GameObjects.Graphics[] = [];
-  private clouds: Phaser.GameObjects.Graphics[] = [];
+  private clouds: Phaser.GameObjects.Image[] = [];
   private state = coastalScrollState(0);
   private areaState = coastalAreaState(0);
   private navigation: Phaser.GameObjects.Graphics[] = [];
@@ -568,14 +569,18 @@ export class CoastalBackground {
       }
       this.currents.push(flow);
     }
-    // Clouds stay near the sides, leaving the central firing lane readable.
-    for (let i = 0; i < 3; i++) {
-      const cloud = scene.add.graphics().setDepth(-9);
-      cloud.fillStyle(0xd2eeeb, 0.035);
-      cloud.fillEllipse(0, 0, 200, 110);
-      cloud.fillEllipse(-30, -16, 150, 80);
-      cloud.fillEllipse(33, 21, 180, 85);
-      this.clouds.push(cloud);
+    // Two cached original textures: slow high wisps and quicker broken low banks.
+    createCloudTextures(scene);
+    for (let i = 0; i < 6; i++) {
+      const art = i < 3 ? CLOUD_ART.wisp : CLOUD_ART.bank;
+      this.clouds.push(
+        scene.add
+          .image(0, 0, art.key)
+          .setDisplaySize(art.displayWidth, art.displayHeight)
+          .setAlpha(art.alpha)
+          .setDepth(i < 3 ? -9.2 : -9)
+          .setFlipX(i % 2 === 1),
+      );
     }
     // Each geometry tile is authored once. All scenery remains behind bullets.
     for (let i = 0; i < 2; i++) {
@@ -873,11 +878,15 @@ export class CoastalBackground {
     this.shade.setAlpha(atmosphere);
     for (let i = 0; i < this.currents.length; i++)
       this.currents[i].setPosition(0, this.state.currentOffset - i * 640);
-    for (let i = 0; i < this.clouds.length; i++)
+    for (let i = 0; i < this.clouds.length; i++) {
+      const near = i >= 3;
+      const drift = this.state.distance / COAST_SCROLL.speed;
       this.clouds[i].setPosition(
-        i % 2 ? 345 : 10,
-        ((this.state.cloudOffset + i * 320) % 960) - 160,
+        (i % 2 ? 316 : 44) + Math.sin(drift * 0.035 + i) * 16,
+        ((drift * (near ? 85 : 42) + (i % 3) * 320 + (near ? 140 : 0)) % 960) -
+          160,
       );
+    }
   }
 
   diagnostics() {
@@ -912,6 +921,13 @@ export class CoastalBackground {
       speed: COAST_SCROLL.speed,
       currentSpeed: COAST_SCROLL.currentSpeed,
       cloudSpeed: COAST_SCROLL.cloudSpeed,
+      cloudImages: this.clouds.length,
+      cloudPositions: this.clouds.map((c) => ({
+        x: c.x,
+        y: c.y,
+        alpha: c.alpha,
+        depth: c.depth,
+      })),
       coastReady: this.coastReady,
       coastImages: this.coast.length,
       artworkBlocks: this.artworkBlocks.map(({ id, y, height, north }) => ({

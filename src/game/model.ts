@@ -11,6 +11,7 @@ import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
 export type Mode = "menu" | "playing" | "paused" | "won" | "lost";
 export interface Body {
+  hitUntil?: number;
   id: number;
   x: number;
   y: number;
@@ -67,6 +68,7 @@ export interface Pickup extends Body {
   kind: PickupKind;
 }
 export interface BossPart {
+  hitUntil?: number;
   id: number;
   side: -1 | 1;
   x: number;
@@ -76,6 +78,7 @@ export interface BossPart {
   active: boolean;
 }
 export interface Boss {
+  hitUntil?: number;
   attackWarning: number;
   attackAngles: number[];
   attackCycle: number;
@@ -135,7 +138,13 @@ export class FlightModel {
   pickupCount = 0;
   lastPickup: PickupKind | null = null;
   lostReason: "damage" | "timeout" | null = null;
-  effects: { x: number; y: number; life: number; kind?: "hit" }[] = [];
+  effects: {
+    x: number;
+    y: number;
+    life: number;
+    kind?: "hit" | "boss" | "pickup";
+    duration?: number;
+  }[] = [];
   shots = 0;
   nextWave = 0;
   cooldown = 0;
@@ -280,7 +289,13 @@ export class FlightModel {
     this.bossDefeated = true;
     this.killCount++;
     this.score += this.stage.boss!.points;
-    this.effects.push({ x: this.boss.x, y: this.boss.y, life: 0.6 });
+    this.effects.push({
+      x: this.boss.x,
+      y: this.boss.y,
+      life: 0.6,
+      kind: "boss",
+      duration: 0.6,
+    });
     if (this.mode === "playing") this.mode = "won";
   }
   // A burst repeats the same warned trajectory, not a wider impassable fan.
@@ -399,7 +414,7 @@ export class FlightModel {
     this.hp--;
     this.damageCount++;
     this.invincible = 1.5;
-    this.effects.push({ ...this.player, life: 0.4 });
+    this.effects.push({ ...this.player, life: 0.4, duration: 0.4 });
     if (this.hp <= 0) {
       this.mode = "lost";
       this.lostReason = "damage";
@@ -560,6 +575,7 @@ export class FlightModel {
         {
           id: ++this.serial,
           maxHp: w.hp,
+          hitUntil: 0,
           y: w.spawnY ?? -24,
           active: true,
           age: 0,
@@ -1050,7 +1066,7 @@ export class FlightModel {
             this.weaponTime = 1;
           }
           this.pickupCount++;
-          this.effects.push({ x: p.x, y: p.y, life: 0.45 });
+          this.effects.push({ x: p.x, y: p.y, life: 0.45, kind: "pickup" });
         }
       }
     for (const b of this.bullets)
@@ -1067,6 +1083,7 @@ export class FlightModel {
             b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
             if (b.pierceRemaining <= 0) b.active = false;
             e.hp -= b.damage ?? 1;
+            e.hitUntil = this.time + 0.055;
             this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
             if (e.hp <= 0) this.destroyEnemy(e);
             if (!b.active) break;
@@ -1086,6 +1103,7 @@ export class FlightModel {
             b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
             if (b.pierceRemaining <= 0) b.active = false;
             part.hp -= b.damage ?? 1;
+            part.hitUntil = this.time + 0.055;
             this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
             this.finishPart(part);
           }
@@ -1099,6 +1117,7 @@ export class FlightModel {
           b.active = false;
           (b.hitIds ??= []).push(-1);
           boss.hp -= b.damage ?? 1;
+          boss.hitUntil = this.time + 0.055;
           this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
           this.finishBoss();
         }

@@ -121,7 +121,7 @@ describe("continuous coastal background", () => {
       undefined,
       SHORT_TIMELINE,
     );
-    expect(created).toBe(27);
+    expect(created).toBe(30);
     background.update(44);
     expect(background.diagnostics().harborArtImages).toBe(4);
     expect(background.diagnostics().harborArtAlpha).toBe(1);
@@ -130,7 +130,7 @@ describe("continuous coastal background", () => {
     expect(graphics.at(-3).alpha).toBe(0);
     const initialDrawn = drawn;
     for (let i = 0; i < 10000; i++) background.update(i / 60);
-    expect(created).toBe(27);
+    expect(created).toBe(30);
     expect(drawn).toBe(initialDrawn);
     // Supply and boss approach must not erase the map or jump back to a new strip.
     for (const time of [50, 56, 64, 69, 70, 75]) {
@@ -182,7 +182,7 @@ describe("continuous coastal background", () => {
       undefined,
       SHORT_TIMELINE,
     );
-    expect(created).toBe(28);
+    expect(created).toBe(31);
     expect(background.diagnostics().exitReady).toBe(true);
     expect(background.diagnostics().exitSeaImages).toBe(0);
     expect(background.diagnostics().exitOpaqueInterior).toBe(true);
@@ -196,7 +196,7 @@ describe("continuous coastal background", () => {
     expect(background.diagnostics().exitWorldHeight).toBe(2040);
     expect(background.diagnostics().exitAlpha).toBe(1);
     for (let frame = 0; frame < 20000; frame++) background.update(frame / 60);
-    expect(created).toBe(28);
+    expect(created).toBe(31);
     background.update(70);
     const paused = background.diagnostics().exitY;
     background.update(70);
@@ -207,7 +207,7 @@ describe("continuous coastal background", () => {
   it.each(["harbor-exit", "harbor-refinery"])(
     "precomposes opaque <=4096px %s without stretching water samples",
     (texture) => {
-      const textures = new Set([texture]);
+      const textures = new Set([texture, "cloud-bank", "cloud-wisp"]);
       const draws: any[][] = [],
         gradients: number[][] = [],
         sizes: number[][] = [];
@@ -412,6 +412,7 @@ describe("continuous coastal background", () => {
         "setDisplaySize",
         "setAlpha",
         "setVisible",
+        "setFlipX",
       ])
         o[method] = chain;
       for (const method of [
@@ -510,6 +511,7 @@ describe("continuous coastal background", () => {
         "fillEllipse",
         "strokeEllipse",
         "setVisible",
+        "setFlipX",
         "setOrigin",
         "setDisplaySize",
         "setAlpha",
@@ -538,9 +540,9 @@ describe("continuous coastal background", () => {
       undefined,
       SHORT_TIMELINE,
     );
-    expect(objects).toHaveLength(23);
+    expect(objects).toHaveLength(26);
     for (let i = 0; i < 1000; i++) background.update(i / 60);
-    expect(objects).toHaveLength(23);
+    expect(objects).toHaveLength(26);
     background.update(42);
     const frozen = JSON.stringify(objects.map(({ x, y }) => ({ x, y })));
     background.update(42);

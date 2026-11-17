@@ -1,3 +1,4 @@
+import { drawImpact } from "./game/impact-art";
 import {
   createPickupLabelTextures,
   pickupLabel,
@@ -38,6 +39,19 @@ let recorded = false;
 let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
+let impacts: Phaser.GameObjects.Graphics;
+const bodyKeys = new Set([
+  "scout",
+  "heavy",
+  "interceptor",
+  "carrier",
+  "ground-turret",
+  "ground-depot",
+  "enemy-brake",
+  "enemy-hook",
+  "boss",
+  "boss-cannon",
+]);
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
 let readPickupNotice = (): string | null => null;
@@ -226,7 +240,18 @@ class FlightScene extends Phaser.Scene {
       .setAngle(angle)
       .setVisible(true)
       .setDepth(1)
-      .clearTint();
+      .clearTint()
+      .setTintMode(Phaser.TintModes.MULTIPLY);
+    if (bodyKeys.has(key)) {
+      const body =
+        key === "boss"
+          ? model.boss
+          : key === "boss-cannon"
+            ? model.boss?.cannons.find((c) => c.x === x && c.y === y)
+            : model.enemies.find((e) => e.active && e.x === x && e.y === y);
+      if ((body?.hitUntil ?? 0) > model.time)
+        image.setTint(0xfff1cb).setTintMode(Phaser.TintModes.FILL);
+    }
     return image;
   }
   create() {
@@ -278,6 +303,7 @@ class FlightScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(5);
     graphics = this.add.graphics();
+    impacts = this.add.graphics().setDepth(2.7);
     overlay = this.add.graphics().setDepth(PRESENTATION_LAYERS.projectiles);
     hud = this.add.graphics().setDepth(PRESENTATION_LAYERS.hud);
     label = this.add
@@ -544,6 +570,7 @@ class FlightScene extends Phaser.Scene {
 
     graphics.clear();
     overlay.clear();
+    impacts.clear();
     hud.clear();
     this.background.update(
       model.mode === "menu"
@@ -799,6 +826,10 @@ class FlightScene extends Phaser.Scene {
                 ? 0xffd18c
                 : 0xffffff,
           );
+          if ((e.hitUntil ?? 0) > model.time)
+            this.visuals[this.visualIndex - 1]
+              .setTint(0xfff1cb)
+              .setTintMode(Phaser.TintModes.FILL);
           if ((e.telegraph ?? 0) > 0) {
             overlay.lineStyle(2, 0xffbd69, 0.8);
             overlay.strokeCircle(
@@ -1082,43 +1113,18 @@ class FlightScene extends Phaser.Scene {
       }
       for (const e of model.effects) {
         const life = e.life - (model.mode === "won" ? this.endingAge : 0);
-        if (life <= 0) continue;
-        if (e.kind === "hit") {
-          // Hits are brief compact white sparks, not another expanding warning ring.
-          const fade = Math.max(0, life / 0.25);
-          const radius = 2 + (1 - fade) * 5;
-          overlay.lineStyle(1.5, 0xffeee1, fade);
-          overlay.lineBetween(
-            e.x - radius,
-            e.y - radius,
-            e.x + radius,
-            e.y + radius,
-          );
-          overlay.lineBetween(
-            e.x + radius,
-            e.y - radius,
-            e.x - radius,
-            e.y + radius,
-          );
-          overlay.fillStyle(0xffffff, fade);
-          overlay.fillCircle(e.x, e.y, 1.5);
-          continue;
-        }
-        const progress = 1 - life / 0.45;
-        overlay.lineStyle(3 * (1 - progress) + 1, 0xffd58a, 1 - progress);
-        overlay.strokeCircle(e.x, e.y, 4 + progress * 29);
-        overlay.fillStyle(0xfff5cb, Math.max(0, 1 - progress * 2));
-        overlay.fillCircle(e.x, e.y, 11 * (1 - progress));
-        for (let i = 0; i < 8; i++) {
-          const angle = (i * Math.PI) / 4;
-          overlay.lineStyle(2, i % 2 ? 0xffa54c : 0xffecaa, 1 - progress);
-          overlay.lineBetween(
-            e.x + Math.cos(angle) * progress * 15,
-            e.y + Math.sin(angle) * progress * 15,
-            e.x + Math.cos(angle) * (8 + progress * 35),
-            e.y + Math.sin(angle) * (8 + progress * 35),
-          );
-        }
+        if (life <= 0 || e.kind === "pickup") continue;
+        const duration = e.duration ?? (e.kind === "hit" ? 0.25 : 0.45);
+        drawImpact(
+          impacts,
+          e.x,
+          e.y,
+          duration - life,
+          e.kind === "hit" ? "hit" : e.kind === "boss" ? "boss" : "destroy",
+          1,
+          Math.floor(e.x * 7 + e.y * 13),
+          duration,
+        );
       }
     } else {
       graphics.lineStyle(1, 0x7de7d5, 0.3);
@@ -1280,6 +1286,8 @@ Object.defineProperty(window, "__P01__", {
     activePickups: model.pickups
       .filter((p) => p.active)
       .map((p) => ({ kind: p.kind, x: p.x, y: p.y })),
+    impactEffects: model.effects.map((e) => ({ ...e })),
+    impactLayer: 2.7,
     lastPickup: model.lastPickup,
     pickupNoticeText: readPickupNotice(),
     supportTime: model.supportTime,
