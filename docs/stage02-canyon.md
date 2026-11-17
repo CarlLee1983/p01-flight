@@ -97,4 +97,6 @@ CI [44108909439](https://github.com/CarlLee1983/p01-flight/actions/runs/44108909
 
 已套用reset先展開設定的兩行修正。新增有界的實際敵種presentationCoverage，每種只保存首次可見/射擊/命中/擊破的遊戲秒、重置後牆鐘毫秒與位置；觀測不改敵人狀態，原本長時間常數空間測試保留。完整第二關E2E附JSON並核對所有九種實際排程角色，不使用沒有出場的圖鑑冒充驗證。非射擊角色carrier/groundDepot的開火為不適用；缺少事件的角色須明列，不能以推論補齊。
 
-本機455unit/typecheck/build成功；Chromium仍因socket EPERM/ptrace限制無法啟動，未繞過。必須以最後新head CI的實頁、完整影片、原生Boss/320px、GL/RAF及第一關回歸結果為準，不能拿舊ccd8813的31/32或舊效能數字冒充此版結果。真手機和人工音樂聽感仍未驗，未合併及未部署。
+本機456unit/typecheck/build成功；Chromium仍因socket EPERM/ptrace限制無法啟動，未繞過。必須以最後新head CI的實頁、完整影片、原生Boss/320px、GL/RAF及第一關回歸結果為準，不能拿舊ccd8813的31/32或舊效能數字冒充此版結果。真手機和人工音樂聽感仍未驗，未合併及未部署。
+
+可見索引自查修正：場外出生的cross不能視為出場畫面；只有中心x18–342且y至少108的active敵人會標記visible。新增場外/入場測試，保留原有常數空間及不改敵人狀態測試。這是觀測精確度修復，沒有改動遊戲規則。

@@ -74,7 +74,7 @@ export class RenderMetrics {
         const coverage = (this.enemyCoverage[role] ??= {frames: 0, hitFrames: 0, chargeFrames: 0});
         const entry = (coverage.presentation ??= {});
         const record = (event: string) => { entry[event] ??= { time: population.time ?? 0, wallMs: performance.now() - this.startedAt, id: e.id, x: e.x, y: e.y, turretAngle: e.turretAngle }; };
-        if (e.active) record("visible");
+        if (e.active && (e.x ?? 180) >= 18 && (e.x ?? 180) <= 342 && (e.y ?? -1) >= 108) record("visible");
         if ((e.shotsFired ?? 0) > 0 || (e.gateCycle ?? 0) > 0) record("fired");
         if ((e.hitUntil ?? 0) > (population.time ?? 0)) record("hit");
         if (!e.active && (e.hp ?? 1) <= 0) record("destroyed");

@@ -81,3 +81,12 @@ it("indexes actual visible/fire/hit/death moments without changing enemies or un
  expect(Object.keys(row).sort()).toEqual(["destroyed", "fired", "hit", "visible"]);
  m.reset(); expect(m.snapshot().presentationCoverage).toEqual({});
 });
+
+it("does not call offscreen spawn centers visible in the evidence index", () => {
+ const m = new RenderMetrics();
+ const enemy = {id: 1, active: true, behavior: "cross", x: -30, y: 140, hp: 1, maxHp: 1};
+ m.sample({enemies: [enemy], bullets: [], enemyBullets: [], time: 30},1,1,0);
+ expect(m.snapshot().presentationCoverage.cross?.visible).toBeUndefined();
+ m.sample({enemies: [{...enemy,x: 35}], bullets: [], enemyBullets: [], time: 30.3},1,1,0);
+ expect(m.snapshot().presentationCoverage.cross!.visible.time).toBe(30.3);
+});
