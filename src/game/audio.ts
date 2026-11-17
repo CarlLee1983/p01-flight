@@ -1,3 +1,4 @@
+import { RecordedMusic } from "./recorded-music";
 import { musicTone, scheduleTone } from "./music-synth";
 import { MUSIC_STEP, scoreStep, sectionFor, type MusicSection } from "./music";
 export type FlightSound =
@@ -14,10 +15,11 @@ export type FlightSound =
   | "lost";
 type Voice = { oscillator: OscillatorNode; gain: GainNode; music: boolean };
 
-/** Original procedural sounds and a small original pulse pattern. No audio files.
+/** Original SFX with licensed recorded BGM by default. Legacy synth retained for archival tests.
  * Call unlock only from a user gesture; construction and update never create audio.
  */
 export class FlightAudio {
+  private recorded: RecordedMusic | null = null;
   private context: AudioContext | null = null;
   private musicBus: GainNode | null = null;
   private sfxBus: GainNode | null = null;
@@ -47,7 +49,7 @@ export class FlightAudio {
     if (typeof document !== "undefined" && document.hidden)
       this.setPlaying(false);
   };
-  constructor() {
+  constructor(private readonly useRecordedMusic = true) {
     if (typeof document !== "undefined")
       document.addEventListener("visibilitychange", this.visibility);
   }
@@ -65,9 +67,25 @@ export class FlightAudio {
         this.musicBus.connect(this.context.destination);
         this.sfxBus.connect(this.context.destination);
         this.setVolumes(this.volumes.music, this.volumes.sfx);
+        if (this.useRecordedMusic) {
+          const base = import.meta.env.BASE_URL;
+          this.recorded = new RecordedMusic(this.context, this.musicBus, {
+            urls: {
+              stage01: [`${base}audio/stage01.ogg`, `${base}audio/stage01.mp3`],
+              boss: [`${base}audio/boss.ogg`, `${base}audio/boss.mp3`],
+            },
+          });
+          this.recorded.setVolume(1);
+        }
       }
       if (this.context.state === "suspended") await this.context.resume();
       this.failed = this.context.state !== "running";
+      if (this.recorded) {
+        await this.recorded.unlockFromGesture();
+        void this.recorded.preload("boss");
+        if (this.playing)
+          this.recorded.play(this.musicContext === "boss" ? "boss" : "stage01");
+      }
     } catch {
       this.failed = true;
     }
@@ -77,11 +95,24 @@ export class FlightAudio {
       Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
     this.volumes = { music: clamp(music), sfx: clamp(sfx) };
     // Bus gain also silences already sounding voices immediately.
-    if (this.musicBus) this.musicBus.gain.value = this.volumes.music * 0.22;
+    if (this.musicBus) {
+      if (this.useRecordedMusic && this.context)
+        this.musicBus.gain.cancelScheduledValues(this.context.currentTime);
+      this.musicBus.gain.value = this.volumes.music * 0.22;
+    }
     if (this.sfxBus) this.sfxBus.gain.value = this.volumes.sfx * 0.32;
   }
   setPlaying(value: boolean) {
     this.playing = value;
+    if (this.useRecordedMusic) {
+      if (value)
+        this.recorded?.play(this.musicContext === "boss" ? "boss" : "stage01");
+      else {
+        this.recorded?.pause();
+        this.stopVoices();
+      }
+      return;
+    }
     if (value && !this.scheduler)
       this.scheduler = setInterval(() => this.scheduleMusic(), 25);
     if (!value) {
@@ -102,6 +133,8 @@ export class FlightAudio {
   }
   /** New run only. Pauses retain position; call before setPlaying(true). */
   resetMusic() {
+    this.recorded?.restart("stage01");
+    if (!this.playing) this.recorded?.pause();
     this.stopVoices();
     this.beat = 0;
     this.nextStepAt = null;
@@ -122,11 +155,14 @@ export class FlightAudio {
   /** Explicit encounter context; takes precedence over legacy intensity. */
   setMusicContext(context: "flight" | "pressure" | "recovery" | "boss") {
     this.musicContext = context;
+    if (this.useRecordedMusic && this.playing)
+      this.recorded?.play(context === "boss" ? "boss" : "stage01");
   }
   update(_dt: number) {
     this.scheduleMusic();
   }
   private scheduleMusic() {
+    if (this.useRecordedMusic) return;
     if (
       !this.playing ||
       !this.ready() ||
@@ -244,6 +280,13 @@ export class FlightAudio {
         break;
       case "hurt":
         this.warningUntil = now + 0.4;
+        if (this.useRecordedMusic && this.musicBus) {
+          const gain = this.musicBus.gain;
+          gain.cancelScheduledValues(now);
+          gain.setValueAtTime(this.volumes.music * 0.22 * 0.3, now);
+          gain.setValueAtTime(this.volumes.music * 0.22 * 0.3, now + 0.32);
+          gain.linearRampToValueAtTime(this.volumes.music * 0.22, now + 0.5);
+        }
         // Keep two slots free during ordinary fire so damage cannot disappear.
         this.tone(190, 46, 0.32, "square", 0.3);
         this.tone(740, 370, 0.16, "triangle", 0.15);
@@ -329,6 +372,7 @@ export class FlightAudio {
   }
   diagnostics() {
     return {
+      recorded: this.recorded?.diagnostics() ?? null,
       state: this.context?.state ?? "locked",
       playing: this.playing,
       intensity: this.intensity,
@@ -342,13 +386,16 @@ export class FlightAudio {
       activeVoices: this.voices.size,
       musicVolume: this.volumes.music,
       sfxVolume: this.volumes.sfx,
-      unavailable: this.failed,
+      unavailable:
+        this.failed || (this.recorded?.diagnostics().loadFailed ?? false),
     };
   }
   dispose() {
     this.setPlaying(false);
     if (typeof document !== "undefined")
       document.removeEventListener("visibilitychange", this.visibility);
+    this.recorded?.dispose();
+    this.recorded = null;
     void this.context?.close().catch(() => {});
     this.context = null;
     this.musicBus = this.sfxBus = null;

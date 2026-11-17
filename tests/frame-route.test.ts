@@ -1,3 +1,4 @@
+import { dodgeDirection } from "./dodge-route";
 import { it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
 import { advanceFrame } from "../src/game/frame-step";
@@ -53,13 +54,14 @@ it.each([10, 15, 20, 30, 60])(
         if (!b1 && m.time >= 140) b1 = m.useBomb();
         if (!b2 && m.time >= 146) b2 = m.useBomb();
         if (weapon === "missile" && m.time >= 149 && m.time < 149.5) dx = 1;
+        dx = dodgeDirection(m, dx);
         advanceFrame(
           m,
           1 / fps,
           dx,
           0,
           true,
-          weapon === "missile" && m.time >= 125,
+          weapon === "missile" && m.time >= 125 && dx === 0,
         );
         for (const e of m.enemies)
           if (

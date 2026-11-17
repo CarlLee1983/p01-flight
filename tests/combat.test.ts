@@ -1,3 +1,4 @@
+import { dodgeDirection } from "./dodge-route";
 import { describe, it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
 import { stage01, GROUND_VISIBLE_Y, type StageConfig } from "../src/data/stage";
@@ -12,7 +13,7 @@ const run = (m: FlightModel, seconds: number, fire = false, fps = 60) => {
 };
 describe("combat increment", () => {
   it.each([30, 60, 120])(
-    "normal centered fire and two bombs clear actual Stage01 at %i FPS",
+    "normal fire with Boss dodges and two bombs clears actual Stage01 at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
@@ -35,7 +36,7 @@ describe("combat increment", () => {
             (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
         )
           bomb2 = m.useBomb();
-        m.update(1 / fps, 0, 0, true);
+        m.update(1 / fps, dodgeDirection(m, 0), 0, true);
         if (m.partsDestroyed > cannonTimes.length) cannonTimes.push(m.time);
         sawBoss ||= !!m.boss?.active;
         sawEnemyBullet ||= m.enemyBullets.some((b) => b.active);
@@ -306,6 +307,13 @@ describe("weapon and encounter progression", () => {
         ),
     ).toBe(true);
     expect(
+      stage01.waves
+        .filter(
+          (w) => w.behavior === "brakeRaider" || w.behavior === "hookWing",
+        )
+        .every((w) => w.at > 52),
+    ).toBe(true);
+    expect(
       stage01.waves.some((w) => w.behavior === "gatekeeper" && w.hp >= 5),
     ).toBe(true);
     expect(stage01.waves.every((w) => w.at < 121)).toBe(true);
@@ -314,7 +322,7 @@ describe("weapon and encounter progression", () => {
     );
   });
   it.each([30, 60, 120])(
-    "beam switch with two timed bombs wins at %i FPS",
+    "beam switch with Boss dodges and two timed bombs wins at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
@@ -331,7 +339,7 @@ describe("weapon and encounter progression", () => {
         if (!bomb2 && m.time >= 146) {
           bomb2 = m.useBomb();
         }
-        m.update(1 / fps, 0, 0, true);
+        m.update(1 / fps, dodgeDirection(m, 0), 0, true);
       }
       expect(m.mode).toBe("won");
       expect(bomb1 && bomb2).toBe(true);
@@ -450,7 +458,7 @@ describe("focused dual weapons", () => {
     });
     m.start();
     m.invincible = 100;
-    run(m, 3.5);
+    run(m, 3.8);
     expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(6);
     expect(m.enemies[0].y).toBeLessThan(153);
     run(m, 4);
@@ -461,7 +469,7 @@ describe("focused dual weapons", () => {
 });
 
 it.each([30, 60, 120])(
-  "focused six-second dodge sweep can clear at %i FPS",
+  "focus aim with normal-speed evasive steering can clear at %i FPS",
   (fps) => {
     const m = new FlightModel(stage01);
     m.start();
@@ -479,9 +487,10 @@ it.each([30, 60, 120])(
           (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
       )
         bomb2 = m.useBomb();
-      const cycle = (m.time - 125) % 6;
-      const dx = m.time < 125 ? 0 : cycle < 1.5 ? -1 : cycle < 4.5 ? 1 : -1;
-      m.update(1 / fps, dx, 0, true, true);
+      // Release focus to evade visible incoming shots, then recenter and focus.
+      const dx = 0;
+      const steer = dodgeDirection(m, dx);
+      m.update(1 / fps, steer, 0, true, steer === 0);
     }
     expect(m.mode).toBe("won");
     expect(m.hp).toBeGreaterThan(0);
@@ -642,7 +651,8 @@ it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
         (b1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
     )
       b2 = m.useBomb();
-    m.update(1 / fps, m.time >= 149 && m.time < 149.5 ? 1 : 0, 0, true, true);
+    const steer = dodgeDirection(m, m.time >= 149 && m.time < 149.5 ? 1 : 0);
+    m.update(1 / fps, steer, 0, true, steer === 0);
   }
   console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
   expect(m.mode).toBe("won");
@@ -1314,7 +1324,7 @@ describe("escort formation density", () => {
 
 describe("ground readability under real continuous fire", () => {
   it.each([30, 60, 120])(
-    "center-fire sees battery warning, firing and then destruction at %i FPS",
+    "normal fire and counterattack sees battery warning, firing and then destruction at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
@@ -1324,7 +1334,12 @@ describe("ground readability under real continuous fire", () => {
         deadAt = 0,
         watchId = 0;
       for (let i = 0; i < 58 * fps; i++) {
-        m.update(1 / fps, 0, 0, true);
+        const target = m.enemies.find((e) => e.id === watchId && e.active);
+        const approach =
+          warning && target && Math.abs(target.x - m.player.x) > 12
+            ? Math.sign(target.x - m.player.x)
+            : 0;
+        m.update(1 / fps, dodgeDirection(m, approach), 0, true);
         const e = m.enemies.find(
           (e) =>
             e.behavior === "groundBattery" && (!watchId || e.id === watchId),

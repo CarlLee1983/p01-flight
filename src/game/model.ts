@@ -1,7 +1,18 @@
+import { enemyMount } from "./enemy-mounts";
+import { raiderMuzzle } from "./raider-geometry";
+import {
+  groundMuzzle,
+  hostileStyle,
+  turnToward,
+  type HostileStyle,
+} from "./hostile-visuals";
+import { bossMuzzle, bossSideAngles } from "./boss-muzzles";
+import { fastAttackAngles, isFastShooter } from "./enemy-patterns";
 import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
 export type Mode = "menu" | "playing" | "paused" | "won" | "lost";
 export interface Body {
+  hitUntil?: number;
   id: number;
   x: number;
   y: number;
@@ -18,6 +29,7 @@ export interface Body {
 }
 export interface Enemy extends Body {
   enteredPlayfield?: boolean;
+  brakeElapsed?: number;
   maxHp?: number;
   speed: number;
   hp: number;
@@ -29,6 +41,8 @@ export interface Enemy extends Body {
   fireEvery?: number;
   shotsFired?: number;
   visibleSince?: number;
+  turretAngle?: number;
+  turretHoldUntil?: number;
   drop?: PickupKind;
   telegraph?: number;
   aimAngle?: number;
@@ -44,6 +58,10 @@ export interface Enemy extends Body {
   attackAngles?: number[];
 }
 export interface EnemyBullet extends Body {
+  visual?: HostileStyle;
+  bornAt?: number;
+  muzzleX?: number;
+  muzzleY?: number;
   vx: number;
   vy: number;
 }
@@ -51,6 +69,7 @@ export interface Pickup extends Body {
   kind: PickupKind;
 }
 export interface BossPart {
+  hitUntil?: number;
   id: number;
   side: -1 | 1;
   x: number;
@@ -60,6 +79,7 @@ export interface BossPart {
   active: boolean;
 }
 export interface Boss {
+  hitUntil?: number;
   attackWarning: number;
   attackAngles: number[];
   attackCycle: number;
@@ -96,6 +116,7 @@ export class FlightModel {
     source: Enemy | Boss;
     sourceId?: number;
     boss: boolean;
+    visual: HostileStyle;
     guard?: BossPart;
   }[] = [];
   boss: Boss | null = null;
@@ -118,7 +139,13 @@ export class FlightModel {
   pickupCount = 0;
   lastPickup: PickupKind | null = null;
   lostReason: "damage" | "timeout" | null = null;
-  effects: { x: number; y: number; life: number }[] = [];
+  effects: {
+    x: number;
+    y: number;
+    life: number;
+    kind?: "hit" | "boss" | "pickup";
+    duration?: number;
+  }[] = [];
   shots = 0;
   nextWave = 0;
   cooldown = 0;
@@ -263,7 +290,13 @@ export class FlightModel {
     this.bossDefeated = true;
     this.killCount++;
     this.score += this.stage.boss!.points;
-    this.effects.push({ x: this.boss.x, y: this.boss.y, life: 0.6 });
+    this.effects.push({
+      x: this.boss.x,
+      y: this.boss.y,
+      life: 0.6,
+      kind: "boss",
+      duration: 0.6,
+    });
     if (this.mode === "playing") this.mode = "won";
   }
   // A burst repeats the same warned trajectory, not a wider impassable fan.
@@ -277,13 +310,60 @@ export class FlightModel {
     guard?: BossPart,
   ) {
     const boss = source === this.boss;
+    const visual = hostileStyle(
+      boss,
+      "behavior" in source ? source.behavior : undefined,
+    );
     const count = boss
       ? (this.stage.boss?.burstShots ?? 1)
       : (this.stage.enemyBurstShots ?? 1);
-    this.emitEnemyBullet(x, y, vx, vy, boss);
+    if (
+      !boss &&
+      "behavior" in source &&
+      isFastShooter(source.behavior) &&
+      count > 1
+    ) {
+      const angles = source.attackAngles?.length
+        ? source.attackAngles
+        : fastAttackAngles(
+            source.behavior,
+            source.shotsFired ?? 0,
+            source.direction,
+          );
+      const speed = Math.hypot(vx, vy);
+      angles.forEach((angle, i) => {
+        const muzzle = i === 0 ? -9 : 9;
+        // These two hulls have fixed twin barrels, not gimballed muzzles.
+        const fixedBarrels =
+          source.behavior === "brakeRaider" || source.behavior === "hookWing";
+        const socket = fixedBarrels
+          ? raiderMuzzle(source, i)
+          : {
+              x: x + Math.cos(angle) * muzzle,
+              y: y - Math.sin(angle) * muzzle,
+            };
+        this.emitEnemyBullet(
+          socket.x,
+          socket.y,
+          Math.sin(angle) * speed,
+          Math.cos(angle) * speed,
+          false,
+          visual,
+        );
+      });
+      return;
+    }
+    this.emitEnemyBullet(x, y, vx, vy, boss, visual);
+    // Slow emitters use genuinely separated pulses. The earlier 0.12s train
+    // was visually merged; Boss now has 30.8px nominal separation, not 16.8px.
+    const spacing = boss
+      ? 0.22
+      : "behavior" in source && source.behavior === "escort"
+        ? 0.4
+        : 0.34;
     for (let i = 1; i < count; i++)
       this.pendingShots.push({
-        at: this.time + i * 0.12,
+        at: this.time + i * spacing,
         x: x - source.x,
         y: y - source.y,
         vx,
@@ -291,6 +371,7 @@ export class FlightModel {
         source,
         sourceId: "id" in source ? source.id : undefined,
         boss,
+        visual,
         guard,
       });
   }
@@ -300,6 +381,7 @@ export class FlightModel {
     vx: number,
     vy: number,
     boss: boolean,
+    visual: HostileStyle,
   ) {
     if (boss) this.emittedBossShots++;
     else this.emittedEnemyShots++;
@@ -308,7 +390,17 @@ export class FlightModel {
       b = { id: ++this.serial, x, y, vx, vy, active: true };
       this.enemyBullets.push(b);
     }
-    Object.assign(b, { x, y, vx, vy, active: true });
+    Object.assign(b, {
+      x,
+      y,
+      vx,
+      vy,
+      active: true,
+      visual,
+      bornAt: this.time,
+      muzzleX: x,
+      muzzleY: y,
+    });
   }
   private drop(x: number, y: number, kind: PickupKind) {
     let p = this.pickups.find((p) => !p.active);
@@ -323,7 +415,7 @@ export class FlightModel {
     this.hp--;
     this.damageCount++;
     this.invincible = 1.5;
-    this.effects.push({ ...this.player, life: 0.4 });
+    this.effects.push({ ...this.player, life: 0.4, duration: 0.4 });
     if (this.hp <= 0) {
       this.mode = "lost";
       this.lostReason = "damage";
@@ -484,6 +576,7 @@ export class FlightModel {
         {
           id: ++this.serial,
           maxHp: w.hp,
+          hitUntil: 0,
           y: w.spawnY ?? -24,
           active: true,
           age: 0,
@@ -494,9 +587,12 @@ export class FlightModel {
               : (w.firstFireDelay ?? w.fireEvery ?? 999),
           telegraph: 0,
           aimAngle: undefined,
+          turretAngle: 0,
+          turretHoldUntil: 0,
           shotsFired: 0,
           visibleSince: undefined,
           enteredPlayfield: false,
+          brakeElapsed: undefined,
           formationPhase: w.formationPhase ?? 0,
           volleyFired: false,
           holdFor: w.holdFor,
@@ -636,15 +732,24 @@ export class FlightModel {
               if (e.fireCooldown <= 0) {
                 if (e.attackPattern === "aim")
                   this.shootEnemy(
-                    e.x,
-                    e.y + 24,
+                    enemyMount(e, 0).x,
+                    enemyMount(e, 0).y,
                     Math.sin(e.aimAngle ?? 0) * 180,
                     Math.cos(e.aimAngle ?? 0) * 180,
                     e,
                   );
                 else
-                  for (const x of e.attackLanes)
-                    this.shootEnemy(x, e.y + 24, 0, 180, e);
+                  for (const [i, x] of e.attackLanes.entries()) {
+                    const socket = enemyMount(e, i);
+                    const angle = Math.atan2(x - socket.x, 540 - socket.y);
+                    this.shootEnemy(
+                      socket.x,
+                      socket.y,
+                      Math.sin(angle) * 180,
+                      Math.cos(angle) * 180,
+                      e,
+                    );
+                  }
                 e.gateCycle = (e.gateCycle ?? 0) + 1;
                 e.fireCooldown = e.fireEvery ?? 2.2;
                 e.aimAngle = undefined;
@@ -694,6 +799,28 @@ export class FlightModel {
             }
           }
         }
+        if (e.behavior === "brakeRaider") {
+          if (e.brakeElapsed === undefined) {
+            e.y = Math.min(145, e.y + e.speed * dt);
+            if (e.y >= 145) e.brakeElapsed = 0;
+          } else {
+            e.brakeElapsed += dt;
+            if (e.brakeElapsed > 0.75) e.y += e.speed * 1.15 * dt;
+          }
+        }
+        if (e.behavior === "hookWing") {
+          // One smooth in-and-out banking pass, mirrored for each entry side.
+          e.x = Math.max(
+            25,
+            Math.min(
+              this.stage.width - 25,
+              (e.originX ?? e.x) +
+                (e.direction ?? 1) *
+                  65 *
+                  Math.sin(Math.min(e.age / 2.7, 1) * Math.PI),
+            ),
+          );
+        }
         if (e.behavior === "weave")
           e.x = Math.max(
             25,
@@ -706,6 +833,7 @@ export class FlightModel {
           !ground &&
           e.behavior !== "gatekeeper" &&
           e.behavior !== "dive" &&
+          e.behavior !== "brakeRaider" &&
           e.behavior !== "cross" &&
           e.behavior !== "carrier" &&
           !(
@@ -729,6 +857,8 @@ export class FlightModel {
         }
         if (
           e.fireEvery &&
+          (e.behavior !== "brakeRaider" ||
+            (e.brakeElapsed !== undefined && (e.shotsFired ?? 0) < 2)) &&
           this.interactable(e) &&
           e.behavior !== "gatekeeper" &&
           e.behavior !== "escort" &&
@@ -737,10 +867,31 @@ export class FlightModel {
           e.y < 400
         ) {
           e.fireCooldown = (e.fireCooldown ?? e.fireEvery) - dt;
+          if (e.behavior === "groundBattery") {
+            const target =
+              e.aimAngle ??
+              Math.atan2(this.player.x - e.x, this.player.y - e.y);
+            if (this.time >= (e.turretHoldUntil ?? 0))
+              e.turretAngle = turnToward(e.turretAngle ?? 0, target, dt);
+          }
           if (e.fireCooldown <= 0.6 && e.aimAngle === undefined)
             e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
+          if (e.behavior === "groundBattery" && e.aimAngle !== undefined) {
+            // Lock the current barrel heading, never snap to a new target.
+            if ((e.telegraph ?? 0) <= 0) e.aimAngle = e.turretAngle ?? 0;
+            e.turretAngle = e.aimAngle;
+          }
           e.telegraph =
             e.fireCooldown > 0 && e.fireCooldown <= 0.6 ? e.fireCooldown : 0;
+          if (
+            isFastShooter(e.behavior) &&
+            e.fireCooldown <= 0.6 &&
+            !e.attackAngles?.length
+          )
+            e.attackAngles =
+              e.behavior === "brakeRaider"
+                ? [e.aimAngle! - 0.18, e.aimAngle! + 0.18]
+                : fastAttackAngles(e.behavior, e.shotsFired ?? 0, e.direction);
           if (
             e.behavior === "heavy" &&
             e.fireCooldown <= 0.6 &&
@@ -752,10 +903,16 @@ export class FlightModel {
           if (e.fireCooldown <= 0) {
             const aim = e.aimAngle ?? 0;
             if (e.behavior === "turret" || e.behavior === "groundBattery") {
+              if (e.behavior === "groundBattery")
+                e.turretHoldUntil = this.time + 0.4;
+              const muzzle =
+                e.behavior === "groundBattery"
+                  ? groundMuzzle(e, aim)
+                  : { x: e.x, y: e.y + 20 };
               for (const a of [0])
                 this.shootEnemy(
-                  e.x,
-                  e.y + 20,
+                  muzzle.x,
+                  muzzle.y,
                   Math.sin(aim + a) * 145,
                   Math.cos(aim + a) * 145,
                   e,
@@ -829,7 +986,7 @@ export class FlightModel {
           const sweep = boss.attackCycle % 2 ? 0.1 : -0.1;
           boss.attackAngles =
             phase === 1
-              ? [-0.25, 0.25].map((a) => a + aim)
+              ? bossSideAngles(boss, this.player.x, this.player.y)
               : phase === 2
                 ? [-0.5, -0.25, 0, 0.25, 0.5].map((a) => a + sweep)
                 : [-0.3, 0, 0.3].map((a) => a + aim);
@@ -839,16 +996,15 @@ export class FlightModel {
       if (boss.y >= 105 && boss.telegraph <= 0 && boss.fireCooldown <= 0) {
         const angles = boss.attackAngles;
         for (const [index, a] of angles.entries()) {
-          const side = index === 0 ? -1 : index === angles.length - 1 ? 1 : 0;
-          const cannon = boss.cannons.find((p) => p.side === side);
-          if (cannon && !cannon.active) continue;
+          const muzzle = bossMuzzle(boss, index, angles.length);
+          if (!muzzle.active) continue;
           this.shootEnemy(
-            boss.x,
-            boss.y + 28,
+            muzzle.x,
+            muzzle.y,
             Math.sin(a) * this.stage.boss.bulletSpeed,
             Math.cos(a) * this.stage.boss.bulletSpeed,
             boss,
-            cannon,
+            muzzle.cannon,
           );
         }
         boss.fireCooldown = this.stage.boss.fireEvery * (phase === 3 ? 0.7 : 1);
@@ -871,6 +1027,7 @@ export class FlightModel {
         shot.vx,
         shot.vy,
         shot.boss,
+        shot.visual,
       );
       return false;
     });
@@ -919,7 +1076,7 @@ export class FlightModel {
             this.weaponTime = 1;
           }
           this.pickupCount++;
-          this.effects.push({ x: p.x, y: p.y, life: 0.45 });
+          this.effects.push({ x: p.x, y: p.y, life: 0.45, kind: "pickup" });
         }
       }
     for (const b of this.bullets)
@@ -936,7 +1093,8 @@ export class FlightModel {
             b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
             if (b.pierceRemaining <= 0) b.active = false;
             e.hp -= b.damage ?? 1;
-            this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+            e.hitUntil = this.time + 0.055;
+            this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
             if (e.hp <= 0) this.destroyEnemy(e);
             if (!b.active) break;
           }
@@ -955,7 +1113,8 @@ export class FlightModel {
             b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
             if (b.pierceRemaining <= 0) b.active = false;
             part.hp -= b.damage ?? 1;
-            this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+            part.hitUntil = this.time + 0.055;
+            this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
             this.finishPart(part);
           }
         if (
@@ -968,7 +1127,8 @@ export class FlightModel {
           b.active = false;
           (b.hitIds ??= []).push(-1);
           boss.hp -= b.damage ?? 1;
-          this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+          boss.hitUntil = this.time + 0.055;
+          this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
           this.finishBoss();
         }
       }

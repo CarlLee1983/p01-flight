@@ -1,6 +1,9 @@
 import { test, expect, webkit } from "@playwright/test";
 test.setTimeout(30000);
 import { state, waitGameTime } from "./gameplay";
+import { chooseTouchTarget } from "../touch-policy";
+import { touchDeliveryBudget } from "../touch-delivery-budget";
+import { TouchTrace } from "../touch-trace";
 import { stage01 } from "../../src/data/stage";
 const BOSS_AT = stage01.boss!.at;
 const point = (x: number, y: number, id = 1) => ({
@@ -163,7 +166,7 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
 
 test("Stage 01 can clear entirely through touch and preserves the record", async ({
   browser,
-}) => {
+}, testInfo) => {
   test.setTimeout(600000);
   const context = await browser.newContext({
     viewport: { width: 390, height: 667 },
@@ -184,48 +187,152 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     type: "touchStart",
     touchPoints: [first],
   });
-  await waitGameTime(page, 70);
-  await expect
-    .poll(
-      async () =>
-        (await state(page)).activeEnemies.some(
-          (e: any) =>
-            e.behavior === "groundBattery" &&
-            e.visibleSince >= 70 &&
-            e.telegraph > 0,
-        ),
-      { timeout: 25000, intervals: [30] },
-    )
-    .toBe(true);
-  const shore = (await state(page)).activeEnemies.find(
+  const initialPointerX = first.x;
+  let previousTarget = 180;
+  const inputTrace = new TouchTrace();
+  let deliveryBudget = 0.2;
+  const attachInputTrace = async () =>
+    testInfo.attach("touch-input-trace", {
+      body: inputTrace.json(),
+      contentType: "application/json",
+    });
+  const touchEvadeUntil = async (
+    seconds: number,
+    untilWon = false,
+    goalX?: number,
+    untilEnemyGone?: number,
+    stopWhen?: (s: any) => boolean,
+  ) => {
+    const start = await state(page);
+    const deadline =
+      Date.now() + Math.max(15000, (seconds - start.time) * 3000 + 20000);
+    while (Date.now() < deadline) {
+      const readStarted = Date.now();
+      const s = await state(page);
+      const readMs = Date.now() - readStarted;
+      if (untilWon && s.mode === "won") {
+        await attachInputTrace();
+        return;
+      }
+      if (s.mode !== "playing") await attachInputTrace();
+      expect(s.mode).toBe("playing");
+      if (stopWhen?.(s)) return s;
+      if (
+        untilEnemyGone !== undefined &&
+        !s.activeEnemies.some((e: any) => e.id === untilEnemyGone)
+      )
+        return;
+      if (
+        goalX !== undefined &&
+        untilEnemyGone === undefined &&
+        !stopWhen &&
+        Math.abs(s.player.x - goalX) < 12
+      )
+        return;
+      if (goalX === undefined && !untilWon && !stopWhen && s.time >= seconds)
+        return;
+      if ((goalX !== undefined || stopWhen) && s.time >= seconds) {
+        await attachInputTrace();
+        throw new Error(
+          `Touch goal ${goalX} not reached safely within bounded game-time window`,
+        );
+      }
+      const target = chooseTouchTarget(
+        s,
+        previousTarget,
+        deliveryBudget,
+        goalX,
+      );
+      const targetChanged = Math.abs(target - previousTarget) > 1;
+      previousTarget = target;
+      first.x = initialPointerX + ((target - 180) * box.width) / 360;
+      const dispatchStarted = Date.now();
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [first],
+      });
+      const dispatchMs = Date.now() - dispatchStarted;
+      const after = await state(page);
+      const gameDelay = Math.max(0, after.time - s.time);
+      inputTrace.record({
+        time: s.time,
+        afterTime: after.time,
+        hp: after.hp,
+        mode: after.mode,
+        player: s.player,
+        afterPlayer: after.player,
+        target,
+        goalX,
+        untilEnemyGone,
+        actualTarget: after.touchTarget,
+        readMs,
+        dispatchMs,
+        gameDelay,
+        deliveryBudget,
+        targetChanged,
+        bullets: s.hostileProjectiles.slice(0, 48),
+        enemies: s.activeEnemies.slice(0, 24),
+      });
+      deliveryBudget = touchDeliveryBudget(
+        deliveryBudget,
+        targetChanged,
+        gameDelay,
+      );
+      await page.waitForTimeout(30);
+    }
+    await attachInputTrace();
+    throw new Error(`Touch pilot did not reach ${seconds}s`);
+  };
+  await touchEvadeUntil(70);
+  const ready = await touchEvadeUntil(80, false, undefined, undefined, (s) =>
+    s.activeEnemies.some(
+      (e: any) =>
+        e.behavior === "groundBattery" &&
+        e.visibleSince >= 70 &&
+        e.telegraph > 0,
+    ),
+  );
+  const shore = ready.activeEnemies.find(
     (e: any) =>
       e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
   );
   const moveTo = async (x: number) => {
-    const s = await state(page);
-    first.x += ((x - s.player.x) * box.width) / 360;
-    await cdp.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [first],
-    });
-    await expect
-      .poll(async () => Math.abs((await state(page)).player.x - x), {
-        intervals: [20],
-      })
-      .toBeLessThan(12);
+    await touchEvadeUntil((await state(page)).time + 8, false, x);
+    expect(Math.abs((await state(page)).player.x - x)).toBeLessThan(12);
   };
   await moveTo(shore.x);
-  await page.screenshot({ path: "docs/mobile-second-shore.png" });
-  await expect
-    .poll(
-      async () =>
-        (await state(page)).activeEnemies.some((e: any) => e.id === shore.id),
-      { timeout: 15000 },
-    )
-    .toBe(false);
-  await moveTo(180);
-  for (const time of [BOSS_AT + 15, BOSS_AT + 21]) {
-    await waitGameTime(page, time);
+  let captured = false;
+  let captureError: unknown;
+  const capture = page
+    .screenshot({ path: "docs/mobile-second-shore.png", timeout: 15000 })
+    .then(
+      () => {
+        captured = true;
+      },
+      (error) => {
+        captureError = error;
+        captured = true;
+      },
+    );
+  try {
+    await touchEvadeUntil(
+      (await state(page)).time + 8,
+      false,
+      shore.x,
+      undefined,
+      () => captured,
+    );
+  } finally {
+    await capture;
+    if (captureError) throw captureError;
+  }
+
+  // Continue goal-directed dodging while firing at the battery, not a blind hold.
+  await touchEvadeUntil((await state(page)).time + 8, false, shore.x, shore.id);
+  expect(
+    (await state(page)).activeEnemies.some((e: any) => e.id === shore.id),
+  ).toBe(false);
+  const useTouchBomb = async (remaining: number, label: string) => {
     const b = (await page.locator("#touch-bomb").boundingBox())!;
     const second = point(b.x + b.width / 2, b.y + b.height / 2, 2);
     await cdp.send("Input.dispatchTouchEvent", {
@@ -236,14 +343,59 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       type: "touchEnd",
       touchPoints: [second],
     });
-    await expect
-      .poll(async () => (await state(page)).bombs)
-      .toBe(time === BOSS_AT + 15 ? 1 : 0);
-    expect((await state(page)).touchTarget).toBeTruthy();
-  }
-  await expect
-    .poll(async () => (await state(page)).mode, { timeout: 30000 })
-    .toBe("won");
+    await expect.poll(async () => (await state(page)).bombs).toBe(remaining);
+    const afterBomb = await state(page);
+    await testInfo.attach(`touch-after-bomb-${label}`, {
+      body: JSON.stringify(
+        {
+          time: afterBomb.time,
+          mode: afterBomb.mode,
+          hp: afterBomb.hp,
+          bombs: afterBomb.bombs,
+          touchTarget: afterBomb.touchTarget,
+          boss: afterBomb.boss,
+          bossDefeated: afterBomb.bossDefeated,
+          save: afterBomb.save,
+          inputTrace: JSON.parse(inputTrace.json()),
+        },
+        null,
+        2,
+      ),
+      contentType: "application/json",
+    });
+    if (afterBomb.mode === "won") {
+      // Bomb damage can synchronously defeat the Boss. The next render update
+      // correctly clears input and saves victory; retaining a touch would be a bug.
+      expect(afterBomb.bossDefeated).toBe(true);
+      await expect
+        .poll(async () => (await state(page)).touchTarget)
+        .toBeFalsy();
+      await expect
+        .poll(
+          async () => (await state(page)).save.stages["stage-01"]?.clearCount,
+        )
+        .toBe(1);
+      return;
+    }
+    expect(
+      afterBomb.mode,
+      JSON.stringify({
+        time: afterBomb.time,
+        hp: afterBomb.hp,
+        reason: afterBomb.lostReason,
+      }),
+    ).toBe("playing");
+    expect(afterBomb.touchTarget).toBeTruthy();
+  };
+  // Spend the existing resource after the battery was destroyed by normal fire,
+  // rather than requiring an unnecessarily passive lateral route through its salvo.
+  await expect.poll(async () => (await state(page)).bombs).toBe(2);
+  await useTouchBomb(1, "shore-return");
+  await moveTo(180);
+  await touchEvadeUntil(BOSS_AT + 15);
+  await useTouchBomb(0, "boss");
+  await touchEvadeUntil(170, true);
+  expect((await state(page)).mode).toBe("won");
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
     touchPoints: [],
@@ -268,6 +420,8 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       spawned: density.spawnedAir,
       entered: density.enteredAir,
       performance: density.renderMetrics,
+      measuredFps: density.measuredFps,
+      renderer: density.renderer,
     }),
   );
   await page.screenshot({ path: "docs/mobile-won.png" });

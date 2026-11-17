@@ -1,3 +1,4 @@
+import { dodgeDirection } from "./dodge-route";
 import { it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
 import { stage01 } from "../src/data/stage";
@@ -52,7 +53,13 @@ it.each([30, 60, 120])(
         if (!b1 && m.time >= 140) b1 = m.useBomb();
         if (!b2 && m.time >= 146) b2 = m.useBomb();
         if (weapon === "missile" && m.time >= 149 && m.time < 149.5) dx = -1;
-        m.update(1 / fps, dx, 0, true, weapon === "missile" && m.time >= 125);
+        m.update(
+          1 / fps,
+          dodgeDirection(m, dx),
+          0,
+          true,
+          weapon === "missile" && m.time >= 125,
+        );
         for (const e of m.enemies)
           if (
             e.active &&
@@ -141,6 +148,8 @@ it("new route uses distinct roles and fixed-time supplies instead of extending B
   expect(new Set(added.map((w) => w.behavior))).toEqual(
     new Set([
       "weave",
+      "brakeRaider",
+      "hookWing",
       "groundBattery",
       "carrier",
       "escort",
@@ -170,8 +179,10 @@ it("provides 405 airborne opponents with bounded firing roles, not phantom groun
       (counts[wave.behavior ?? "straight"] ?? 0) + 1;
   }
   expect(counts).toEqual({
-    straight: 120,
-    weave: 132,
+    straight: 112,
+    weave: 128,
+    brakeRaider: 6,
+    hookWing: 6,
     cross: 125,
     escort: 12,
     carrier: 6,

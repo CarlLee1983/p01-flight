@@ -1,14 +1,42 @@
+const COVERAGE_KINDS = new Set([
+  "straight",
+  "weave",
+  "cross",
+  "dive",
+  "heavy",
+  "turret",
+  "carrier",
+  "groundBattery",
+  "groundDepot",
+  "escort",
+  "gatekeeper",
+  "brakeRaider",
+  "hookWing",
+]);
 interface ActiveObject {
   active: boolean;
 }
 interface RenderPopulation {
-  enemies: readonly (ActiveObject & { behavior?: string })[];
+  effects?: readonly unknown[];
+  enemies: readonly (ActiveObject & {
+    behavior?: string;
+    y?: number;
+    hitUntil?: number;
+    telegraph?: number;
+  })[];
+  time?: number;
   bullets: readonly ActiveObject[];
   enemyBullets: readonly ActiveObject[];
 }
 /** Constant-space counters. Snapshot allocation happens only on explicit reads. */
 export class RenderMetrics {
+  private enemyCoverage: Record<
+    string,
+    { frames: number; hitFrames: number; chargeFrames: number }
+  > = {};
   private frames = 0;
+  private peakEffects = 0;
+  private peakImpactPrimitives = 0;
   private drawTotalMs = 0;
   private drawMaxMs = 0;
   private peakEnemies = 0;
@@ -18,6 +46,8 @@ export class RenderMetrics {
   private peakSprites = 0;
   private spritePool = 0;
   reset() {
+    this.enemyCoverage = {};
+    this.peakEffects = this.peakImpactPrimitives = 0;
     this.frames = this.drawTotalMs = this.drawMaxMs = 0;
     this.peakEnemies = this.peakAirEnemies = this.peakPlayerBullets = 0;
     this.peakEnemyBullets = this.peakSprites = this.spritePool = 0;
@@ -27,6 +57,7 @@ export class RenderMetrics {
     sprites: number,
     pool: number,
     drawMs: number,
+    impactPrimitives = 0,
   ) {
     let enemies = 0,
       air = 0,
@@ -35,6 +66,19 @@ export class RenderMetrics {
     for (const e of population.enemies)
       if (e.active) {
         enemies++;
+        if ((e.y ?? -1) >= 80 && (e.y ?? 999) <= 640) {
+          const key = COVERAGE_KINDS.has(e.behavior ?? "")
+            ? e.behavior!
+            : "straight";
+          const entry = (this.enemyCoverage[key] ??= {
+            frames: 0,
+            hitFrames: 0,
+            chargeFrames: 0,
+          });
+          entry.frames++;
+          if ((e.hitUntil ?? 0) > (population.time ?? 0)) entry.hitFrames++;
+          if ((e.telegraph ?? 0) > 0) entry.chargeFrames++;
+        }
         if (
           e.behavior !== "groundBattery" &&
           e.behavior !== "groundDepot" &&
@@ -44,6 +88,14 @@ export class RenderMetrics {
       }
     for (const b of population.bullets) if (b.active) playerBullets++;
     for (const b of population.enemyBullets) if (b.active) enemyBullets++;
+    this.peakEffects = Math.max(
+      this.peakEffects,
+      population.effects?.length ?? 0,
+    );
+    this.peakImpactPrimitives = Math.max(
+      this.peakImpactPrimitives,
+      impactPrimitives,
+    );
     this.frames++;
     const duration = Math.max(0, Number.isFinite(drawMs) ? drawMs : 0);
     this.drawTotalMs += duration;
@@ -58,6 +110,9 @@ export class RenderMetrics {
   snapshot() {
     return {
       frames: this.frames,
+      enemyCoverage: { ...this.enemyCoverage },
+      peakEffects: this.peakEffects,
+      peakImpactPrimitives: this.peakImpactPrimitives,
       meanDrawCpuMs: this.frames ? this.drawTotalMs / this.frames : 0,
       maxDrawCpuMs: this.drawMaxMs,
       peakEnemies: this.peakEnemies,

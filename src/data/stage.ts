@@ -1,6 +1,8 @@
 export const GROUND_SCROLL_SPEED = 32;
 export const GROUND_VISIBLE_Y = 108;
 export type Behavior =
+  | "brakeRaider"
+  | "hookWing"
   | "straight"
   | "weave"
   | "turret"
@@ -88,13 +90,22 @@ const reinforcements: Wave[] = reinforcementTimes.flatMap((at, group) =>
         fireEvery: lane === 0 && at <= 111 ? 0.75 : undefined,
         firstFireDelay: lane === 0 && at <= 111 ? 0.6 : undefined,
       };
+    const specialist =
+      lane === 0 && (row === 0 || row === 2)
+        ? [12, 16, 19].includes(group)
+          ? "brakeRaider"
+          : [15, 18, 21].includes(group)
+            ? "hookWing"
+            : undefined
+        : undefined;
     return {
       at: at + row * 0.32 + lane * 0.08,
       x: side === 1 ? 48 + lane * 42 : 312 - lane * 42,
-      speed: 225,
+      speed: specialist === "hookWing" ? 210 : 225,
       hp: 1,
       points: 80,
-      behavior: group % 3 === 0 ? "straight" : "weave",
+      behavior: specialist ?? (group % 3 === 0 ? "straight" : "weave"),
+      direction: side,
       fireEvery: lane === 0 && at <= 111 ? 0.75 : undefined,
       firstFireDelay: lane === 0 && at <= 111 ? 0.6 : undefined,
     };
@@ -129,7 +140,7 @@ export const stage01: StageConfig = {
       id: "blockade",
       title: "突破封鎖",
       at: 40,
-      hint: "先避開預告航道，再追擊橫移封鎖艦；集中火力可取得升級補給",
+      hint: "留意炮口充能，移位後追擊橫移封鎖艦；集中火力可取得升級補給",
     },
     {
       id: "push",
@@ -153,7 +164,7 @@ export const stage01: StageConfig = {
       id: "escort-run",
       title: "護航航道",
       at: 78,
-      hint: "追擊側翼護航機，預告亮起時移出瞄準線",
+      hint: "追擊側翼護航機，炮口亮起後移位",
     },
     {
       id: "recovery",
