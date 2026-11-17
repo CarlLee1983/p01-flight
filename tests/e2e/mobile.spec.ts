@@ -1,6 +1,7 @@
 import { test, expect, webkit } from "@playwright/test";
 test.setTimeout(30000);
-import { state, waitGameTime, dodgeInput } from "./gameplay";
+import { state, waitGameTime } from "./gameplay";
+import { chooseTouchTarget } from "../touch-policy";
 import { stage01 } from "../../src/data/stage";
 const BOSS_AT = stage01.boss!.at;
 const point = (x: number, y: number, id = 1) => ({
@@ -185,16 +186,18 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     touchPoints: [first],
   });
   const initialPointerX = first.x;
-  const touchEvadeUntil = async (seconds: number) => {
+  let previousTarget = 180;
+  const touchEvadeUntil = async (seconds: number, untilWon = false) => {
     const start = await state(page);
     const deadline =
       Date.now() + Math.max(15000, (seconds - start.time) * 3000 + 20000);
     while (Date.now() < deadline) {
       const s = await state(page);
-      if (s.time >= seconds) return;
+      if (untilWon && s.mode === "won") return;
+      if (!untilWon && s.time >= seconds) return;
       expect(s.mode).toBe("playing");
-      const dx = dodgeInput(s);
-      const target = Math.max(18, Math.min(342, s.player.x + dx * 16));
+      const target = chooseTouchTarget(s, previousTarget);
+      previousTarget = target;
       first.x = initialPointerX + ((target - 180) * box.width) / 360;
       await cdp.send("Input.dispatchTouchEvent", {
         type: "touchMove",
@@ -222,6 +225,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
   );
   const moveTo = async (x: number) => {
+    previousTarget = x;
     first.x = initialPointerX + ((x - 180) * box.width) / 360;
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
@@ -260,9 +264,8 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       .toBe(time === BOSS_AT + 15 ? 1 : 0);
     expect((await state(page)).touchTarget).toBeTruthy();
   }
-  await expect
-    .poll(async () => (await state(page)).mode, { timeout: 30000 })
-    .toBe("won");
+  await touchEvadeUntil(170, true);
+  expect((await state(page)).mode).toBe("won");
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
     touchPoints: [],

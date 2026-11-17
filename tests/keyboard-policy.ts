@@ -14,7 +14,11 @@ export interface PilotSnapshot {
 const horizon = 0.35;
 const speed = 240;
 /** Minimum separation along actual relative trajectories, including wall stop. */
-export function clearance(s: PilotSnapshot, dx: Steering): number {
+export function clearance(
+  s: PilotSnapshot,
+  dx: Steering,
+  targetDistance = Infinity,
+): number {
   const width = s.width ?? 360;
   const p = s.player;
   const stop =
@@ -22,6 +26,7 @@ export function clearance(s: PilotSnapshot, dx: Steering): number {
       ? horizon
       : Math.min(
           horizon,
+          Math.max(0, targetDistance) / speed,
           Math.max(0, (dx < 0 ? p.x - 18 : width - 18 - p.x) / speed),
         );
   let minimum = Infinity;
