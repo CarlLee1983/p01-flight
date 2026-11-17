@@ -69,6 +69,7 @@ let renderedImpactPrimitives = 0;
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
 let readPickupNotice = (): string | null => null;
+let readPickupBounds = (): {x: number; y: number; bottom: number} | null => null;
 let readBackgroundInfo: () => Record<string, unknown> = () => ({});
 const renderMetrics = new RenderMetrics();
 let frameCount = 0,
@@ -229,6 +230,7 @@ class FlightScene extends Phaser.Scene {
   pickupGuide: Phaser.GameObjects.Text[] = [];
   pickupNotice!: Phaser.GameObjects.Text;
   pickupNoticeUntil = 0;
+  private pickupInHud = false;
   sectionNotice!: Phaser.GameObjects.Text;
   bossAdvice!: Phaser.GameObjects.Text;
   endingAge = 0;
@@ -367,9 +369,15 @@ class FlightScene extends Phaser.Scene {
       .setDepth(5);
     readPickupNotice = () =>
       this.pickupNotice.visible ? this.pickupNotice.text : null;
+    readPickupBounds = () => {
+      if (!this.pickupNotice.visible) return null;
+      const b = this.pickupNotice.getBounds();
+      return {x: b.x, y: b.y, bottom: b.bottom};
+    };
     this.bossAdvice = this.add
       .text(180, 600, "", {
-        fontSize: "10px",
+        fontFamily: "monospace",
+        fontSize: "11px",
         color: "#ffc69f",
         align: "center",
         backgroundColor: "#102935dd",
@@ -577,6 +585,15 @@ class FlightScene extends Phaser.Scene {
         pickupMessage(model.lastPickup ?? "power", model.weaponLevel, model.hp),
       );
       this.pickupNoticeUntil = model.time + 1.6;
+    }
+    const pickupInHud = !!model.boss?.active;
+    if (pickupInHud !== this.pickupInHud) {
+      this.pickupInHud = pickupInHud;
+      this.pickupNotice
+        .setPosition(pickupInHud ? 350 : 180, pickupInHud ? 32 : 90)
+        .setOrigin(pickupInHud ? 1 : 0.5, 0.5)
+        .setFontSize(pickupInHud ? 11 : 13)
+        .setPadding(pickupInHud ? 5 : 8, pickupInHud ? 3 : 5);
     }
     this.pickupNotice.setVisible(
       model.mode === "playing" &&
@@ -1339,6 +1356,7 @@ Object.defineProperty(window, "__P01__", {
     impactLayer: 2.7,
     lastPickup: model.lastPickup,
     pickupNoticeText: readPickupNotice(),
+    pickupNoticeBounds: readPickupBounds(),
     supportTime: model.supportTime,
     supportShots: model.supportShots,
     supportDrones: model.supportDrones,

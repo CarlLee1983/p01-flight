@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { state, withKeyboardPilot } from "./gameplay";
+import { state, withKeyboardPilot, waitGameTime } from "./gameplay";
 import {
   installStage02Sampler,
   saveStage02Sampler,
@@ -82,6 +82,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
         await page.setViewportSize({ width: 320, height: 700 });
         const narrow = await state(page);
         expect(narrow.boss?.active).toBe(true);
+        if (narrow.pickupNoticeBounds) expect(narrow.pickupNoticeBounds.bottom).toBeLessThanOrEqual(72);
         await captureStage02Frame(page, "stage02-boss-320");
         await page.setViewportSize({ width: 1000, height: 900 });
         await page.keyboard.down("Space");
@@ -383,4 +384,44 @@ test("Stage02 failed sortie can restart with the same seed", async ({
   expect(retry.hp).toBe(3);
   expect(retry.mode).toBe("playing");
   expect(retry.time).toBeLessThan(2);
+});
+
+
+test("Stage02 real ground battery turns, fires and is destroyed through normal controls", async ({ page }, testInfo) => {
+ test.setTimeout(150000);
+ await unlockStage02(page);
+ await page.locator("#start").click();
+ await page.keyboard.down("Space");
+ await withKeyboardPilot(page, () => waitGameTime(page, 28));
+ await page.keyboard.up("Space");
+ let initialAngle = 0;
+ await withKeyboardPilot(page, async () => {
+   await waitGameTime(page, 30);
+   await captureStage02Frame(page, "stage02-ground-aiming");
+   await waitGameTime(page, 31.15);
+   const firing = await state(page);
+   expect(firing.groundShotCount).toBeGreaterThan(0);
+   const turret = firing.activeEnemies.find((e: any) => e.behavior === "groundBattery");
+   expect(turret).toBeTruthy();
+   initialAngle = turret.turretAngle;
+   await captureStage02Frame(page, "stage02-ground-fired");
+ });
+ const turnUntil = (await state(page)).time + 0.85;
+ await withKeyboardPilot(page, async () => {
+   await waitGameTime(page, turnUntil);
+   const turned = (await state(page)).activeEnemies.find((e: any) => e.behavior === "groundBattery");
+   expect(turned).toBeTruthy();
+   expect(Math.abs(turned.turretAngle - initialAngle)).toBeGreaterThan(0.02);
+   await captureStage02Frame(page, "stage02-ground-turned");
+   await page.keyboard.down("Space");
+   await expect.poll(async () => (await state(page)).renderMetrics.presentationCoverage.groundBattery?.destroyed, {timeout: 45000, intervals: [30]}).toBeTruthy();
+   const killed = await state(page);
+   const row = killed.renderMetrics.presentationCoverage.groundBattery;
+   expect(row.fired).toBeTruthy(); expect(row.hit).toBeTruthy(); expect(row.destroyed).toBeTruthy();
+   expect(killed.mode).toBe("playing");
+   await captureStage02Frame(page, "stage02-ground-destroyed");
+   await testInfo.attach("stage02-real-ground-battery", {body: JSON.stringify({initialAngle, turnedAngle: turned.turretAngle, ...row},null,2), contentType: "application/json"});
+   console.log("STAGE02_REAL_GROUND_BATTERY", JSON.stringify(row));
+ }, 50);
+ await page.keyboard.up("Space");
 });
