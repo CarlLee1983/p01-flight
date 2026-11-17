@@ -108,6 +108,16 @@ it("creates four bounded original textures once, with actual barrel mouths at de
     expect(
       new Set(entry.marks.map((m) => m.color)).size,
     ).toBeGreaterThanOrEqual(8);
+    // Each hull has separate lit bevel, shadow side wall and recessed cockpit planes.
+    const colors = new Set(entry.marks.map((m) => m.color));
+    for (const material of [
+      "#c4926d",
+      "#a87758",
+      "#513a32",
+      "#314852",
+      "#4a777d",
+    ])
+      expect(colors.has(material)).toBe(true);
     for (const muzzle of spec.muzzles) {
       const x = (spec.width / 2 + muzzle.x) * 2,
         y = (spec.height / 2 + muzzle.y) * 2;

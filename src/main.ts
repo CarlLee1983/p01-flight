@@ -689,7 +689,7 @@ class FlightScene extends Phaser.Scene {
                 e,
               ).setDepth(1);
             }
-            // Subtle base rim distinguishes interactive targets from painted scenery.
+            // Only damaged targets receive a compact health bar; no floating selection rim.
             if (e.y >= GROUND_VISIBLE_Y) {
               if (e.hp < (e.maxHp ?? e.hp)) {
                 overlay.fillStyle(0x10232a, 0.9);
@@ -1169,7 +1169,7 @@ class FlightScene extends Phaser.Scene {
     }
   }
 }
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   width: 360,
   height: 640,
@@ -1270,4 +1270,22 @@ Object.defineProperty(window, "__P01__", {
     renderMetrics: renderMetrics.snapshot(),
     measuredFps: frameTime > 0 ? (frameCount * 1000) / frameTime : 0,
   }),
+});
+
+// Read-only frame capture: use Phaser's post-render readPixels path rather than
+// the browser compositor. This diagnoses partial headless screenshots without
+// changing renderer settings, game time, damage, or the production framebuffer.
+Object.defineProperty(window, "__P01_CAPTURE__", {
+  value: () =>
+    new Promise<string>((resolve, reject) => {
+      const timeout = window.setTimeout(
+        () => reject(new Error("Frame capture timeout")),
+        5000,
+      );
+      game.renderer.snapshot((result) => {
+        window.clearTimeout(timeout);
+        if (result instanceof HTMLImageElement) resolve(result.src);
+        else reject(new Error("Expected a rendered image"));
+      });
+    }),
 });

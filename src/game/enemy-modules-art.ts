@@ -545,6 +545,261 @@ export function paintEnemyModule(
     gun(0, 17, 14, 6);
     rect(-5, -2, 10, 4, METAL.copperLight);
   }
+  // Broad raised armour faces, lit from upper-left. These are structural planes,
+  // not noise/scratches: the right wall stays darker on BOTH mirrored wings.
+  // Keep the original silhouette, all weapon mouths and combat geometry untouched.
+  if (kind === "escort") {
+    for (const side of [-1, 1]) {
+      poly(
+        mirror(
+          [
+            [19, -8],
+            [27, -7],
+            [28, -2],
+            [24, 2],
+            [19, 1],
+          ],
+          side,
+        ),
+        "#835641",
+      );
+      poly(
+        mirror(
+          [
+            [19, -8],
+            [27, -7],
+            [26, -5],
+            [20, -5],
+          ],
+          side,
+        ),
+        side < 0 ? "#c4926d" : "#a87758",
+      );
+      poly(
+        mirror(
+          [
+            [26, -5],
+            [28, -2],
+            [24, 2],
+            [23, 0],
+          ],
+          side,
+        ),
+        "#513a32",
+      );
+    }
+    poly(
+      [
+        [3, -15],
+        [6, -15],
+        [8, 5],
+        [4, 11],
+        [2, 6],
+      ],
+      "#314852",
+    );
+    poly(
+      [
+        [-5, -15],
+        [-3, -16],
+        [-3, -10],
+        [-5, -9],
+      ],
+      "#c2c3ad",
+    );
+    poly(
+      [
+        [-2, -6],
+        [2, -6],
+        [2, -3],
+        [-1, -1],
+      ],
+      "#4a777d",
+    );
+    poly(
+      [
+        [-2, -6],
+        [1, -6],
+        [0, -5],
+        [-2, -4],
+      ],
+      "#c0d2c7",
+    );
+  } else if (kind === "gatekeeper") {
+    for (const side of [-1, 1]) {
+      poly(
+        mirror(
+          [
+            [32, -14],
+            [41, -14],
+            [42, -8],
+            [40, 0],
+            [33, 1],
+          ],
+          side,
+        ),
+        "#86563e",
+      );
+      poly(
+        mirror(
+          [
+            [32, -14],
+            [41, -14],
+            [40, -11],
+            [33, -10],
+          ],
+          side,
+        ),
+        side < 0 ? "#c4926d" : "#a87758",
+      );
+      poly(
+        mirror(
+          [
+            [40, -11],
+            [42, -8],
+            [40, 0],
+            [37, 0],
+            [39, -7],
+          ],
+          side,
+        ),
+        "#513a32",
+      );
+      // Lower shoulder bevel is below the raised plate, before the gun sponson.
+      poly(
+        mirror(
+          [
+            [16, 10],
+            [23, 13],
+            [29, 9],
+            [28, 14],
+            [24, 17],
+            [16, 14],
+          ],
+          side,
+        ),
+        "#293c46",
+      );
+    }
+    poly(
+      [
+        [8, -28],
+        [12, -18],
+        [10, 13],
+        [5, 24],
+        [3, 22],
+        [7, 10],
+      ],
+      "#314852",
+    );
+    poly(
+      [
+        [-8, -28],
+        [-5, -30],
+        [-4, -22],
+        [-9, -19],
+      ],
+      "#c2c3ad",
+    );
+    // Recessed cockpit: darker lower glass and one restrained reflected sky plane.
+    poly(
+      [
+        [-5, -15],
+        [4, -15],
+        [6, -8],
+        [2, -4],
+        [-3, -4],
+      ],
+      "#4a777d",
+    );
+    poly(
+      [
+        [-4, -16],
+        [3, -16],
+        [4, -13],
+        [-4, -11],
+      ],
+      "#b5c9be",
+    );
+    poly(
+      [
+        [-6, 6],
+        [6, 6],
+        [4, 8],
+        [-5, 8],
+      ],
+      "#ae7351",
+    );
+  } else {
+    for (const side of [-1, 1]) {
+      poly(
+        mirror(
+          [
+            [16, -6],
+            [21, -3],
+            [18, 4],
+            [14, 6],
+            [14, 2],
+          ],
+          side,
+        ),
+        "#835641",
+      );
+      poly(
+        mirror(
+          [
+            [16, -6],
+            [21, -3],
+            [19, -2],
+            [16, -3],
+          ],
+          side,
+        ),
+        side < 0 ? "#c4926d" : "#a87758",
+      );
+      poly(
+        mirror(
+          [
+            [19, -2],
+            [18, 4],
+            [14, 6],
+            [14, 4],
+          ],
+          side,
+        ),
+        "#513a32",
+      );
+    }
+    poly(
+      [
+        [4, -19],
+        [6, -10],
+        [7, -4],
+        [5, -3],
+        [3, -8],
+      ],
+      "#314852",
+    );
+    poly(
+      [
+        [-5, -19],
+        [-3, -19],
+        [-4, -10],
+        [-6, -8],
+      ],
+      "#a9b1a2",
+    );
+    poly(
+      [
+        [-1, -14],
+        [1, -14],
+        [1, -10],
+        [0, -8],
+        [-1, -10],
+      ],
+      "#4a777d",
+    );
+  }
 }
 export function createEnemyModuleTextures(scene: Phaser.Scene): void {
   for (const kind of Object.keys(ENEMY_MODULE_ART) as EnemyModuleKind[]) {

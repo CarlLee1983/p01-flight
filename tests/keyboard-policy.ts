@@ -18,7 +18,9 @@ export function clearance(
   s: PilotSnapshot,
   dx: Steering,
   targetDistance = Infinity,
+  predictionSeconds = horizon,
 ): number {
+  const horizon = Math.max(0, predictionSeconds);
   const width = s.width ?? 360;
   const p = s.player;
   const stop =

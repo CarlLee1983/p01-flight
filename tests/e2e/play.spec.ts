@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import {
   state,
@@ -175,6 +176,16 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).partsDestroyed, { timeout: 10000 })
     .toBe(2);
   await page.screenshot({ path: "docs/boss-phase3.png" });
+  // Independent post-render snapshots diagnose compositor rectangles. Keep the
+  // original screenshot/video as evidence; never replace a failed image silently.
+  for (let i = 0; i < 3; i++) {
+    const png = await page.evaluate(() => (window as any).__P01_CAPTURE__());
+    expect(png).toMatch(/^data:image\/png;base64,/);
+    await writeFile(
+      `docs/boss-phase3-framebuffer-${i}.png`,
+      Buffer.from(png.split(",")[1], "base64"),
+    );
+  }
   await expect
     .poll(async () => (await state(page)).mode, { timeout: 90000 })
     .toBe("won");

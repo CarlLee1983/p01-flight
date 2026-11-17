@@ -129,3 +129,19 @@ Rejected broad change: moving escort/fast/heavy origins together altered prior
 route damage and one low-FPS survival check. No health or test assertions were
 relaxed. Changes were isolated; only the patrol source correction remains, while
 other visual sockets were aligned to their existing combat sources instead.
+
+## Exact-head visual/CI follow-up (fd5ab7db)
+
+PR run 44044168632 passed 322 unit and 23 browser tests. Push run44044160587
+passed22/23 browser tests, but the normal touch pilot lost at43.7s. The video
+shows prior damage in the crossing segment, not only the final patrol shot.
+Do not deploy by selecting only the green run. Test control latency separately
+from model update frequency, without changing health, bullets or assertions.
+
+New hulls remove the detached escort triangles/patrol box. Their code-drawn
+material is still flatter than the source scout art: style acceptance remains
+open. `boss-phase3.png` contains a rectangular missing left body; continuous
+video also contains transient rectangles in HUD/menus. No cropping/masking is
+used in the sprite pool. Add post-render framebuffer captures alongside the
+original compositor screenshots before attributing this to assets or declaring
+it fixed. Preserve original evidence, not just a better-looking replacement.

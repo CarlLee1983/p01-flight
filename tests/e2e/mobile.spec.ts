@@ -2,6 +2,7 @@ import { test, expect, webkit } from "@playwright/test";
 test.setTimeout(30000);
 import { state, waitGameTime } from "./gameplay";
 import { chooseTouchTarget } from "../touch-policy";
+import { TouchTrace } from "../touch-trace";
 import { stage01 } from "../../src/data/stage";
 const BOSS_AT = stage01.boss!.at;
 const point = (x: number, y: number, id = 1) => ({
@@ -164,7 +165,7 @@ test("touch drag, two fingers, cancellation, pause and rotation remain controlla
 
 test("Stage 01 can clear entirely through touch and preserves the record", async ({
   browser,
-}) => {
+}, testInfo) => {
   test.setTimeout(600000);
   const context = await browser.newContext({
     viewport: { width: 390, height: 667 },
@@ -187,24 +188,59 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
   });
   const initialPointerX = first.x;
   let previousTarget = 180;
+  const inputTrace = new TouchTrace();
+  let deliveryBudget = 0.2;
+  const attachInputTrace = async () =>
+    testInfo.attach("touch-input-trace", {
+      body: inputTrace.json(),
+      contentType: "application/json",
+    });
   const touchEvadeUntil = async (seconds: number, untilWon = false) => {
     const start = await state(page);
     const deadline =
       Date.now() + Math.max(15000, (seconds - start.time) * 3000 + 20000);
     while (Date.now() < deadline) {
+      const readStarted = Date.now();
       const s = await state(page);
-      if (untilWon && s.mode === "won") return;
+      const readMs = Date.now() - readStarted;
+      if (untilWon && s.mode === "won") {
+        await attachInputTrace();
+        return;
+      }
       if (!untilWon && s.time >= seconds) return;
+      if (s.mode !== "playing") await attachInputTrace();
       expect(s.mode).toBe("playing");
-      const target = chooseTouchTarget(s, previousTarget);
+      const target = chooseTouchTarget(s, previousTarget, deliveryBudget);
       previousTarget = target;
       first.x = initialPointerX + ((target - 180) * box.width) / 360;
+      const dispatchStarted = Date.now();
       await cdp.send("Input.dispatchTouchEvent", {
         type: "touchMove",
         touchPoints: [first],
       });
+      const dispatchMs = Date.now() - dispatchStarted;
+      const after = await state(page);
+      const gameDelay = Math.max(0, after.time - s.time);
+      inputTrace.record({
+        time: s.time,
+        afterTime: after.time,
+        hp: after.hp,
+        mode: after.mode,
+        player: s.player,
+        afterPlayer: after.player,
+        target,
+        actualTarget: after.touchTarget,
+        readMs,
+        dispatchMs,
+        gameDelay,
+        deliveryBudget,
+        bullets: s.hostileProjectiles.slice(0, 48),
+        enemies: s.activeEnemies.slice(0, 24),
+      });
+      deliveryBudget = Math.min(0.3, Math.max(0.2, gameDelay * 1.25));
       await page.waitForTimeout(30);
     }
+    await attachInputTrace();
     throw new Error(`Touch pilot did not reach ${seconds}s`);
   };
   await touchEvadeUntil(70);
