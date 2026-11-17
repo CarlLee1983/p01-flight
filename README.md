@@ -1,10 +1,12 @@
-# P01 · 雲際航線
+# P01 · 雲際航線／赤岩峽谷
 
-原創縱向戰機射擊技術雛型。本輪範圍：限時 170 秒的 Stage 01，含敵彈、不同敵機行為、道具與關底頭目；採原創高解析機體、沿岸場景與 Kenney CC0 子彈／尾焰，不含 Raiden Fighters 的任何素材、音樂、角色或關卡。純靜態前端，無帳號、API、DB、追蹤或雲端存檔。部署由專案協調者維護原有私人試玩站，repo 維持 private。
+原創縱向戰機射擊遊戲，使用 Phaser 4.2.1、TypeScript 與 Vite。純靜態前端，沒有帳號、遊戲後端、API、資料庫或雲端存檔；最高分、分關通關紀錄與音量保存在瀏覽器。玩法類型參考傳統縱向街機射擊，不使用 Raiden Fighters 的素材、音樂、角色或關卡。
 
-## 執行
+Repository 已依擁有者授權公開；私人試玩站仍由專案協調者維護。開發分支與這份交付不會自行合併或部署。
 
-Node.js 24（開發驗證 24.22.1）、npm。
+## 本機執行
+
+Node.js 24、npm，使用鎖檔安裝：
 
 ```sh
 npm ci
@@ -15,66 +17,57 @@ npm run build
 node scripts/serve.mjs
 ```
 
-正式建置以 `http://127.0.0.1:4173` 開啟。不要用 file:// 雙擊 HTML：ES modules 與 localStorage 的 file origin 不具可攜保證。純靜態不表示首次開啟不需下載資源；本版未做 Service Worker 離線安裝。可將 dist/ 放任意靜態伺服器，更新時須保留既有試玩站的存取限制與網址。
+正式建置在 `http://127.0.0.1:4173`。若收到已建置 ZIP，解壓後在包含 `dist/` 和 `scripts/` 的目錄執行 `node scripts/serve.mjs`，不必安裝遊戲依賴。
 
-## 操作與完成條件
+請使用 HTTP 靜態伺服器，不要以 file:// 雙擊 HTML。本版未製作 Service Worker 離線安裝；首次開啟需要下載資源。正式更新應保留私人試玩站既有網址與存取限制。
 
-- WASD／方向鍵：八方向移動，斜向正規化，不能出界。
-- Space／Z：按住連射；C：循環散射／貫穿光束／追蹤飛彈；Shift：精準慢移；X：衝擊炸彈（每場兩枚）；Enter：開始或重試；P：暫停。
-- 擊落敵機得分；躲避機身與粉紅敵彈。受傷扣一生命並獲得 1.5 秒無敵。
-- 三條生命；170 秒內擊敗關底頭目才通關，生命歸零或頭目未在期限內擊敗則失敗。青色十字補血，金色能量永久提升本場共用火力級別，改善散射覆蓋、光束貫穿數或飛彈數量／傷害。頭目有三個攻擊階段與預告。
-- 結算可重試或返回標題，離開分頁自動暫停。
-- 桌機鍵盤優先；手機畫面縮放不是手機操控支援。
-- 原創合成節奏與射擊／爆炸／升級／炸彈／勝敗聲。首次開始操作才解鎖音訊；設定音量 0 或按「全部靜音」會保存靜音，暫停與背景分頁停止聲音。
+## 關卡與操作
 
-## 瀏覽器驗收
+- **Stage 01 雲際航線**：港區、沿岸火力與出港突圍，125 秒 Boss 出場，170 秒上限。
+- **Stage 02 赤岩峽谷**：河谷、鋼桁橋、礦區、水壩與開闊蓄水池；145 秒 Boss 出場，190 秒上限。上限不是固定遊玩長度，提前擊破 Boss 即通關。
+- 第一關通關後解鎖第二關；結算可按「前往第二關」，也可從標題頁選關。兩關最高分與通關次數分開保存，舊 v1 第一關已通關存檔可直接解鎖。
+- WASD／方向鍵八方向移動；Space／Z 按住連射；C 換散射／貫穿／追蹤；Shift 精準慢移；X 使用炸彈；P 暫停；Enter 開始或重試。
+- 觸控按住畫面拖曳移動並連射，指尖按下不會讓戰機瞬移。側欄提供炸彈、換武器、暫停；旋轉裝置會取消舊手勢，回正後重新按住即可。窄螢幕與橫向暫停選單可捲動，直向較適合縱向關卡。
+- 三條生命，受傷有 1.5 秒無敵；生命歸零或超時則失敗。結算可重試／返回標題，離開分頁自動暫停。
+- 補給圖示：P 升級、十字修復、S/B/M 切武器並升一級、W 提供 8 秒雙僚機；C 仍可自由換武器，僚機不擋子彈。
+- 第二關「再飛一次」保留編隊 seed；「重新編隊出擊」換新 seed。`?seed=42` 固定一般新出擊；結果頁重新編隊刻意覆蓋本次 seed，重新載入該網址則回到 42。這不是無敵或跳時間入口。
+
+## 音樂與素材
+
+首次操作解鎖聲音。音樂／音效音量及靜音會保存，暫停與背景分頁停止聲音。使用合法錄製關卡與 Boss 配樂，第二關目前共用曲目；射擊、爆炸等音效為原創。播放器／頁尾保留署名與試聽，來源見 [licensed-music.md](docs/licensed-music.md)。
+
+機體、地形、動畫與 Kenney CC0 素材來源見 [素材清單](docs/asset-manifest.md) 和 [原創素材紀錄](docs/original-art-production.md)。第二關六張原創素材的完整內建 image_gen 提示、處理方式與 WebP 雜湊見 [stage02-art-sources.json](docs/stage02-art-sources.json)。地標是場景；真正地炮、補給駁船及敵機仍是獨立遊戲元件。
+
+## 測試與驗收
 
 ```sh
-npx playwright install --with-deps chromium firefox
+npx playwright install --with-deps chromium firefox webkit
+npm run typecheck
+npm test
 npm run build
 npm run test:e2e
 ```
 
-使用系統 Chromium 時可設定 `CHROMIUM_PATH=/usr/bin/chromium`。Playwright 會以固定 localhost origin 啟動靜態伺服器。測試實際按鍵與完整關卡，不藉由修改遊戲時間／生命偷過關。包含自然死亡、暫停、10 次重新開始、重新整理、真正關閉／重開專用 Chromium profile、Firefox smoke、損壞存檔。
+系統 Chromium 可設定 `CHROMIUM_PATH=/usr/bin/chromium`。本機環境若禁止 socket／ptrace，應記錄阻礙並使用可行 CI，不繞過權限限制。
 
-歷史 G0/G1 阻礙見 [docs/verification.md](docs/verification.md)；最新沿岸街機版見 [docs/arcade-increment.md](docs/arcade-increment.md) 及 PR #2 的精確 CI 證據，不可將歷史未驗項當最新測試結果。
+測試使用正常鍵盤與 CDP 觸控，不改血量、跳時間或指定勝利。包含兩關完整出擊、實際跨關、正常失敗與重試、手機旋轉／回正、設定與重設、真正關閉重開瀏覽器、舊存檔兼容、音訊解鎖及格式回退。第二關另有正常操控地炮轉向／實彈／受擊／擊破取證，並保存實際敵種照片、事件 JSON 與完整影片。
 
-## 儲存
+完整出擊在 Chromium 驗證；Firefox/WebKit 為啟動、輸入或音訊 smoke，不冒稱完整跨瀏覽器通關。
 
-key `p01-flight:save:v1`。只在結算／設定／重設時寫入；每場只有一次結算。最高分、通關旗標、通關次數、音量偏好經 schema/version 檢查；JSON 壞掉或儲存拒絕不阻擋遊玩並警示。資料只屬於當前 origin/browser，可能被清除、無法跨裝置同步、可被竄改，不適用可信排行榜。
+目前測試規模為 456 unit 與 33 E2E；最後精確提交的結果看 [PR #11](https://github.com/CarlLee1983/p01-flight/pull/11) checks 與 artifact。舊版少量測試或先前 CI 不代替本版。手機模擬不等於實體手機手感；音訊解碼通過不等於人工聆聽驗收。遊戲趣味與獨立視覺覆核仍需分開記錄。
 
-## 結構
+全域 batchSize 維持 4096，只對 Image/Text 使用 QuadSingle；第二關素材只在載入時烘焙接縫與段落透明邊，不逐幀重建大圖。效能以真 WebGL 提交與 RAF 間隔觀測，不把 CPU 繪圖命令時間稱作 GPU 時間。詳見 [渲染紀錄](docs/render-batching-performance.md)。
 
-- `src/data/stage.ts`：Stage 01 時長、波次、敵機參數。新增 Stage 02 只需新配置與選關設計，不需改玩家基礎邏輯。
-- `src/game/model.ts`：純 TypeScript 模擬、碰撞規則、池化、勝敗；與 Phaser 無依賴，方便單元測試。
-- `src/storage/save.ts`：版本化存檔與失敗降級。
-- `src/main.ts`：Phaser scene 渲染與輸入、HTML 操作面板、一次性結算。
-- `scripts/serve.mjs`：僅供本機靜態交付，不是遊戲後端。
+## 存檔與架構
 
-Phaser 負責 Canvas/WebGL 呈現、生命週期及鍵盤；小型幾何碰撞由可測試 model 處理，未引入 Arcade Physics/ECS/通用引擎。渲染和遊戲規則分離。窗口 `__P01__()` 是只讀診斷快照，供 E2E 驗證，沒有修改生命／時間捷徑。
+key：`p01-flight:save:v1`。結算只寫一次，設定／重設才更新對應資料。損壞 JSON 或寫入被拒絕不會阻擋遊玩，會顯示提示。紀錄只屬於當前 origin/browser，可能被清除，不能跨裝置同步，也不適合作可信排行榜。
 
-## 範圍與來源
+- `src/data/stage.ts`、`stage02.ts`：關卡配置與第二關受控隨機波次；補給、休息窗口和 Boss 時點固定。
+- `src/game/model.ts`：不依賴 Phaser 的模擬、碰撞、池化與勝敗。
+- `src/game/stage-selection.ts`：解鎖、銜接與 seed。
+- `src/game/canyon-background.ts`：快取地形、地標與 Boss 蓄水池。
+- `src/storage/save.ts`：版本化存檔及失敗降級。
+- `src/main.ts`：Phaser 呈現、輸入、HUD 與 HTML 選單。
+- `scripts/serve.mjs`：交付用本機靜態伺服器，不是遊戲後端。
 
-本輪使用者已授權完善第一關：敵彈、不同敵機行為、道具、關底頭目。沒有追加關卡、觸控或改動隱私；音效與節奏為本專案原創 Web Audio 合成，無外部音檔。美術來源與授權見 [素材清單](docs/asset-manifest.md)。玩家、偵察機、重裝與頭目使用各自原創生成機體；來源、處理及限制見 [原創素材紀錄](docs/original-art-production.md)。敵彈、道具及命中動畫為原創程式圖形。
-
-存檔 schema/key 保持 v1；舊版已通關紀錄保留，不因新的頭目條件重設紀錄。既有高分仍保留，但不同玩法版本的分數不作公平排名。
-
-## 沿岸街機版驗證
-
-程式 head `5ef010c84180d150e3ee6be658235d0f992684c7` 的 [CI](https://github.com/CarlLee1983/p01-flight/actions/runs/43815661148) 通過35個unit、8個E2E、typecheck及build。實際鍵盤完整通關、自然失敗、三phase、炸彈、10次重試、關閉重開存檔、舊v1讀回與音訊解鎖/靜音均通過。最終截圖已目視。Firefox僅smoke，不是完整Firefox通關。無人工聽感或使用者手感結論，私人正式站登入後舊檔未由此CI驗證。
-
-## 最新製作增量
-
-目前功能與驗證限制以 [mobile-controls.md](docs/mobile-controls.md) 為準；第一關內容見 [stage-one-encounters.md](docs/stage-one-encounters.md)；武器包版見 [weapon-capsules.md](docs/weapon-capsules.md)；捲動與三武器版見 [scrolling-combat.md](docs/scrolling-combat.md)，前版見 [coastal-production.md](docs/coastal-production.md)。上述 PR #2 結果是前版歷史紀錄，不代表本版已通過瀏覽器驗收。
-
-連續地景以 32px/s 向下捲動，海流與雲層使用不同速度；C 三種武器有覆蓋、貫穿和追蹤取捨。PR #4 的 CI artifact 包含動態錄影與連續截圖，不將模型通關或靜態畫面等同玩家手感驗收。
-
-補給：P 升級、十字修復、S/B/M 切對應武器並升一級、W 提供 8 秒雙僚機。C 仍能自由換武器；僚機不擋子彈。新增窄翼攔截機和雙貨艙補給機，原創來源保留於素材紀錄。
-
-觸控：按住畫面拖曳並連射，側欄提供炸彈／換武器／暫停；指尖按下不讓戰機瞬移。手機模擬測試不等於真機手感驗收。
-
-## 第一關完整出擊版
-
-第一關125秒迎接Boss、170秒上限，正常示例約146–154秒通關，不新增第二關。不是延長舊空白：港區壓制、第二段岸防火力、左右護航、短補給、出口突圍是不同作戰段落。`src/data/stage.ts`定義戰鬥配置；`src/data/scenery.ts`定義同步地景區塊。
-
-CI的push與PR事件都須通過；不能只看PR成功忽略同head的push失敗。慢裝置/錄影每幀超50ms原會丟失模擬時間，已在渲染入口以最多250ms、每步不超1/60s的有界追幀處理。E2E以遊戲時鐘及有界實際等待確認進程，敗北/暫停/停滯立即提供診斷，不刪完整觸控與存檔驗收。
+沒有通用 ECS 或自製遊戲引擎。`__P01__()` 為診斷快照，沒有改生命／時間的捷徑。第一關經驗見 [製作手冊](docs/stage01-production-playbook.md)；第二關設計與實際覆核紀錄見 [stage02-canyon.md](docs/stage02-canyon.md)。手冊中早期「不開第二關」是已被最新開發授權取代的歷史範圍，不表示第一關已獲真人最終驗收。
