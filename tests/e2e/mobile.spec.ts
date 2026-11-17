@@ -222,8 +222,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
   );
   const moveTo = async (x: number) => {
-    const s = await state(page);
-    first.x += ((x - s.player.x) * box.width) / 360;
+    first.x = initialPointerX + ((x - 180) * box.width) / 360;
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
       touchPoints: [first],
