@@ -286,6 +286,8 @@ test("Stage02 full CDP touch sortie clears and preserves its result", async ({},
       touchPoints: [anchor],
     });
     const { chooseTouchTarget } = await import("../touch-policy");
+    const { VisibleHullTracker } = await import("../visible-hull-policy");
+    const visibleHulls = new VisibleHullTracker();
     const { touchDeliveryBudget } = await import("../touch-delivery-budget");
     let target = 180,
       budget = 0.2,
@@ -316,7 +318,8 @@ test("Stage02 full CDP touch sortie clears and preserves its result", async ({},
         const after = await state(page);
         if (after.mode === "won") break;
       }
-      const next = chooseTouchTarget(s, target, budget);
+      const hullHazards = visibleHulls.observe(s.time, s.activeEnemies);
+      const next = chooseTouchTarget({...s, hostileProjectiles: [...s.hostileProjectiles, ...hullHazards]}, target, budget);
       const changed = Math.abs(next - target) > 1;
       target = next;
       anchor.x = box.x + box.width / 2 + ((target - 180) * box.width) / 360;
