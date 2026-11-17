@@ -8,11 +8,12 @@ export interface PilotSnapshot {
     vx: number;
     vy: number;
   }>;
+  focus?: boolean;
   width?: number;
   height?: number;
 }
 const horizon = 0.35;
-const speed = 240;
+
 /** Minimum separation along actual relative trajectories, including wall stop. */
 export function clearance(
   s: PilotSnapshot,
@@ -21,6 +22,7 @@ export function clearance(
   predictionSeconds = horizon,
 ): number {
   const horizon = Math.max(0, predictionSeconds);
+  const speed = s.focus ? 100 : 240;
   const width = s.width ?? 360;
   const p = s.player;
   const stop =
@@ -66,10 +68,12 @@ export function chooseAction(
   // Centering is optional, never a reason to cross a bullet's swept path.
   const goal = Math.max(18, Math.min(width - 18, goalX ?? width / 2));
   const toward = Math.sign(goal - s.player.x) as Steering;
+  // Explicit goals use the same 32px safe corridor as standing, still 20px
+  // beyond the model's 12px bullet hit radius. Optional centering stays at 48px.
   if (distance.get(0)! >= 32) {
     if (
       Math.abs(goal - s.player.x) > (goalX === undefined ? 48 : 8) &&
-      (distance.get(toward) ?? 0) >= 48
+      (distance.get(toward) ?? 0) >= (goalX === undefined ? 48 : 32)
     )
       return toward;
     return 0;

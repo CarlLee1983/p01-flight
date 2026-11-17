@@ -72,11 +72,11 @@ export async function keyboardMoveTo(
   let held: Steering = 0;
   const trace: unknown[] = [];
   const release = async () => {
-    await page.keyboard.up("ArrowLeft");
-    await page.keyboard.up("ArrowRight");
+    if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
     held = 0;
   };
   try {
+    await page.keyboard.down("Shift");
     while (Date.now() < deadline) {
       const s = await state(page);
       trace.push({
@@ -101,22 +101,24 @@ export async function keyboardMoveTo(
         throw new Error(
           `Keyboard goal did not converge: ${JSON.stringify(trace)}`,
         );
-      const next = chooseAction(s, held, goalX);
+      const next = chooseAction({ ...s, focus: true }, held, goalX);
       if (next !== held) {
         await release();
         if (next)
           await page.keyboard.down(next < 0 ? "ArrowLeft" : "ArrowRight");
         held = next;
       }
-      // Re-read position and hazards even while a key is held; reverse after
-      // overshoot rather than continuing toward the boundary indefinitely.
+      // Focused pulses end BEFORE the next snapshot RPC. Otherwise snapshot
+      // transport plus key-up latency can carry us across the entire goal.
       await page.waitForTimeout(20);
+      await release();
     }
     throw new Error(
       `Keyboard goal wall-time bound exceeded: ${JSON.stringify(trace)}`,
     );
   } finally {
     await release();
+    await page.keyboard.up("Shift");
   }
 }
 
