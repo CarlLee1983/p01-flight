@@ -8,6 +8,7 @@ import { RAIDER_GEOMETRY, raiderMuzzle } from "./game/raider-geometry";
 import { createRaiderTextures, RAIDER_ART } from "./game/raider-art";
 import { createCannonTextures } from "./game/cannon-art";
 import {
+  shouldFlashBody,
   bossChargeSources,
   CANNON_ART,
   PRESENTATION_LAYERS,
@@ -40,18 +41,8 @@ let graphics: Phaser.GameObjects.Graphics;
 let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
 let impacts: Phaser.GameObjects.Graphics;
-const bodyKeys = new Set([
-  "scout",
-  "heavy",
-  "interceptor",
-  "carrier",
-  "ground-turret",
-  "ground-depot",
-  "enemy-brake",
-  "enemy-hook",
-  "boss",
-  "boss-cannon",
-]);
+let renderedImpactPrimitives = 0;
+
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
 let readPickupNotice = (): string | null => null;
@@ -218,6 +209,7 @@ class FlightScene extends Phaser.Scene {
         `${import.meta.env.BASE_URL}assets/kenney/${file}.png`,
       );
   }
+  private presentedHits = new WeakMap<object, number>();
   sprite(
     key: string,
     x: number,
@@ -226,6 +218,7 @@ class FlightScene extends Phaser.Scene {
     height: number,
     alpha = 1,
     angle = 0,
+    damageBody?: { hitUntil?: number },
   ) {
     let image = this.visuals[this.visualIndex++];
     if (!image) {
@@ -242,15 +235,15 @@ class FlightScene extends Phaser.Scene {
       .setDepth(1)
       .clearTint()
       .setTintMode(Phaser.TintModes.MULTIPLY);
-    if (bodyKeys.has(key)) {
-      const body =
-        key === "boss"
-          ? model.boss
-          : key === "boss-cannon"
-            ? model.boss?.cannons.find((c) => c.x === x && c.y === y)
-            : model.enemies.find((e) => e.active && e.x === x && e.y === y);
-      if ((body?.hitUntil ?? 0) > model.time)
-        image.setTint(0xfff1cb).setTintMode(Phaser.TintModes.FILL);
+    if (damageBody) {
+      const hit = damageBody.hitUntil ?? 0;
+      const flash = shouldFlashBody(
+        hit,
+        this.presentedHits.get(damageBody),
+        model.time,
+      );
+      this.presentedHits.set(damageBody, hit);
+      if (flash) image.setTint(0xfff1cb).setTintMode(Phaser.TintModes.FILL);
     }
     return image;
   }
@@ -528,6 +521,7 @@ class FlightScene extends Phaser.Scene {
         this.visualIndex,
         this.visuals.length,
         performance.now() - drawStarted,
+        renderedImpactPrimitives,
       );
   }
   draw() {
@@ -571,6 +565,7 @@ class FlightScene extends Phaser.Scene {
     graphics.clear();
     overlay.clear();
     impacts.clear();
+    renderedImpactPrimitives = 0;
     hud.clear();
     this.background.update(
       model.mode === "menu"
@@ -642,7 +637,7 @@ class FlightScene extends Phaser.Scene {
             overlay.fillRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
             overlay.lineStyle(2, 0xdcb878, 0.95);
             overlay.strokeRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
-            this.sprite("heavy", e.x, e.y, 68, 70).setDepth(4);
+            this.sprite("heavy", e.x, e.y, 68, 70, 1, 0, e).setDepth(4);
             for (const side of [-1, 1]) {
               overlay.fillStyle(0x354f60);
               overlay.fillRect(e.x + side * 39 - 7, e.y - 17, 14, 45);
@@ -679,7 +674,9 @@ class FlightScene extends Phaser.Scene {
           }
           if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
             if (e.behavior === "groundDepot") {
-              this.sprite("ground-depot", e.x, e.y, 70, 48).setDepth(0);
+              this.sprite("ground-depot", e.x, e.y, 70, 48, 1, 0, e).setDepth(
+                0,
+              );
             } else {
               this.sprite("ground-base", e.x, e.y, 72, 72).setDepth(0);
               // Texture is down-facing; Phaser clockwise rotation is opposite our aim-from-down axis.
@@ -691,6 +688,7 @@ class FlightScene extends Phaser.Scene {
                 48,
                 1,
                 (-(e.turretAngle ?? 0) * 180) / Math.PI,
+                e,
               ).setDepth(1);
             }
             // Subtle base rim distinguishes interactive targets from painted scenery.
@@ -726,7 +724,7 @@ class FlightScene extends Phaser.Scene {
             continue;
           }
           if (e.behavior === "escort") {
-            this.sprite("scout", e.x, e.y, 47, 40).setDepth(4);
+            this.sprite("scout", e.x, e.y, 47, 40, 1, 0, e).setDepth(4);
             overlay.fillStyle(0x697b8c);
             overlay.fillTriangle(
               e.x - 35,
@@ -760,7 +758,7 @@ class FlightScene extends Phaser.Scene {
           }
           if (e.behavior === "brakeRaider" || e.behavior === "hookWing") {
             const art = RAIDER_ART[e.behavior];
-            this.sprite(art.key, e.x, e.y, art.width, art.height);
+            this.sprite(art.key, e.x, e.y, art.width, art.height, 1, 0, e);
             for (const side of [-1, 1]) {
               this.sprite(
                 "fire03",
@@ -819,6 +817,7 @@ class FlightScene extends Phaser.Scene {
                   : e.behavior === "weave"
                     ? Math.sin((e.age ?? 0) * 2.6) * 18
                     : 0,
+            e,
           ).setTint(
             e.behavior === "turret"
               ? 0xd890ff
@@ -826,7 +825,7 @@ class FlightScene extends Phaser.Scene {
                 ? 0xffd18c
                 : 0xffffff,
           );
-          if ((e.hitUntil ?? 0) > model.time)
+          if (this.visuals[this.visualIndex - 1].tintMode === Phaser.TintModes.FILL)
             this.visuals[this.visualIndex - 1]
               .setTint(0xfff1cb)
               .setTintMode(Phaser.TintModes.FILL);
@@ -976,6 +975,7 @@ class FlightScene extends Phaser.Scene {
           BOSS_BODY.height,
           1,
           Math.sin(model.time * 1.8) * BOSS_BODY.bankDegrees,
+          model.boss,
         );
         for (const cannon of model.boss.cannons) {
           graphics.lineStyle(13, 0x243b4e);
@@ -1005,6 +1005,9 @@ class FlightScene extends Phaser.Scene {
             cannon.y,
             CANNON_ART.width,
             CANNON_ART.height,
+            1,
+            0,
+            cannon,
           ).setDepth(2);
           if (cannon.active) {
             overlay.fillStyle(0x182630);
@@ -1115,7 +1118,7 @@ class FlightScene extends Phaser.Scene {
         const life = e.life - (model.mode === "won" ? this.endingAge : 0);
         if (life <= 0 || e.kind === "pickup") continue;
         const duration = e.duration ?? (e.kind === "hit" ? 0.25 : 0.45);
-        drawImpact(
+        renderedImpactPrimitives += drawImpact(
           impacts,
           e.x,
           e.y,

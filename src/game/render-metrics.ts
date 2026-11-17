@@ -2,6 +2,7 @@ interface ActiveObject {
   active: boolean;
 }
 interface RenderPopulation {
+  effects?: readonly unknown[];
   enemies: readonly (ActiveObject & { behavior?: string })[];
   bullets: readonly ActiveObject[];
   enemyBullets: readonly ActiveObject[];
@@ -9,6 +10,8 @@ interface RenderPopulation {
 /** Constant-space counters. Snapshot allocation happens only on explicit reads. */
 export class RenderMetrics {
   private frames = 0;
+  private peakEffects = 0;
+  private peakImpactPrimitives = 0;
   private drawTotalMs = 0;
   private drawMaxMs = 0;
   private peakEnemies = 0;
@@ -18,6 +21,7 @@ export class RenderMetrics {
   private peakSprites = 0;
   private spritePool = 0;
   reset() {
+    this.peakEffects = this.peakImpactPrimitives = 0;
     this.frames = this.drawTotalMs = this.drawMaxMs = 0;
     this.peakEnemies = this.peakAirEnemies = this.peakPlayerBullets = 0;
     this.peakEnemyBullets = this.peakSprites = this.spritePool = 0;
@@ -27,6 +31,7 @@ export class RenderMetrics {
     sprites: number,
     pool: number,
     drawMs: number,
+    impactPrimitives = 0,
   ) {
     let enemies = 0,
       air = 0,
@@ -44,6 +49,14 @@ export class RenderMetrics {
       }
     for (const b of population.bullets) if (b.active) playerBullets++;
     for (const b of population.enemyBullets) if (b.active) enemyBullets++;
+    this.peakEffects = Math.max(
+      this.peakEffects,
+      population.effects?.length ?? 0,
+    );
+    this.peakImpactPrimitives = Math.max(
+      this.peakImpactPrimitives,
+      impactPrimitives,
+    );
     this.frames++;
     const duration = Math.max(0, Number.isFinite(drawMs) ? drawMs : 0);
     this.drawTotalMs += duration;
@@ -58,6 +71,8 @@ export class RenderMetrics {
   snapshot() {
     return {
       frames: this.frames,
+      peakEffects: this.peakEffects,
+      peakImpactPrimitives: this.peakImpactPrimitives,
       meanDrawCpuMs: this.frames ? this.drawTotalMs / this.frames : 0,
       maxDrawCpuMs: this.drawMaxMs,
       peakEnemies: this.peakEnemies,

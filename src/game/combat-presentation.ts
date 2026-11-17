@@ -20,3 +20,12 @@ export function bossChargeSources(boss: Boss) {
   }
   return sources;
 }
+
+/** Retain one presentation frame for a hit that arrived between slow renders. */
+export function shouldFlashBody(
+  until: number,
+  lastPresented: number | undefined,
+  now: number,
+) {
+  return until > 0 && (until !== lastPresented || until > now);
+}

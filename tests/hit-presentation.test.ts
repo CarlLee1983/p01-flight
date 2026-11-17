@@ -30,3 +30,11 @@ it("real hit schedules a brief body flash without changing damage or score", () 
   for (let i = 0; i < 8; i++) m.update(1 / 60, 0, 0, false);
   expect(m.time).toBeGreaterThan(enemy.hitUntil!);
 });
+import { shouldFlashBody } from "../src/game/combat-presentation";
+it("slow render latches a missed hit exactly once, independent of collocated bodies", () => {
+  expect(shouldFlashBody(0.055, undefined, 0.1)).toBe(true);
+  expect(shouldFlashBody(0.055, 0.055, 0.12)).toBe(false);
+  expect(shouldFlashBody(0.2, 0.055, 0.25)).toBe(true);
+  expect(shouldFlashBody(0, 0.2, 0)).toBe(false);
+  expect(shouldFlashBody(0.3, 0.3, 0.27)).toBe(true);
+});
