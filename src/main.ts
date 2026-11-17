@@ -1,5 +1,8 @@
 import { enemyMount, enemyBank } from "./game/enemy-mounts";
-import { configureTextureBatch } from "./game/texture-batching";
+import {
+  configureTextureBatch,
+  textureBatchName,
+} from "./game/texture-batching";
 import { createEnemyModuleTextures } from "./game/enemy-modules-art";
 import { drawImpact } from "./game/impact-art";
 import {
@@ -1282,8 +1285,7 @@ Object.defineProperty(window, "__P01__", {
     renderer: {
       type: game.renderer.type,
       batchSize: game.config.batchSize,
-      hudBatchRole: (label?.customRenderNodes as Record<string, unknown>)
-        ?.BatchHandler,
+      hudBatchRole: textureBatchName(label?.customRenderNodes),
       maxTextures:
         "maxTextures" in game.renderer ? game.renderer.maxTextures : 0,
     },

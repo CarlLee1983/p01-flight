@@ -9,3 +9,12 @@ export function configureTextureBatch(object: RenderObject) {
     object.setRenderNodeRole?.("BatchHandler", "BatchHandlerQuadSingle");
   }
 }
+
+/** Phaser resolves role strings to cyclic RenderNode objects; expose a scalar. */
+export function textureBatchName(roles: object | undefined): string | null {
+  const role = (roles as Record<string, unknown> | undefined)?.BatchHandler;
+  if (typeof role === "string") return role;
+  if (role && typeof role === "object" && "name" in role)
+    return typeof role.name === "string" ? role.name : null;
+  return null;
+}
