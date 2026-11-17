@@ -97,13 +97,23 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
     .toBeGreaterThanOrEqual(105);
   await page.screenshot({ path: "docs/boss.png" });
+  // Capture warning and angles from one frame. A second page.evaluate can run
+  // after the volley fired and legitimately cleared its forecast.
+  let warning: any;
   await expect
-    .poll(async () => (await state(page)).boss?.attackWarning ?? 0, {
-      timeout: 7000,
-      intervals: [20],
-    })
-    .toBeGreaterThan(0);
-  const warning = (await state(page)).boss;
+    .poll(
+      async () => {
+        const snapshot = (await state(page)).boss;
+        if (snapshot?.attackWarning > 0 && snapshot.attackAngles.length >= 2) {
+          warning = snapshot;
+          return true;
+        }
+        return false;
+      },
+      { timeout: 7000, intervals: [20] },
+    )
+    .toBe(true);
+  expect(warning.attackWarning).toBeGreaterThan(0);
   expect(warning.attackAngles.length).toBeGreaterThanOrEqual(2);
   await page.screenshot({ path: "docs/boss-attack-forecast.png" });
   await expect
