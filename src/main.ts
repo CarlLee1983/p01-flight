@@ -1,3 +1,4 @@
+import { bossMuzzle } from "./game/boss-muzzles";
 import Phaser from "phaser";
 import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
@@ -899,16 +900,25 @@ class FlightScene extends Phaser.Scene {
         }
         if (model.boss.attackWarning > 0) {
           for (const [index, angle] of model.boss.attackAngles.entries()) {
-            if (index === 0 && !model.boss.cannons[0].active) continue;
-            if (
-              index === model.boss.attackAngles.length - 1 &&
-              !model.boss.cannons[1].active
-            )
-              continue;
+            const muzzle = bossMuzzle(
+              model.boss,
+              index,
+              model.boss.attackAngles.length,
+            );
+            if (!muzzle.active) continue;
+            // The charging source is readable even when the long ray exits the view.
+            overlay.fillStyle(0xffd179, 0.75);
+            overlay.fillCircle(muzzle.x, muzzle.y, 4);
+            overlay.lineStyle(1.5, 0xffd179, 0.7);
+            overlay.strokeCircle(
+              muzzle.x,
+              muzzle.y,
+              8 + Math.sin(model.time * 18),
+            );
             overlay.lineStyle(1.8, 0xffd179, 0.65);
             for (let d = 40; d < 580; d += 26) {
-              const x = model.boss.x + Math.sin(angle) * d;
-              const y = model.boss.y + 28 + Math.cos(angle) * d;
+              const x = muzzle.x + Math.sin(angle) * d;
+              const y = muzzle.y + Math.cos(angle) * d;
               if (x < 10 || x > 350 || y > 625) break;
               overlay.lineBetween(
                 x,

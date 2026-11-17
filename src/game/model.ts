@@ -1,3 +1,4 @@
+import { bossMuzzle } from "./boss-muzzles";
 import { fastAttackAngles, isFastShooter } from "./enemy-patterns";
 import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
@@ -883,16 +884,15 @@ export class FlightModel {
       if (boss.y >= 105 && boss.telegraph <= 0 && boss.fireCooldown <= 0) {
         const angles = boss.attackAngles;
         for (const [index, a] of angles.entries()) {
-          const side = index === 0 ? -1 : index === angles.length - 1 ? 1 : 0;
-          const cannon = boss.cannons.find((p) => p.side === side);
-          if (cannon && !cannon.active) continue;
+          const muzzle = bossMuzzle(boss, index, angles.length);
+          if (!muzzle.active) continue;
           this.shootEnemy(
-            boss.x,
-            boss.y + 28,
+            muzzle.x,
+            muzzle.y,
             Math.sin(a) * this.stage.boss.bulletSpeed,
             Math.cos(a) * this.stage.boss.bulletSpeed,
             boss,
-            cannon,
+            muzzle.cannon,
           );
         }
         boss.fireCooldown = this.stage.boss.fireEvery * (phase === 3 ? 0.7 : 1);
