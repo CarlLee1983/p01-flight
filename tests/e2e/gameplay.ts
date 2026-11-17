@@ -1,3 +1,4 @@
+import { goalControl } from "../keyboard-goal-control";
 import { chooseAction, type Steering } from "../keyboard-policy";
 import { expect, type Page } from "@playwright/test";
 export const state = (page: Page) =>
@@ -135,15 +136,25 @@ export async function keyboardMoveTo(
   const start = await state(page);
   const deadline = Date.now() + 30000;
   let held: Steering = 0;
+  let lastReleaseMs = 100;
   const trace: unknown[] = [];
   const release = async () => {
-    if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
+    if (held) {
+      const began = Date.now();
+      await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
+      lastReleaseMs = Date.now() - began;
+    }
     held = 0;
   };
   try {
     await page.keyboard.down("Shift");
     while (Date.now() < deadline) {
+      const readStarted = Date.now();
       const s = await state(page);
+      const releaseLag = Math.max(
+        0.1,
+        Math.min(0.4, (Date.now() - readStarted + lastReleaseMs) / 1000),
+      );
       trace.push({
         time: s.time,
         x: s.player.x,
@@ -151,6 +162,7 @@ export async function keyboardMoveTo(
         mode: s.mode,
         held,
         goalX,
+        releaseLag,
       });
       if (trace.length > 64) trace.shift();
       expect(s.mode, JSON.stringify(trace)).toBe("playing");
@@ -166,17 +178,23 @@ export async function keyboardMoveTo(
         throw new Error(
           `Keyboard goal did not converge: ${JSON.stringify(trace)}`,
         );
-      const next = chooseAction({ ...s, focus: true }, held, goalX);
+      const { next, pulse } = goalControl(
+        s,
+        held,
+        goalX,
+        tolerance,
+        releaseLag,
+      );
       if (next !== held) {
         await release();
         if (next)
           await page.keyboard.down(next < 0 ? "ArrowLeft" : "ArrowRight");
         held = next;
       }
-      // Focused pulses end BEFORE the next snapshot RPC. Otherwise snapshot
-      // transport plus key-up latency can carry us across the entire goal.
+      // Sustain far-field movement across observation RPCs so trajectory
+      // prediction matches 100px/s. Only pulse inside the transport brake band.
       await page.waitForTimeout(20);
-      await release();
+      if (pulse) await release();
     }
     throw new Error(
       `Keyboard goal wall-time bound exceeded: ${JSON.stringify(trace)}`,

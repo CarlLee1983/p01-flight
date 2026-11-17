@@ -64,10 +64,16 @@ export function chooseTouchTarget(
     delayedTouchClearance(s, target, previousTarget, latencySeconds);
   const stay = safe(x);
   if (stay >= 32) {
-    return Math.abs(goal - x) > (goalX === undefined ? 48 : 4) &&
-      safe(center) >= 48
-      ? center
-      : x;
+    if (Math.abs(goal - x) <= (goalX === undefined ? 48 : 4)) return x;
+    // A long target can cross a bullet while a shorter, self-stopping target
+    // remains safe. Do not discard those corridors merely because standing is safe.
+    const forward =
+      goalX === undefined
+        ? [center]
+        : [72, 48, 24].map((step) =>
+            clamp(x + Math.sign(goal - x) * Math.min(step, Math.abs(goal - x))),
+          );
+    return forward.find((target) => safe(target) >= 48) ?? x;
   }
   const candidates = [
     ...new Set(
