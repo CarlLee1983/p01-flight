@@ -13,7 +13,7 @@ const run = (m: FlightModel, seconds: number, fire = false, fps = 60) => {
 };
 describe("combat increment", () => {
   it.each([30, 60, 120])(
-    "normal centered fire and two bombs clear actual Stage01 at %i FPS",
+    "normal fire with Boss dodges and two bombs clears actual Stage01 at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
@@ -36,7 +36,7 @@ describe("combat increment", () => {
             (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
         )
           bomb2 = m.useBomb();
-        m.update(1 / fps, 0, 0, true);
+        m.update(1 / fps, m.boss?.active ? dodgeDirection(m, 0) : 0, 0, true);
         if (m.partsDestroyed > cannonTimes.length) cannonTimes.push(m.time);
         sawBoss ||= !!m.boss?.active;
         sawEnemyBullet ||= m.enemyBullets.some((b) => b.active);
@@ -315,7 +315,7 @@ describe("weapon and encounter progression", () => {
     );
   });
   it.each([30, 60, 120])(
-    "beam switch with two timed bombs wins at %i FPS",
+    "beam switch with Boss dodges and two timed bombs wins at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
@@ -332,7 +332,7 @@ describe("weapon and encounter progression", () => {
         if (!bomb2 && m.time >= 146) {
           bomb2 = m.useBomb();
         }
-        m.update(1 / fps, 0, 0, true);
+        m.update(1 / fps, m.boss?.active ? dodgeDirection(m, 0) : 0, 0, true);
       }
       expect(m.mode).toBe("won");
       expect(bomb1 && bomb2).toBe(true);

@@ -1,4 +1,4 @@
-import { bossMuzzle } from "./boss-muzzles";
+import { bossMuzzle, bossSideAngles } from "./boss-muzzles";
 import { fastAttackAngles, isFastShooter } from "./enemy-patterns";
 import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
@@ -874,7 +874,7 @@ export class FlightModel {
           const sweep = boss.attackCycle % 2 ? 0.1 : -0.1;
           boss.attackAngles =
             phase === 1
-              ? [-0.25, 0.25].map((a) => a + aim)
+              ? bossSideAngles(boss, this.player.x, this.player.y)
               : phase === 2
                 ? [-0.5, -0.25, 0, 0.25, 0.5].map((a) => a + sweep)
                 : [-0.3, 0, 0.3].map((a) => a + aim);
