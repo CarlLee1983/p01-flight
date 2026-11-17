@@ -29,34 +29,99 @@ export async function waitGameTime(page: Page, seconds: number) {
     `Game did not reach ${seconds}s within bounded wall-time budget: ${JSON.stringify(await state(page))}`,
   );
 }
+/** Keep real controls running while slow screenshot/assertion RPCs are pending.
+ * Work must use bounded Playwright operations (capture 15s / poll explicit timeout).
+ * Both branches settle before return; an input failure remains the primary error. */
+export async function withKeyboardPilot<T>(
+  page: Page,
+  work: () => Promise<T>,
+  goalX?: number,
+): Promise<T> {
+  let done = false,
+    result: T | undefined,
+    failure: unknown,
+    held: Steering = 0;
+  const pending = work().then(
+    (value) => {
+      result = value;
+      done = true;
+    },
+    (error) => {
+      failure = error;
+      done = true;
+    },
+  );
+  try {
+    while (!done) {
+      const s = await state(page);
+      if (s.mode === "won") break; // Work retains its own outcome assertions.
+      expect(s.mode).toBe("playing");
+      const next = chooseAction(s, held, goalX);
+      if (next !== held) {
+        if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
+        held = 0;
+        if (next) {
+          await page.keyboard.down(next < 0 ? "ArrowLeft" : "ArrowRight");
+          held = next;
+        }
+      }
+      await page.waitForTimeout(20);
+    }
+    await pending;
+    if (failure) throw failure;
+    return result as T;
+  } finally {
+    try {
+      if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
+    } finally {
+      await pending;
+    }
+  }
+}
 export async function keyboardShoreCounterattack(page: Page) {
   await evadeUntil(page, 70);
-  await expect
-    .poll(
-      async () =>
-        (await state(page)).activeEnemies.some(
-          (e: any) =>
-            e.behavior === "groundBattery" &&
-            e.visibleSince >= 70 &&
-            e.telegraph > 0,
-        ),
-      { timeout: 25000, intervals: [30] },
-    )
-    .toBe(true);
-  const s = await state(page);
-  const target = s.activeEnemies.find(
-    (e: any) =>
-      e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
+  let target: any;
+  await withKeyboardPilot(page, () =>
+    expect
+      .poll(
+        async () => {
+          const snapshot = await state(page);
+          target = snapshot.activeEnemies.find(
+            (e: any) =>
+              e.behavior === "groundBattery" &&
+              e.visibleSince >= 70 &&
+              e.telegraph > 0,
+          );
+          return Boolean(target);
+        },
+        { timeout: 25000, intervals: [30] },
+      )
+      .toBe(true),
   );
   await keyboardMoveTo(page, target.x, 18);
-  await page.screenshot({ path: "docs/second-shore-counterattack.png" });
-  await expect
-    .poll(
-      async () =>
-        (await state(page)).activeEnemies.some((e: any) => e.id === target.id),
-      { timeout: 15000 },
-    )
-    .toBe(false);
+  await withKeyboardPilot(
+    page,
+    () =>
+      page.screenshot({
+        path: "docs/second-shore-counterattack.png",
+        timeout: 15000,
+      }),
+    target.x,
+  );
+  await withKeyboardPilot(
+    page,
+    () =>
+      expect
+        .poll(
+          async () =>
+            (await state(page)).activeEnemies.some(
+              (e: any) => e.id === target.id,
+            ),
+          { timeout: 15000 },
+        )
+        .toBe(false),
+    target.x,
+  );
   await keyboardMoveTo(page, 180, 12);
 }
 

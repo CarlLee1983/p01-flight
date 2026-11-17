@@ -6,6 +6,7 @@ import {
   keyboardShoreCounterattack,
   keyboardMoveTo,
   evadeUntil,
+  withKeyboardPilot,
 } from "./gameplay";
 import { stage01 } from "../../src/data/stage";
 const BOSS_AT = stage01.boss!.at;
@@ -115,7 +116,9 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await keyboardShoreCounterattack(page);
   for (const t of [78, 80.2, 84.2, 100, 105, 112, 123]) {
     await evadeUntil(page, t);
-    await page.screenshot({ path: `docs/sortie-${t}.png` });
+    await withKeyboardPilot(page, () =>
+      page.screenshot({ path: `docs/sortie-${t}.png`, timeout: 15000 }),
+    );
   }
   await expect
     .poll(async () => (await state(page)).boss?.y ?? -60, { timeout: 80000 })
@@ -123,10 +126,14 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect((await state(page)).hudBottom).toBeLessThan(63);
   const layers = await state(page);
   expect(layers.hudLayer).toBeGreaterThan(layers.combatMaxLayer);
-  await page.screenshot({ path: "docs/boss.png" });
+  await withKeyboardPilot(page, () =>
+    page.screenshot({ path: "docs/boss.png", timeout: 15000 }),
+  );
   await page.setViewportSize({ width: 320, height: 700 });
   expect((await state(page)).hudBottom).toBeLessThan(63);
-  await page.screenshot({ path: "docs/boss-320.png" });
+  await withKeyboardPilot(page, () =>
+    page.screenshot({ path: "docs/boss-320.png", timeout: 15000 }),
+  );
   await page.setViewportSize({ width: 1000, height: 900 });
   // Capture warning and angles from one frame. A second page.evaluate can run
   // after the volley fired and legitimately cleared its charge state.
@@ -151,7 +158,9 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect(new Set(sources.map((p: any) => `${p.x}:${p.y}`)).size).toBe(
     sources.length,
   );
-  await page.screenshot({ path: "docs/boss-charge-no-guides.png" });
+  await withKeyboardPilot(page, () =>
+    page.screenshot({ path: "docs/boss-charge-no-guides.png", timeout: 15000 }),
+  );
   await expect
     .poll(async () => (await state(page)).audio.musicSection, { timeout: 5000 })
     .toBe("boss");
@@ -159,11 +168,18 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect((await state(page)).audio.sectionTransitionCount).toBeGreaterThan(2);
   await evadeUntil(page, BOSS_AT + 7);
   await expect.poll(async () => (await state(page)).partsDestroyed).toBe(2);
-  await page.screenshot({ path: "docs/boss-cannons-destroyed.png" });
+  await withKeyboardPilot(page, () =>
+    page.screenshot({
+      path: "docs/boss-cannons-destroyed.png",
+      timeout: 15000,
+    }),
+  );
   await evadeUntil(page, BOSS_AT + 15);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(1);
-  await page.screenshot({ path: "docs/bomb.png" });
+  await withKeyboardPilot(page, () =>
+    page.screenshot({ path: "docs/bomb.png", timeout: 15000 }),
+  );
   await evadeUntil(page, BOSS_AT + 21);
   await page.keyboard.press("x");
   await expect.poll(async () => (await state(page)).bombs).toBe(0);
@@ -176,31 +192,35 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await expect
     .poll(async () => (await state(page)).partsDestroyed, { timeout: 10000 })
     .toBe(2);
-  await page.screenshot({ path: "docs/boss-phase3.png" });
+  await withKeyboardPilot(page, () =>
+    page.screenshot({ path: "docs/boss-phase3.png", timeout: 15000 }),
+  );
   // Independent post-render snapshots diagnose compositor rectangles. Keep the
   // original screenshot/video as evidence; never replace a failed image silently.
   const renderer = (await state(page)).renderer;
   console.log("FRAME_RENDERER", JSON.stringify(renderer));
   expect(renderer.batchSize).toBe(4096);
   expect(renderer.hudBatchRole).toBe("BatchHandlerQuadSingle");
-  for (let i = 0; i < 8; i++) {
-    const png = await page.evaluate(() => (window as any).__P01_CAPTURE__());
-    expect(png).toMatch(/^data:image\/png;base64,/);
-    await writeFile(
-      `docs/boss-phase3-framebuffer-${i}.png`,
-      Buffer.from(png.split(",")[1], "base64"),
-    );
-    const source = await page.evaluate(() =>
-      (window as any).__P01_HUD_SOURCE__(),
-    );
-    await writeFile(
-      `docs/boss-phase3-hud-source-${i}.png`,
-      Buffer.from(source.split(",")[1], "base64"),
-    );
-  }
-  await expect
-    .poll(async () => (await state(page)).mode, { timeout: 90000 })
-    .toBe("won");
+  await withKeyboardPilot(page, async () => {
+    for (let i = 0; i < 8; i++) {
+      const png = await page.evaluate(() => (window as any).__P01_CAPTURE__());
+      expect(png).toMatch(/^data:image\/png;base64,/);
+      await writeFile(
+        `docs/boss-phase3-framebuffer-${i}.png`,
+        Buffer.from(png.split(",")[1], "base64"),
+      );
+      const source = await page.evaluate(() =>
+        (window as any).__P01_HUD_SOURCE__(),
+      );
+      await writeFile(
+        `docs/boss-phase3-hud-source-${i}.png`,
+        Buffer.from(source.split(",")[1], "base64"),
+      );
+    }
+    await expect
+      .poll(async () => (await state(page)).mode, { timeout: 90000 })
+      .toBe("won");
+  });
   await page.keyboard.up("Space");
   const won = await state(page);
   expect(won.time).toBeGreaterThanOrEqual(BOSS_AT);

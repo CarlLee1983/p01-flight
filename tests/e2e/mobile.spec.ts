@@ -200,6 +200,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     untilWon = false,
     goalX?: number,
     untilEnemyGone?: number,
+    stopWhen?: (s: any) => boolean,
   ) => {
     const start = await state(page);
     const deadline =
@@ -214,6 +215,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       }
       if (s.mode !== "playing") await attachInputTrace();
       expect(s.mode).toBe("playing");
+      if (stopWhen?.(s)) return s;
       if (
         untilEnemyGone !== undefined &&
         !s.activeEnemies.some((e: any) => e.id === untilEnemyGone)
@@ -222,11 +224,13 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
       if (
         goalX !== undefined &&
         untilEnemyGone === undefined &&
+        !stopWhen &&
         Math.abs(s.player.x - goalX) < 12
       )
         return;
-      if (goalX === undefined && !untilWon && s.time >= seconds) return;
-      if (goalX !== undefined && s.time >= seconds) {
+      if (goalX === undefined && !untilWon && !stopWhen && s.time >= seconds)
+        return;
+      if ((goalX !== undefined || stopWhen) && s.time >= seconds) {
         await attachInputTrace();
         throw new Error(
           `Touch goal ${goalX} not reached safely within bounded game-time window`,
@@ -273,19 +277,15 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     throw new Error(`Touch pilot did not reach ${seconds}s`);
   };
   await touchEvadeUntil(70);
-  await expect
-    .poll(
-      async () =>
-        (await state(page)).activeEnemies.some(
-          (e: any) =>
-            e.behavior === "groundBattery" &&
-            e.visibleSince >= 70 &&
-            e.telegraph > 0,
-        ),
-      { timeout: 25000, intervals: [30] },
-    )
-    .toBe(true);
-  const shore = (await state(page)).activeEnemies.find(
+  const ready = await touchEvadeUntil(80, false, undefined, undefined, (s) =>
+    s.activeEnemies.some(
+      (e: any) =>
+        e.behavior === "groundBattery" &&
+        e.visibleSince >= 70 &&
+        e.telegraph > 0,
+    ),
+  );
+  const shore = ready.activeEnemies.find(
     (e: any) =>
       e.behavior === "groundBattery" && e.visibleSince >= 70 && e.telegraph > 0,
   );
@@ -294,7 +294,32 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
     expect(Math.abs((await state(page)).player.x - x)).toBeLessThan(12);
   };
   await moveTo(shore.x);
-  await page.screenshot({ path: "docs/mobile-second-shore.png" });
+  let captured = false;
+  let captureError: unknown;
+  const capture = page
+    .screenshot({ path: "docs/mobile-second-shore.png", timeout: 15000 })
+    .then(
+      () => {
+        captured = true;
+      },
+      (error) => {
+        captureError = error;
+        captured = true;
+      },
+    );
+  try {
+    await touchEvadeUntil(
+      (await state(page)).time + 8,
+      false,
+      shore.x,
+      undefined,
+      () => captured,
+    );
+  } finally {
+    await capture;
+    if (captureError) throw captureError;
+  }
+
   // Continue goal-directed dodging while firing at the battery, not a blind hold.
   await touchEvadeUntil((await state(page)).time + 8, false, shore.x, shore.id);
   expect(
