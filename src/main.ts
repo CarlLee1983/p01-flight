@@ -170,6 +170,8 @@ class FlightScene extends Phaser.Scene {
       "harbor-exit",
       "harbor-refinery",
       "ground-battery",
+      "ground-base",
+      "ground-turret",
       "ground-depot",
     ])
       this.load.image(
@@ -654,84 +656,17 @@ class FlightScene extends Phaser.Scene {
             if (e.behavior === "groundDepot") {
               this.sprite("ground-depot", e.x, e.y, 70, 48).setDepth(0);
             } else {
-              // Fixed armored plinth; only the turret and barrels rotate.
-              graphics.fillStyle(0x162e36);
-              graphics.fillRoundedRect(e.x - 31, e.y - 29, 62, 58, 5);
-              graphics.lineStyle(2, 0x698487);
-              graphics.strokeRoundedRect(e.x - 28, e.y - 26, 56, 52, 4);
-              graphics.fillStyle(0x0b1d27, 0.75);
-              graphics.fillTriangle(
-                e.x - 31,
-                e.y + 25,
-                e.x + 31,
-                e.y + 25,
-                e.x + 24,
-                e.y + 35,
-              );
-              graphics.fillTriangle(
-                e.x - 31,
-                e.y + 25,
-                e.x - 24,
-                e.y + 35,
-                e.x + 24,
-                e.y + 35,
-              );
-              graphics.lineStyle(2, 0xb2aaa0);
-              graphics.lineBetween(e.x - 25, e.y - 25, e.x + 23, e.y - 25);
-              graphics.fillStyle(0x42585e);
-              graphics.fillRect(e.x - 23, e.y - 21, 46, 42);
-              for (const side of [-1, 1]) {
-                graphics.fillStyle(0xc4a376);
-                graphics.fillRect(e.x + side * 23 - 3, e.y - 24, 6, 5);
-                graphics.fillRect(e.x + side * 23 - 3, e.y + 19, 6, 5);
-              }
-              graphics.fillStyle(0x6c7976);
-              for (const side of [-1, 1]) {
-                graphics.fillRect(e.x + side * 22 - 5, e.y - 16, 10, 11);
-                graphics.fillRect(e.x + side * 22 - 5, e.y + 5, 10, 11);
-                graphics.lineStyle(1, 0x263c43);
-                graphics.lineBetween(
-                  e.x + side * 22 - 4,
-                  e.y - 4,
-                  e.x + side * 22 + 4,
-                  e.y - 4,
-                );
-              }
-              graphics.fillStyle(0x182d36);
-              graphics.fillCircle(e.x, e.y, 19);
-              graphics.lineStyle(2, 0x9ba8a2);
-              graphics.strokeCircle(e.x, e.y, 17);
-              const angle = e.turretAngle ?? 0;
-              const muzzle = groundMuzzle(e, angle);
-              for (const offset of [-4, 4]) {
-                const px = Math.cos(angle) * offset,
-                  py = -Math.sin(angle) * offset;
-                graphics.lineStyle(5, 0xc5bca7);
-                graphics.lineBetween(
-                  e.x + px,
-                  e.y + py,
-                  muzzle.x + px,
-                  muzzle.y + py,
-                );
-                graphics.lineStyle(2, 0x354957);
-                graphics.lineBetween(
-                  e.x + px,
-                  e.y + py,
-                  muzzle.x + px,
-                  muzzle.y + py,
-                );
-              }
-              // Twin rails support one central bore: projectile and flash use its opening.
-              graphics.lineStyle(7, 0x788d91);
-              graphics.lineBetween(e.x, e.y, muzzle.x, muzzle.y);
-              graphics.lineStyle(2, 0xc7c7b8);
-              graphics.lineBetween(e.x, e.y, muzzle.x, muzzle.y);
-              graphics.fillStyle(0x142731);
-              graphics.fillCircle(muzzle.x, muzzle.y, 3);
-              graphics.fillStyle(0x60777c);
-              graphics.fillCircle(e.x, e.y, 10);
-              graphics.fillStyle(0xe9b877);
-              graphics.fillCircle(e.x, e.y, 3);
+              this.sprite("ground-base", e.x, e.y, 72, 72).setDepth(0);
+              // Texture is down-facing; Phaser clockwise rotation is opposite our aim-from-down axis.
+              this.sprite(
+                "ground-turret",
+                e.x,
+                e.y,
+                48,
+                48,
+                1,
+                (-(e.turretAngle ?? 0) * 180) / Math.PI,
+              ).setDepth(1);
             }
             // Subtle base rim distinguishes interactive targets from painted scenery.
             if (e.y >= GROUND_VISIBLE_Y) {

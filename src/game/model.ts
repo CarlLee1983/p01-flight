@@ -842,7 +842,7 @@ export class FlightModel {
             const aim = e.aimAngle ?? 0;
             if (e.behavior === "turret" || e.behavior === "groundBattery") {
               if (e.behavior === "groundBattery")
-                e.turretHoldUntil = this.time + 0.35;
+                e.turretHoldUntil = this.time + 0.4;
               const muzzle =
                 e.behavior === "groundBattery"
                   ? groundMuzzle(e, aim)

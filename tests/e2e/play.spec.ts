@@ -37,6 +37,8 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     "harbor-exit",
     "harbor-refinery",
     "ground-battery",
+    "ground-base",
+    "ground-turret",
     "ground-depot",
   ]) {
     const response = await page.request.get(`/assets/original/${name}.png`);

@@ -55,6 +55,7 @@ it.each([30, 60, 120])(
         expect(e.turretAngle).toBeCloseTo(locked);
       if (m.emittedEnemyShots > prior) {
         if (!first) first = m.time;
+        expect(e.turretAngle).toBeCloseTo(locked);
         const b = m.enemyBullets.find((b) => b.active && b.bornAt === m.time)!;
         const muzzle = groundMuzzle(e, locked);
         expect(b.muzzleX).toBeCloseTo(muzzle.x);

@@ -1,0 +1,22 @@
+[
+  {
+    "file": "ground-base.png",
+    "size": [1254, 1254],
+    "mode": "RGBA",
+    "alpha_range": [0, 255],
+    "visible_bbox_alpha128": [159, 146, 1096, 1107],
+    "transparent_pixels": 768227,
+    "bytes": 1586843,
+    "sha256": "b439f9bf2320985fd4455a05d3424268f95f6f2398d09eaf65cdf93a4777cd29"
+  },
+  {
+    "file": "ground-turret-centered.png",
+    "size": [1254, 1254],
+    "mode": "RGBA",
+    "alpha_range": [0, 255],
+    "visible_bbox_alpha128": [321, 311, 933, 1165],
+    "transparent_pixels": 1257151,
+    "bytes": 695013,
+    "sha256": "90c60c6354acb20787597040764c382744166f746f2b8703fab315e9fcff15cd"
+  }
+]
