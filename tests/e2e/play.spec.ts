@@ -181,7 +181,8 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   // original screenshot/video as evidence; never replace a failed image silently.
   const renderer = (await state(page)).renderer;
   console.log("FRAME_RENDERER", JSON.stringify(renderer));
-  expect(renderer.batchSize).toBe(1);
+  expect(renderer.batchSize).toBe(4096);
+  expect(renderer.hudBatchRole).toBe("BatchHandlerQuadSingle");
   for (let i = 0; i < 8; i++) {
     const png = await page.evaluate(() => (window as any).__P01_CAPTURE__());
     expect(png).toMatch(/^data:image\/png;base64,/);

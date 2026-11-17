@@ -1,4 +1,5 @@
 import { enemyMount, enemyBank } from "./game/enemy-mounts";
+import { configureTextureBatch } from "./game/texture-batching";
 import { createEnemyModuleTextures } from "./game/enemy-modules-art";
 import { drawImpact } from "./game/impact-art";
 import {
@@ -250,6 +251,15 @@ class FlightScene extends Phaser.Scene {
     return image;
   }
   create() {
+    // Texture-only isolation retains the observed missing-quad mitigation.
+    // Global batchSize:1 also split every Graphics triangle into a draw call.
+    this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, configureTextureBatch);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off(
+        Phaser.Scenes.Events.ADDED_TO_SCENE,
+        configureTextureBatch,
+      );
+    });
     this.background = new CoastalBackground(this);
     readBackgroundInfo = () => this.background.diagnostics();
     readCombatLayer = () =>
@@ -1176,10 +1186,9 @@ const game = new Phaser.Game({
   parent: "game",
   backgroundColor: "#0c2035",
   scene: [FlightScene],
-  // Diagnostic compatibility setting: isolate each quad while investigating
-  // partial image/text batches. Sampler limiting alone did not resolve it.
-  // Keep content and simulation unchanged; validate framebuffers and CPU cost.
-  render: { pixelArt: false, antialias: true, batchSize: 1 },
+  // Normal Graphics batching; textured Image/Text use the built-in single-quad
+  // node separately. Never globally split all effect/background triangles.
+  render: { pixelArt: false, antialias: true, batchSize: 4096 },
   fps: { target: 60 },
 });
 document.addEventListener("visibilitychange", () => {
@@ -1273,6 +1282,8 @@ Object.defineProperty(window, "__P01__", {
     renderer: {
       type: game.renderer.type,
       batchSize: game.config.batchSize,
+      hudBatchRole: (label?.customRenderNodes as Record<string, unknown>)
+        ?.BatchHandler,
       maxTextures:
         "maxTextures" in game.renderer ? game.renderer.maxTextures : 0,
     },
