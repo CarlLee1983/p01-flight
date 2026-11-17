@@ -1,0 +1,184 @@
+[
+  {
+    "key": "enemy-hook-metal",
+    "source": "metal-hook.png",
+    "sourceSha256": "c244b93bb5639a7598812eaf4065a20803555de5c6fd9bc73f085eccf01fde13",
+    "sourceSize": [
+      1340,
+      1174
+    ],
+    "size": [
+      192,
+      168
+    ],
+    "columnRig": {
+      "source": [
+        0,
+        460,
+        880,
+        1340
+      ],
+      "destination": [
+        0,
+        60,
+        132,
+        192
+      ],
+      "sourceY": [
+        30,
+        1145
+      ],
+      "destinationY": [
+        4,
+        164
+      ]
+    },
+    "file": "public/assets/original/enemy-hook-metal.webp",
+    "bytes": 16882,
+    "sha256": "ccbb26a1dedf97eeb18d7ac123b869838d6839eb8e04a451931303bd9c513db1"
+  },
+  {
+    "key": "enemy-brake-metal",
+    "source": "metal-brake.png",
+    "sourceSha256": "2f64d3948772bf24842c6b947f0d4383fae708e22426a455564ef02931dda0c5",
+    "sourceSize": [
+      1341,
+      1173
+    ],
+    "size": [
+      192,
+      168
+    ],
+    "columnRig": {
+      "source": [
+        0,
+        430,
+        920,
+        1341
+      ],
+      "destination": [
+        0,
+        60,
+        132,
+        192
+      ],
+      "sourceY": [
+        83,
+        1106
+      ],
+      "destinationY": [
+        4,
+        164
+      ]
+    },
+    "file": "public/assets/original/enemy-brake-metal.webp",
+    "bytes": 15786,
+    "sha256": "502ba4d46b6cd860cb689832733fb22d70d74813453dbbdc82305accf9a8d355"
+  },
+  {
+    "key": "enemy-patrol-metal",
+    "source": "metal-patrol.png",
+    "sourceSha256": "48ab1d903cd65f350c8bc3387deb5b1db72fc3c6d7b5251219cffec4fe913305",
+    "sourceSize": [
+      1468,
+      1071
+    ],
+    "size": [
+      416,
+      304
+    ],
+    "columnRig": {
+      "source": [
+        0,
+        230,
+        1235,
+        1468
+      ],
+      "destination": [
+        0,
+        52,
+        364,
+        416
+      ],
+      "sourceY": [
+        9,
+        1017
+      ],
+      "destinationY": [
+        8,
+        280
+      ]
+    },
+    "file": "public/assets/original/enemy-patrol-metal.webp",
+    "bytes": 49512,
+    "sha256": "e7b33184362deac7dff6270ec226c93b8fa686ffdd17b27428a0f12d27ffe33e"
+  },
+  {
+    "key": "boss-cannon-metal",
+    "source": "metal-cannon.png",
+    "sourceSha256": "8724e40094b2482c5de675db93759740b9d96c4d5883551fb3372f2ee0d420f5",
+    "sourceSize": [
+      1024,
+      1536
+    ],
+    "size": [
+      128,
+      192
+    ],
+    "columnRig": null,
+    "file": "public/assets/original/boss-cannon-metal.webp",
+    "bytes": 8816,
+    "sha256": "c29991cc5841be1415e2e33d5110bd0a612804a0f6d075e4948649e550cebcd4"
+  },
+  {
+    "key": "boss-cannon-broken-metal",
+    "source": "metal-broken.png",
+    "sourceSha256": "0035bba6b88f42c7a5d2b86f5b2399489cd65662290ae016bbaab34bfbd91204",
+    "sourceSize": [
+      1024,
+      1536
+    ],
+    "size": [
+      128,
+      192
+    ],
+    "columnRig": null,
+    "file": "public/assets/original/boss-cannon-broken-metal.webp",
+    "bytes": 7224,
+    "sha256": "cc39cf7ab0e0f7b13d2a996943651eedf0fdafb5c5d944c9c33cf4f0af5c229c"
+  },
+  {
+    "key": "enemy-escort-metal",
+    "source": "metal-escort.png",
+    "sourceSha256": "08569544e520d5f7bbd0906b44b2c0b799a03334bf775fcdbd196fc82a293bb7",
+    "sourceSize": [
+      1582,
+      994
+    ],
+    "size": [
+      280,
+      176
+    ],
+    "columnRig": null,
+    "file": "public/assets/original/enemy-escort-metal.webp",
+    "bytes": 19926,
+    "sha256": "4cf5e228d7699f0ead4b0c3bea279fe3e48bcfa259c065a8ec880274cf93880a"
+  },
+  {
+    "key": "enemy-gunship-metal",
+    "source": "metal-gunship.png",
+    "sourceSha256": "9082e10d445ffc05f20fe5f1ec6301bd42c58a90a98c8c349a6c8f7625aae38b",
+    "sourceSize": [
+      1340,
+      1174
+    ],
+    "size": [
+      224,
+      196
+    ],
+    "columnRig": null,
+    "file": "public/assets/original/enemy-gunship-metal.webp",
+    "bytes": 15718,
+    "sha256": "a0e9b37bd0410876ae6d068e1c5b30f524eefdac3e02e5a4d1c7b4eb881d26e8"
+  }
+]

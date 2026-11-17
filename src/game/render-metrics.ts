@@ -13,6 +13,7 @@ const COVERAGE_KINDS = new Set([
   "brakeRaider",
   "hookWing",
 ]);
+type PresentationEvent = {time: number; wallMs: number; id?: number; x?: number; y?: number; turretAngle?: number};
 interface ActiveObject {
   active: boolean;
 }
@@ -23,6 +24,8 @@ interface RenderPopulation {
     y?: number;
     hitUntil?: number;
     telegraph?: number;
+    id?: number; x?: number; hp?: number; maxHp?: number;
+    shotsFired?: number; gateCycle?: number; turretAngle?: number;
   })[];
   time?: number;
   bullets: readonly ActiveObject[];
@@ -32,8 +35,9 @@ interface RenderPopulation {
 export class RenderMetrics {
   private enemyCoverage: Record<
     string,
-    { frames: number; hitFrames: number; chargeFrames: number }
+    { frames: number; hitFrames: number; chargeFrames: number; presentation?: Record<string, PresentationEvent> }
   > = {};
+  private startedAt = performance.now();
   private frames = 0;
   private peakEffects = 0;
   private peakImpactPrimitives = 0;
@@ -47,6 +51,7 @@ export class RenderMetrics {
   private spritePool = 0;
   reset() {
     this.enemyCoverage = {};
+    this.startedAt = performance.now();
     this.peakEffects = this.peakImpactPrimitives = 0;
     this.frames = this.drawTotalMs = this.drawMaxMs = 0;
     this.peakEnemies = this.peakAirEnemies = this.peakPlayerBullets = 0;
@@ -63,7 +68,17 @@ export class RenderMetrics {
       air = 0,
       playerBullets = 0,
       enemyBullets = 0;
-    for (const e of population.enemies)
+    for (const e of population.enemies) {
+      const role = e.behavior ?? "straight";
+      if (COVERAGE_KINDS.has(role) && (e.y ?? -1) >= 80 && (e.y ?? 999) <= 640 && (e.maxHp ?? 0) > 0) {
+        const coverage = (this.enemyCoverage[role] ??= {frames: 0, hitFrames: 0, chargeFrames: 0});
+        const entry = (coverage.presentation ??= {});
+        const record = (event: string) => { entry[event] ??= { time: population.time ?? 0, wallMs: performance.now() - this.startedAt, id: e.id, x: e.x, y: e.y, turretAngle: e.turretAngle }; };
+        if (e.active && (e.x ?? 180) >= 18 && (e.x ?? 180) <= 342 && (e.y ?? -1) >= 108) record("visible");
+        if ((e.shotsFired ?? 0) > 0 || (e.gateCycle ?? 0) > 0) record("fired");
+        if ((e.hitUntil ?? 0) > (population.time ?? 0)) record("hit");
+        if (!e.active && (e.hp ?? 1) <= 0) record("destroyed");
+      }
       if (e.active) {
         enemies++;
         if ((e.y ?? -1) >= 80 && (e.y ?? 999) <= 640) {
@@ -86,6 +101,7 @@ export class RenderMetrics {
         )
           air++;
       }
+    }
     for (const b of population.bullets) if (b.active) playerBullets++;
     for (const b of population.enemyBullets) if (b.active) enemyBullets++;
     this.peakEffects = Math.max(
@@ -111,6 +127,7 @@ export class RenderMetrics {
     return {
       frames: this.frames,
       enemyCoverage: { ...this.enemyCoverage },
+      presentationCoverage: Object.fromEntries(Object.entries(this.enemyCoverage).filter(([, entry]) => entry.presentation).map(([role, entry]) => [role, structuredClone(entry.presentation)])),
       peakEffects: this.peakEffects,
       peakImpactPrimitives: this.peakImpactPrimitives,
       meanDrawCpuMs: this.frames ? this.drawTotalMs / this.frames : 0,

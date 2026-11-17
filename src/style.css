@@ -551,3 +551,16 @@ progress {
     margin-top: 6px;
   }
 }
+
+#stage-select {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  background: #102935;
+  color: #e5f2ef;
+  border: 1px solid #63877f;
+  border-radius: 5px;
+  padding: 5px;
+  margin: 5px 0 10px;
+  font: inherit;
+}
