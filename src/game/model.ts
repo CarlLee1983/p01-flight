@@ -133,7 +133,7 @@ export class FlightModel {
   pickupCount = 0;
   lastPickup: PickupKind | null = null;
   lostReason: "damage" | "timeout" | null = null;
-  effects: { x: number; y: number; life: number }[] = [];
+  effects: { x: number; y: number; life: number; kind?: "hit" }[] = [];
   shots = 0;
   nextWave = 0;
   cooldown = 0;
@@ -1031,7 +1031,7 @@ export class FlightModel {
             b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
             if (b.pierceRemaining <= 0) b.active = false;
             e.hp -= b.damage ?? 1;
-            this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+            this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
             if (e.hp <= 0) this.destroyEnemy(e);
             if (!b.active) break;
           }
@@ -1050,7 +1050,7 @@ export class FlightModel {
             b.pierceRemaining = (b.pierceRemaining ?? 1) - 1;
             if (b.pierceRemaining <= 0) b.active = false;
             part.hp -= b.damage ?? 1;
-            this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+            this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
             this.finishPart(part);
           }
         if (
@@ -1063,7 +1063,7 @@ export class FlightModel {
           b.active = false;
           (b.hitIds ??= []).push(-1);
           boss.hp -= b.damage ?? 1;
-          this.effects.push({ x: b.x, y: b.y, life: 0.25 });
+          this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
           this.finishBoss();
         }
       }

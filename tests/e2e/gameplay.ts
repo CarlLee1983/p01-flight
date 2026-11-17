@@ -1,3 +1,4 @@
+import { chooseAction, type Steering } from "../keyboard-policy";
 import { expect, type Page } from "@playwright/test";
 export const state = (page: Page) =>
   page.evaluate(() => (window as any).__P01__());
@@ -76,6 +77,8 @@ export async function keyboardShoreCounterattack(page: Page) {
 /** Real-key pilot for survival waits. Reads visible projectile positions only;
  * never writes health, clocks, shots or model state. */
 export async function evadeUntil(page: Page, seconds: number) {
+  let held: Steering = 0;
+  const trace: unknown[] = [];
   const start = await state(page);
   const deadline =
     Date.now() + Math.max(15000, (seconds - start.time) * 3000 + 20000);
@@ -90,31 +93,20 @@ export async function evadeUntil(page: Page, seconds: number) {
           hp: s.hp,
           player: s.player,
           fps: s.measuredFps,
+          trace,
         }),
       ).toBe("playing");
-      const dx = dodgeInput(s, 160, 44);
-      const key = dx < 0 ? "ArrowLeft" : dx > 0 ? "ArrowRight" : "";
-      // A 30ms press can fall entirely between software-rendered frames.
-      // Keep the real key down only until the visible ship has moved 16px,
-      // then release before another decision or screenshot. No model writes.
-      if (key) {
-        await page.keyboard.down(key);
-        try {
-          await page.waitForFunction(
-            ({ x, direction }) => {
-              const current = (window as any).__P01__();
-              return (
-                current.mode !== "playing" ||
-                (current.player.x - x) * direction >= 16
-              );
-            },
-            { x: s.player.x, direction: dx },
-            { polling: "raf", timeout: 2000 },
-          );
-        } finally {
-          await page.keyboard.up(key);
-        }
-      } else await page.waitForTimeout(20);
+      const dx = chooseAction(s, held);
+      trace.push({ time: s.time, x: s.player.x, hp: s.hp, held, next: dx });
+      if (trace.length > 20) trace.shift();
+      // Keep one real key state: change it only when the swept-path decision
+      // changes, avoiding a down/wait/up RPC chain for every tiny movement.
+      if (dx !== held) {
+        if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
+        if (dx) await page.keyboard.down(dx < 0 ? "ArrowLeft" : "ArrowRight");
+        held = dx;
+      }
+      await page.waitForTimeout(20);
     }
     throw new Error(`Evading pilot did not reach ${seconds}s`);
   } finally {

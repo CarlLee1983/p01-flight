@@ -1115,6 +1115,27 @@ class FlightScene extends Phaser.Scene {
       for (const e of model.effects) {
         const life = e.life - (model.mode === "won" ? this.endingAge : 0);
         if (life <= 0) continue;
+        if (e.kind === "hit") {
+          // Hits are brief compact white sparks, not another expanding warning ring.
+          const fade = Math.max(0, life / 0.25);
+          const radius = 2 + (1 - fade) * 5;
+          overlay.lineStyle(1.5, 0xffeee1, fade);
+          overlay.lineBetween(
+            e.x - radius,
+            e.y - radius,
+            e.x + radius,
+            e.y + radius,
+          );
+          overlay.lineBetween(
+            e.x + radius,
+            e.y - radius,
+            e.x - radius,
+            e.y + radius,
+          );
+          overlay.fillStyle(0xffffff, fade);
+          overlay.fillCircle(e.x, e.y, 1.5);
+          continue;
+        }
         const progress = 1 - life / 0.45;
         overlay.lineStyle(3 * (1 - progress) + 1, 0xffd58a, 1 - progress);
         overlay.strokeCircle(e.x, e.y, 4 + progress * 29);
