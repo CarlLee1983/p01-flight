@@ -34,6 +34,10 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     "coast",
     "interceptor",
     "carrier",
+    "harbor-battlefield",
+    "harbor-exit",
+    "ground-battery",
+    "ground-depot",
   ]) {
     const response = await page.request.get(`/assets/original/${name}.png`);
     expect(response.status()).toBe(200);
@@ -47,6 +51,11 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
     .toBeGreaterThan(1);
   await page.screenshot({ path: "docs/playing.png" });
+  await waitGameTime(page, 14);
+  expect(
+    (await state(page)).activeEnemies.some((e: any) => e.behavior === "escort"),
+  ).toBe(true);
+  await page.screenshot({ path: "docs/escort-formation.png" });
   await waitGameTime(page, 21.5);
   await page.screenshot({ path: "docs/cross-formation.png" });
   // Measure newly spawned ground travel before normal player fire can destroy it.
@@ -445,4 +454,138 @@ test("intercepting a supply craft yields a visible weapon choice capsule", async
   expect((await state(page)).weaponMode).toBe("spread");
   expect((await state(page)).weaponLevel).toBeGreaterThan(1);
   await page.screenshot({ path: "docs/weapon-selected.png" });
+});
+
+test("mid-stage patrol corvette warns alternating lanes before firing", async ({
+  page,
+}) => {
+  test.setTimeout(100000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await page.keyboard.down("Space");
+  await waitGameTime(page, 39.5);
+  await page.keyboard.up("Space");
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some(
+          (e: any) => e.behavior === "gatekeeper",
+        ),
+      { timeout: 10000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.find(
+          (e: any) => e.behavior === "gatekeeper",
+        )?.telegraph ?? 0,
+      { timeout: 10000, intervals: [40] },
+    )
+    .toBeGreaterThan(0);
+  const first = (await state(page)).activeEnemies.find(
+    (e: any) => e.behavior === "gatekeeper",
+  );
+  expect(first.attackLanes.length).toBeGreaterThan(0);
+  await page.screenshot({ path: "docs/patrol-lane-warning.png" });
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.find(
+          (e: any) => e.behavior === "gatekeeper",
+        )?.attackPattern,
+      { timeout: 10000, intervals: [40] },
+    )
+    .not.toBe(first.attackPattern);
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.find(
+          (e: any) => e.behavior === "gatekeeper",
+        )?.telegraph ?? 0,
+      { timeout: 10000, intervals: [40] },
+    )
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: "docs/patrol-opposite-warning.png" });
+  expect((await state(page)).mode).toBe("playing");
+  // A real weapon choice and movement after reading the opposing lane.
+  await page.keyboard.press("KeyC");
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(200);
+  await page.keyboard.up("ArrowRight");
+  await page.keyboard.down("Space");
+  await page.waitForTimeout(1500);
+  expect((await state(page)).weaponMode).toBe("beam");
+  await page.screenshot({ path: "docs/patrol-counterattack.png" });
+  await page.keyboard.up("Space");
+});
+
+test("ground batteries visibly warn and fire during continuous normal shooting", async ({
+  page,
+}) => {
+  test.setTimeout(150000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "開始飛行" }).click();
+  await page.keyboard.down("Space");
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some(
+          (e: any) =>
+            e.behavior === "groundBattery" && e.y >= 108 && e.telegraph > 0,
+        ),
+      { timeout: 75000, intervals: [30] },
+    )
+    .toBe(true);
+  const warning = await state(page);
+  expect(warning.mode).toBe("playing");
+  expect(warning.background.harborArtReady).toBe(true);
+  const target = warning.activeEnemies.find(
+    (e: any) => e.behavior === "groundBattery" && e.telegraph > 0,
+  );
+  await page.screenshot({ path: "docs/ground-continuous-fire-warning.png" });
+  // Dodge the fixed aim and turn the main gun onto the visible shore battery.
+  const direction = target.x < warning.player.x ? "ArrowLeft" : "ArrowRight";
+  await page.keyboard.down(direction);
+  await expect
+    .poll(async () => Math.abs((await state(page)).player.x - target.x), {
+      intervals: [20],
+    })
+    .toBeLessThan(18);
+  await page.keyboard.up(direction);
+  await expect
+    .poll(async () => (await state(page)).groundShotCount, { timeout: 5000 })
+    .toBeGreaterThan(0);
+  await page.screenshot({ path: "docs/ground-counterattack.png" });
+  await expect
+    .poll(
+      async () =>
+        (await state(page)).activeEnemies.some((e: any) => e.id === target.id),
+      { timeout: 15000 },
+    )
+    .toBe(false);
+  // Return to the supply lane using input, never mutate the game model.
+  const current = await state(page);
+  const back = current.player.x < 180 ? "ArrowRight" : "ArrowLeft";
+  await page.keyboard.down(back);
+  await expect
+    .poll(async () => Math.abs((await state(page)).player.x - 180), {
+      intervals: [20],
+    })
+    .toBeLessThan(12);
+  await page.keyboard.up(back);
+  await waitGameTime(page, 56);
+  for (const time of [56, 64, 66, 69]) {
+    await waitGameTime(page, time);
+    const snapshot = await state(page);
+    expect(snapshot.mode).toBe("playing");
+    expect(snapshot.background.harborArtAlpha).toBeGreaterThan(0.8);
+    expect(snapshot.background.exitReady).toBe(true);
+    expect(snapshot.background.exitY).toBeCloseTo(
+      (snapshot.time - 53) * 32 - 720,
+      0,
+    );
+    await page.screenshot({ path: `docs/approach-continuous-${time}.png` });
+  }
+  await page.keyboard.up("Space");
 });

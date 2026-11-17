@@ -58,3 +58,45 @@ Both mechanically trimmed/scaled and padded for runtime use. Both visually check
 Hashes:
 3e4f76187863fd8986cc17ce4b994a0cd347cf70341325ae0ad04a7f75b59b42 p01-flight/public/assets/original/interceptor.png
 ac02a1efca41b742c9def19bca47566a7110d5d160f8d29db90652364e85ab0c p01-flight/public/assets/original/carrier.png
+
+## Harbor battlefield and ground targets (2026-11-16)
+
+Three new original assets generated using the built-in OpenAI image generation tool. Existing assets were preserved. No third-party reference images, logos or copied game assets were used.
+
+| Asset                  |         Export | Purpose                                                                                                                     |
+| ---------------------- | -------------: | --------------------------------------------------------------------------------------------------------------------------- |
+| harbor-battlefield.png | 720 × 1440 RGB | Detailed overhead industrial harbor, central open teal-water channel, rocky shores with warehouses, cranes, tanks and roads |
+| ground-battery.png     | 336 × 333 RGBA | Down-facing twin coastal gun emplacement, irregular circular turret/support outline with no square base                     |
+| ground-depot.png       | 336 × 229 RGBA | Small corrugated-roof supply warehouse and twin fuel tanks with pipes/crates, no rectangular ground slab                    |
+
+### Prompt record
+
+Shared direction: original production 2D military-science-fiction arcade game art, hand-painted/prerendered hard-surface details, upper-left lighting, muted gray/olive/ochre metal and teal ocean, no text/logos/UI. Ground sprites requested actual transparent alpha and no outside shadow, clear silhouette at 52–60px.
+
+- Battery requested strict top view, two parallel gun barrels pointing down, recoil housings, olive-gray armored panels, amber targeting sensor, circular mechanical pivot and irregular support feet, no surrounding base/floor.
+- Depot requested overhead small corrugated warehouse adjoining two round fuel tanks, pipes and crates, compact asymmetric industrial shape, no square platform. Result retains a slight painted elevation in the building/tank faces; it is not a perfectly orthographic engineering projection.
+- Battlefield requested a tall actual game ground texture, central 60% uncluttered dark teal sea, side rocky islands, warehouse roofs, individual containers, gantry cranes, roads, weathered concrete docks, oil tanks and radar station, no aircraft/ships/bullets or large geometric structures crossing the center.
+
+### Checks and integration limits
+
+All three outputs visually inspected. The two ground sprites have real RGBA alpha spanning 0–255 and transparent corners. Composited onto teal at 60px and inspected enlarged: the double gun barrels and warehouse/tank shapes remain distinguishable with no rectangular matte. These are single-frame art, not damage-state animations. Runtime retains aspect ratio and independently determines collision extents.
+
+The battlefield is NOT generated as a proven seamless tile. Runtime edge blending/overlap is required and must be visually checked in motion. New art can be loaded as the real scrolling ground layer; it is not a standalone concept illustration. Background brightness and target contrast still require integrated gameplay inspection.
+
+The original generated images were mechanically resized/padded only for export. Runtime effects and scenery code are owned by the development agent. No image-quality/performance claim beyond the checks above is made.
+
+Hashes:
+f6ac745469b61c326ca772746b2c249894730b1bc43b61eee2ca0c445d5c3bec p01-flight/public/assets/original/harbor-battlefield.png
+068256e4a7735f3b154025668f413599f1211a3253bc91eafc6b60417fafe844 p01-flight/public/assets/original/ground-battery.png
+bd503f344459f713105f74775354385eccbe64e768f2ce9900ad91d9a898ceb1 p01-flight/public/assets/original/ground-depot.png
+
+## Harbor exit / pre-boss approach (2026-11-16)
+
+`public/assets/original/harbor-exit.png`: 720 × 1440 RGB, generated with the built-in OpenAI image tool using this project's original harbor-battlefield.png as a style and ocean-palette reference only. No external art supplied. Original generated design, mechanically resized for runtime; existing assets unchanged.
+
+Prompt: actual top-down scrolling game terrain, tall 1:2 portrait, same finely painted prerendered coastal industrial style and muted teal sea; bottom quarter retains warehouse shores, middle transitions to asymmetric rocky breakwaters and beacon tips at left/right, top half opens to wide command-ship battle water. Keep central 65% open dark water. No ships, aircraft, boss, bullets, UI, text, borders or giant central platform. Upper-left daylight and matching gray-ochre rocky shore/materials.
+
+Visually inspected: distinct new composition that progresses from industrial shore at bottom through breakwaters to open sea at top. Color and texture closely match the preceding harbor. Suitable for the pre-boss transition rather than endlessly repeating dense port. Not proven pixel-seamless with previous image; runtime overlap/crossfade and actual motion QA are required. The top sea area is intentionally uncluttered. The image does not contain the boss; gameplay renders it independently.
+
+Hash:
+006c92972e52e13af1c966cb0e1e27763e7ee9de384952b803f4056af8ad69e2 p01-flight/public/assets/original/harbor-exit.png

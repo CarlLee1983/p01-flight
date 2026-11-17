@@ -1,11 +1,10 @@
 import Phaser from "phaser";
-import { stage01 } from "./data/stage";
+import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
 import { BrowserSaveRepository } from "./storage/save";
 import { FlightAudio } from "./game/audio";
 import { CoastalBackground } from "./game/background";
 import { createPickupTextures, pickupVisual } from "./game/pickup-art";
-import { createGroundTextures } from "./game/ground-art";
 import { TouchInput } from "./game/touch-input";
 import "./style.css";
 let storage: Storage | null = null;
@@ -73,7 +72,7 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子節奏與音效。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>按住 Space／Z 射擊。留意編隊進場與蓄力光圈，側移躲開瞄準彈。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意預告後移位，避免留在鎖定線上。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${stage01.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
   document.querySelector("#start")?.addEventListener("click", start);
@@ -160,6 +159,10 @@ class FlightScene extends Phaser.Scene {
       "coast",
       "interceptor",
       "carrier",
+      "harbor-battlefield",
+      "harbor-exit",
+      "ground-battery",
+      "ground-depot",
     ])
       this.load.image(
         file,
@@ -205,7 +208,6 @@ class FlightScene extends Phaser.Scene {
   create() {
     this.background = new CoastalBackground(this);
     createPickupTextures(this);
-    createGroundTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
         this.add
@@ -402,7 +404,16 @@ class FlightScene extends Phaser.Scene {
             ? "beam"
             : "shot",
       );
-    audio.setIntensity(model.boss?.active ? 2 : model.time > 30 ? 1 : 0);
+    audio.setIntensity(
+      model.boss?.active ||
+        model.enemies.some((e) => e.active && e.behavior === "gatekeeper")
+        ? 2
+        : model.time >= 56
+          ? 0
+          : model.time > 15
+            ? 1
+            : 0,
+    );
     if (
       model.killCount > previous.kills ||
       model.partsDestroyed > previous.parts
@@ -454,9 +465,13 @@ class FlightScene extends Phaser.Scene {
   draw() {
     this.visualIndex = 0;
     const section = model.section;
+    const patrol = model.enemies.find(
+      (e) => e.active && e.behavior === "gatekeeper",
+    );
     this.sectionNotice.setVisible(
       model.mode === "playing" &&
         !model.boss?.active &&
+        !patrol &&
         !!section &&
         model.time - section.at < 3.2,
     );
@@ -470,12 +485,14 @@ class FlightScene extends Phaser.Scene {
         );
     }
     this.bossAdvice.setVisible(
-      model.mode === "playing" && !!model.boss?.active,
+      model.mode === "playing" && (!!model.boss?.active || !!patrol),
     );
     this.bossAdvice.setText(
-      model.boss?.cannons.some((c) => c.active)
-        ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
-        : "側炮全毀 · 集中攻擊核心",
+      patrol
+        ? "避開金色預告線 · 移位後追擊巡邏艦"
+        : model.boss?.cannons.some((c) => c.active)
+          ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
+          : "側炮全毀 · 集中攻擊核心",
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
     for (const image of this.visuals) image.setVisible(false);
@@ -536,15 +553,161 @@ class FlightScene extends Phaser.Scene {
         }
       for (const e of model.enemies)
         if (e.active) {
-          if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
-            this.sprite(e.behavior, e.x, e.y, 52, 52).setDepth(0);
+          const grounded =
+            e.behavior === "groundBattery" || e.behavior === "groundDepot";
+          graphics.fillStyle(0x04131e, grounded ? 0.35 : 0.22);
+          graphics.fillEllipse(
+            e.x + (grounded ? 5 : 12),
+            e.y + (grounded ? 7 : 22),
+            e.behavior === "gatekeeper" ? 96 : grounded ? 48 : 38,
+            grounded ? 40 : 20,
+          );
+          if (e.behavior === "gatekeeper") {
+            // A broad patrol corvette has a distinct silhouette and readable lane warning.
+            overlay.fillStyle(0x182d3d);
+            overlay.fillRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
+            overlay.lineStyle(2, 0xdcb878, 0.95);
+            overlay.strokeRoundedRect(e.x - 49, e.y - 28, 98, 58, 8);
+            this.sprite("heavy", e.x, e.y, 68, 70).setDepth(4);
+            for (const side of [-1, 1]) {
+              overlay.fillStyle(0x354f60);
+              overlay.fillRect(e.x + side * 39 - 7, e.y - 17, 14, 45);
+              overlay.fillStyle(0xffd08a);
+              overlay.fillRect(e.x + side * 39 - 3, e.y + 18, 6, 18);
+              this.sprite(
+                "fire03",
+                e.x + side * 31,
+                e.y - 35,
+                8,
+                15,
+                0.75,
+              ).setDepth(4);
+            }
+            overlay.fillStyle(0x1c2830);
+            overlay.fillRect(e.x - 44, e.y - 39, 88, 4);
+            overlay.fillStyle(0xffc775);
+            overlay.fillRect(
+              e.x - 44,
+              e.y - 39,
+              88 * Math.max(0, e.hp / (e.maxHp ?? e.hp)),
+              4,
+            );
             if ((e.telegraph ?? 0) > 0) {
+              overlay.lineStyle(
+                1.5,
+                0xffc66e,
+                0.55 + Math.sin(model.time * 16) * 0.18,
+              );
+              for (const lane of e.attackLanes ?? []) {
+                overlay.lineBetween(lane, e.y + 34, lane, 620);
+                overlay.strokeTriangle(
+                  lane - 5,
+                  e.y + 42,
+                  lane + 5,
+                  e.y + 42,
+                  lane,
+                  e.y + 51,
+                );
+              }
+              if (e.attackPattern === "aim") {
+                const angle = e.aimAngle ?? 0;
+                overlay.lineBetween(
+                  e.x,
+                  e.y + 35,
+                  e.x + Math.sin(angle) * 600,
+                  e.y + 35 + Math.cos(angle) * 600,
+                );
+              }
+            }
+            continue;
+          }
+          if (e.behavior === "groundBattery" || e.behavior === "groundDepot") {
+            this.sprite(
+              e.behavior === "groundBattery"
+                ? "ground-battery"
+                : "ground-depot",
+              e.x,
+              e.y,
+              70,
+              e.behavior === "groundBattery" ? 70 : 48,
+            ).setDepth(0);
+            // Subtle base rim distinguishes interactive targets from painted scenery.
+            if (e.y >= GROUND_VISIBLE_Y) {
+              overlay.lineStyle(
+                1,
+                e.behavior === "groundBattery" ? 0xf4ba72 : 0x88e1ca,
+                0.7,
+              );
+              overlay.strokeEllipse(e.x, e.y + 10, 64, 44);
+              if (e.hp < (e.maxHp ?? e.hp)) {
+                overlay.fillStyle(0x10232a, 0.9);
+                overlay.fillRect(e.x - 24, e.y - 39, 48, 3);
+                overlay.fillStyle(0xffc775);
+                overlay.fillRect(
+                  e.x - 24,
+                  e.y - 39,
+                  48 * Math.max(0, e.hp / (e.maxHp ?? e.hp)),
+                  3,
+                );
+              }
+            }
+            if ((e.telegraph ?? 0) > 0) {
+              const angle = e.aimAngle ?? 0;
               overlay.lineStyle(2, 0xffbc73, 0.9);
               overlay.strokeCircle(
                 e.x,
-                e.y + 16,
-                10 + Math.sin(model.time * 20) * 3,
+                e.y + 20,
+                11 + Math.sin(model.time * 20) * 3,
               );
+              // Locked aim, not a tracking laser: the player can step aside.
+              overlay.lineStyle(1.5, 0xffbc73, 0.65);
+              for (let distance = 32; distance < 360; distance += 28)
+                overlay.lineBetween(
+                  e.x + Math.sin(angle) * distance,
+                  e.y + 20 + Math.cos(angle) * distance,
+                  e.x + Math.sin(angle) * (distance + 12),
+                  e.y + 20 + Math.cos(angle) * (distance + 12),
+                );
+            }
+            continue;
+          }
+          if (e.behavior === "escort") {
+            this.sprite("scout", e.x, e.y, 47, 40).setDepth(4);
+            overlay.fillStyle(0x697b8c);
+            overlay.fillTriangle(
+              e.x - 35,
+              e.y + 15,
+              e.x - 17,
+              e.y - 15,
+              e.x - 13,
+              e.y + 20,
+            );
+            overlay.fillTriangle(
+              e.x + 35,
+              e.y + 15,
+              e.x + 17,
+              e.y - 15,
+              e.x + 13,
+              e.y + 20,
+            );
+            overlay.lineStyle(2, 0x9ee5dd, 0.9);
+            overlay.lineBetween(e.x - 34, e.y + 14, e.x - 19, e.y - 11);
+            overlay.lineBetween(e.x + 34, e.y + 14, e.x + 19, e.y - 11);
+            for (const side of [-1, 1]) {
+              overlay.fillStyle(e.volleyFired ? 0x4d7478 : 0xffd28a);
+              overlay.fillCircle(e.x + side * 23, e.y + 11, 3);
+            }
+            if ((e.telegraph ?? 0) > 0) {
+              overlay.lineStyle(1.5, 0xffcc80, 0.7);
+              for (const offset of [-0.28, 0, 0.28]) {
+                const angle = (e.aimAngle ?? 0) + offset;
+                overlay.lineBetween(
+                  e.x,
+                  e.y + 18,
+                  e.x + Math.sin(angle) * 40,
+                  e.y + 18 + Math.cos(angle) * 40,
+                );
+              }
             }
             continue;
           }
@@ -712,6 +875,8 @@ class FlightScene extends Phaser.Scene {
           drone.y,
         );
       }
+      graphics.fillStyle(0x04131e, 0.25);
+      graphics.fillEllipse(model.player.x + 10, model.player.y + 21, 30, 18);
       const p =
         model.mode === "won"
           ? {
@@ -794,7 +959,8 @@ class FlightScene extends Phaser.Scene {
       sections.forEach((section, i) => {
         const active = model.time >= section.at;
         overlay.fillStyle(active ? 0x8ce5d0 : 0x314b58, active ? 0.9 : 0.55);
-        overlay.fillRect(16 + i * 66, 67, 60, 3);
+        const segment = 328 / Math.max(1, sections.length);
+        overlay.fillRect(16 + i * segment, 67, segment - 5, 3);
       });
     }
     label.setText(
@@ -883,8 +1049,16 @@ Object.defineProperty(window, "__P01__", {
         y: e.y,
         behavior: e.behavior,
         hp: e.hp,
+        maxHp: e.maxHp,
+        telegraph: e.telegraph,
+        attackPattern: e.attackPattern,
+        attackLanes: e.attackLanes,
+        volleyFired: e.volleyFired,
+        visibleSince: e.visibleSince,
+        shotsFired: e.shotsFired,
       })),
     shots: model.shots,
+    groundShotCount: model.groundShotCount,
     enemyBullets: model.enemyBullets.filter((b) => b.active).length,
     pickups: model.pickups.filter((p) => p.active).length,
     activePickups: model.pickups

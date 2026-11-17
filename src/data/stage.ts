@@ -1,4 +1,5 @@
 export const GROUND_SCROLL_SPEED = 32;
+export const GROUND_VISIBLE_Y = 108;
 export type Behavior =
   | "straight"
   | "weave"
@@ -8,7 +9,9 @@ export type Behavior =
   | "cross"
   | "carrier"
   | "groundBattery"
-  | "groundDepot";
+  | "groundDepot"
+  | "gatekeeper"
+  | "escort";
 export type PickupKind =
   | "heal"
   | "double"
@@ -25,9 +28,13 @@ export interface Wave {
   points: number;
   behavior?: Behavior;
   fireEvery?: number;
+  firstFireDelay?: number;
   drop?: PickupKind;
   spawnY?: number;
   direction?: number;
+  holdFor?: number;
+  strafeWidth?: number;
+  formationPhase?: number;
 }
 export interface StageSection {
   id: string;
@@ -79,10 +86,28 @@ export const stage01: StageConfig = {
       hint: "看見蓄力光圈，側移避開瞄準彈",
     },
     {
+      id: "blockade",
+      title: "突破封鎖",
+      at: 40,
+      hint: "先避開預告航道，再追擊橫移封鎖艦；集中火力可取得升級補給",
+    },
+    {
+      id: "push",
+      title: "最後推進",
+      at: 50,
+      hint: "看清俯衝方向，穿越最後一組攔截機",
+    },
+    {
       id: "resupply",
-      title: "補給接近",
+      title: "最後攔截",
       at: 56,
-      hint: "整隊補血，保留炸彈迎擊指揮艦",
+      hint: "躲開最後護航扇射，再收取修復補給",
+    },
+    {
+      id: "regroup",
+      title: "整隊接近",
+      at: 66,
+      hint: "補血整隊，保留炸彈迎擊指揮艦",
     },
     {
       id: "commander",
@@ -121,6 +146,31 @@ export const stage01: StageConfig = {
         fireEvery: 2.4,
       })),
     ),
+    // Two staggered escort flights: one telegraphed volley per aircraft.
+    ...[12, 58].flatMap((at) =>
+      [60, 180, 300].map((x, i) => ({
+        at: at + i * 0.8,
+        x,
+        speed: 140,
+        hp: 4,
+        points: 160,
+        behavior: "escort" as const,
+        formationPhase: i * 0.8,
+      })),
+    ),
+    // Opposing interception pairs add movement, not additional bullets.
+    ...[24, 37].flatMap((at) =>
+      [-1, 1].map((direction, i) => ({
+        at: at + i * 0.7,
+        x: direction === 1 ? -30 : 390,
+        spawnY: 230 + i * 45,
+        direction,
+        speed: 150,
+        hp: 2,
+        points: 180,
+        behavior: "cross" as const,
+      })),
+    ),
     // Optional supply craft: intercept away from the center to choose a weapon.
     ...(["spread", "beam", "missile"] as const).map((drop, i) => ({
       at: 12 + i * 18,
@@ -157,18 +207,19 @@ export const stage01: StageConfig = {
         behavior: "dive" as const,
       })),
     ),
-    ...[32, 40, 46].flatMap((at) =>
+    ...[32].flatMap((at) =>
       [80, 280].map((x) => ({
         at,
         x,
         speed: 110,
-        hp: at === 32 ? 12 : 5,
+        hp: at === 32 ? 18 : 5,
         points: 350,
         behavior: at === 32 ? ("groundBattery" as const) : ("turret" as const),
         fireEvery: at === 32 ? 4.8 : 2.2,
+        firstFireDelay: 0.9,
       })),
     ),
-    ...[36, 45].map((at) => ({
+    ...[36].map((at) => ({
       at,
       x: at === 36 ? 270 : 180,
       speed: 95,
@@ -178,6 +229,18 @@ export const stage01: StageConfig = {
       fireEvery: at === 36 ? undefined : 2.8,
       drop: at === 36 ? ("heal" as const) : undefined,
     })),
+    {
+      at: 40,
+      x: 180,
+      speed: 130,
+      hp: 64,
+      points: 1000,
+      behavior: "gatekeeper" as const,
+      fireEvery: 2.2,
+      holdFor: 9,
+      strafeWidth: 75,
+      drop: "power" as const,
+    },
   ].sort((a, b) => a.at - b.at),
   pickups: [
     { at: 5, x: 180, kind: "power" },

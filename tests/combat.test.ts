@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
-import { stage01, type StageConfig } from "../src/data/stage";
+import { stage01, GROUND_VISIBLE_Y, type StageConfig } from "../src/data/stage";
 const empty: StageConfig = {
   ...stage01,
   waves: [],
@@ -294,7 +294,7 @@ describe("weapon and encounter progression", () => {
         .every((w) => w.behavior === "weave" || w.behavior === "cross"),
     ).toBe(true);
     expect(
-      stage01.waves.some((w) => w.behavior === "turret" && w.hp >= 5),
+      stage01.waves.some((w) => w.behavior === "gatekeeper" && w.hp >= 5),
     ).toBe(true);
     expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
     expect(stage01.pickups!.some((p) => p.at === 60 && p.kind === "heal")).toBe(
@@ -769,7 +769,7 @@ describe("encounter sections and breakable cannons", () => {
       m.time = at;
       expect(m.section.id).toBe(id);
     }
-    expect(stage01.waves.some((w) => w.at >= 56 && w.at < 70)).toBe(false);
+    expect(stage01.waves.some((w) => w.at >= 66 && w.at < 70)).toBe(false);
     expect(stage01.pickups!.some((p) => p.kind === "heal" && p.at === 60)).toBe(
       true,
     );
@@ -918,6 +918,7 @@ describe("ground targets", () => {
             points: 100,
             behavior: "groundBattery",
             fireEvery: 1,
+            firstFireDelay: 0.6,
           },
         ],
       });
@@ -990,21 +991,21 @@ describe("Stage01 pacing pass", () => {
       stage01.waves.some((w) => w.behavior === "heavy" && w.at === 54),
     ).toBe(false);
     expect(
-      stage01.waves.filter((w) => w.behavior === "turret").map((w) => w.at),
-    ).toEqual([40, 40, 46, 46]);
+      stage01.waves.filter((w) => w.behavior === "gatekeeper").map((w) => w.at),
+    ).toEqual([40]);
     expect(
       stage01.waves.filter((w) => w.behavior === "dive").map((w) => w.at),
     ).toEqual([34, 35.2, 50, 51.2]);
   });
   it.each([30, 60, 120])(
-    "schedule clears residual enemies before the 60–70 second rest at %i FPS",
+    "schedule clears residual enemies before the 66–70 second rest at %i FPS",
     (fps) => {
       const m = new FlightModel(stage01);
       m.start();
       // Isolate exit timing even when enemies survive. Not a gameplay victory fixture.
       m.invincible = 120;
-      run(m, 60, false, fps);
-      for (let i = 0; i < 9.8 * fps; i++) {
+      run(m, 66, false, fps);
+      for (let i = 0; i < 3.8 * fps; i++) {
         expect(m.enemies.some((e) => e.active)).toBe(false);
         expect(m.enemyBullets.some((b) => b.active)).toBe(false);
         expect(m.boss).toBeNull();
@@ -1022,4 +1023,350 @@ describe("Stage01 pacing pass", () => {
       expect(m.lostReason).toBe("damage");
     },
   );
+});
+
+describe("gatekeeper encounter", () => {
+  it.each([30, 60, 120])(
+    "normal centered firing still exposes elite warnings and at least one volley at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let warning = false,
+        volley = false,
+        first = -1,
+        last = -1;
+      for (let i = 0; i < 52 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        const e = m.enemies.find(
+          (e) => e.active && e.behavior === "gatekeeper",
+        );
+        if (e) {
+          if (first < 0) first = m.time;
+          last = m.time;
+          warning ||= (e.telegraph ?? 0) > 0;
+          volley ||= (e.gateCycle ?? 0) > 0;
+          expect(e.maxHp).toBe(64);
+        }
+      }
+      expect(warning).toBe(true);
+      expect(volley).toBe(true);
+      expect(last - first).toBeGreaterThan(3);
+      console.log("gate visibility", fps, first, last);
+    },
+  );
+  it.each([30, 60, 120])(
+    "left, right and locked aim are telegraphed and bounded at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        waves: [
+          {
+            at: 0,
+            x: 180,
+            speed: 130,
+            hp: 1000,
+            points: 1,
+            behavior: "gatekeeper",
+            fireEvery: 2.2,
+            holdFor: 9,
+            strafeWidth: 75,
+          },
+        ],
+      });
+      m.start();
+      m.invincible = 100;
+      const patterns = new Set<string>();
+      const volleys: number[] = [];
+      let cycle = 0;
+      for (let i = 0; i < 10 * fps; i++) {
+        m.update(1 / fps);
+        const e = m.enemies[0];
+        if ((e.telegraph ?? 0) > 0) {
+          patterns.add(e.attackPattern!);
+          if (e.attackPattern === "left")
+            expect(e.attackLanes).toEqual([54, 100.80000000000001, 147.6]);
+          if (e.attackPattern === "right")
+            expect(e.attackLanes).toHaveLength(3);
+        }
+        if ((e.gateCycle ?? 0) > cycle) {
+          cycle = e.gateCycle!;
+          volleys.push(cycle);
+        }
+      }
+      expect(patterns).toEqual(new Set(["left", "right", "aim"]));
+      expect(volleys).toEqual([1, 2, 3]);
+      expect(m.enemies[0].telegraph).toBe(0);
+      expect(m.enemies[0].attackLanes).toEqual([]);
+      expect(m.enemies[0].y).toBeGreaterThan(150);
+      run(m, 6);
+      expect(m.enemies.some((e) => e.active)).toBe(false);
+    },
+  );
+  it("elite reward is single-drop and pause/restart reset encounter state", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 180,
+          spawnY: 150,
+          speed: 130,
+          hp: 1,
+          points: 1000,
+          behavior: "gatekeeper",
+          drop: "power",
+          fireEvery: 2.2,
+          holdFor: 9,
+        },
+      ],
+    });
+    m.start();
+    m.update(0);
+    m.pause();
+    const frozen = JSON.stringify(m.enemies);
+    run(m, 1);
+    expect(JSON.stringify(m.enemies)).toBe(frozen);
+    m.pause();
+    const e = m.enemies[0];
+    m.bullets.push({ id: 999, x: e.x, y: e.y, active: true });
+    m.update(0);
+    m.update(0);
+    expect(m.score).toBe(1000);
+    expect(
+      m.pickups.filter((p) => p.active && p.kind === "power"),
+    ).toHaveLength(1);
+    m.start();
+    expect(m.enemies).toHaveLength(0);
+  });
+});
+
+it("gatekeeper aim locks during warning while strafing remains a trackable target", () => {
+  const m = new FlightModel({
+    ...empty,
+    waves: [
+      {
+        at: 0,
+        x: 180,
+        speed: 130,
+        hp: 1000,
+        points: 1,
+        behavior: "gatekeeper",
+        fireEvery: 2.2,
+        holdFor: 9,
+        strafeWidth: 75,
+      },
+    ],
+  });
+  m.start();
+  m.invincible = 100;
+  let warned = false,
+    locked = 0;
+  const xs: number[] = [];
+  for (let i = 0; i < 10 * 60; i++) {
+    const e = m.enemies[0];
+    if (e?.attackPattern === "aim" && (e.telegraph ?? 0) > 0 && !warned) {
+      warned = true;
+      locked = e.aimAngle!;
+    }
+    m.update(1 / 60, warned ? 1 : 0);
+    if (m.enemies[0]) xs.push(m.enemies[0].x);
+    if ((m.enemies[0]?.gateCycle ?? 0) >= 3) break;
+  }
+  expect(warned).toBe(true);
+  expect(m.player.x).toBeGreaterThan(180);
+  expect(
+    m.enemyBullets.some(
+      (b) =>
+        b.active &&
+        Math.abs(b.vx - Math.sin(locked) * 180) < 0.001 &&
+        Math.abs(b.vy - Math.cos(locked) * 180) < 0.001,
+    ),
+  ).toBe(true);
+  expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(100);
+});
+
+describe("escort formation density", () => {
+  it("adds ten purposeful wave entries without extending stage or crowding the rest", () => {
+    expect(stage01.waves).toHaveLength(51);
+    expect(stage01.waves.filter((w) => w.behavior === "escort")).toHaveLength(
+      6,
+    );
+    expect(stage01.waves.filter((w) => w.behavior === "cross")).toHaveLength(
+      13,
+    );
+    expect(stage01.duration).toBe(115);
+    expect(stage01.boss!.at).toBe(70);
+    expect(stage01.waves.every((w) => w.at < 60)).toBe(true);
+  });
+  it.each([30, 60, 120])(
+    "escort wings share formation phase, warn then fire only one fan at %i FPS",
+    (fps) => {
+      const m = new FlightModel({
+        ...empty,
+        waves: [100, 180, 260].map((x, i) => ({
+          at: i * 0.8,
+          x,
+          speed: 140,
+          hp: 100,
+          points: 160,
+          behavior: "escort" as const,
+          formationPhase: i * 0.8,
+        })),
+      });
+      m.start();
+      m.invincible = 100;
+      let warnings = 0;
+      const seen = new Set<number>();
+      for (let i = 0; i < 2.6 * fps; i++) {
+        m.update(1 / fps);
+        for (const e of m.enemies)
+          if ((e.telegraph ?? 0) > 0 && !seen.has(e.id)) {
+            seen.add(e.id);
+            warnings++;
+          }
+      }
+      expect(warnings).toBe(3);
+      const offsets = m.enemies.map((e) => e.x - e.originX!);
+      expect(Math.max(...offsets) - Math.min(...offsets)).toBeLessThan(1.1);
+      run(m, 1, false, fps);
+      expect(m.enemies.every((e) => e.volleyFired)).toBe(true);
+      expect(m.enemyBullets.length).toBeLessThanOrEqual(9);
+      // Expired bullets must not be replaced by a second volley.
+      run(m, 7, false, fps);
+      expect(m.enemies.some((e) => e.active)).toBe(false);
+      expect(m.enemyBullets.some((b) => b.active)).toBe(false);
+    },
+  );
+  it("escort aim locks at warning and a re-used pool slot resets one-shot flag", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        { at: 0, x: 80, speed: 140, hp: 100, points: 1, behavior: "escort" },
+        { at: 8, x: 80, speed: 140, hp: 100, points: 1, behavior: "escort" },
+      ],
+    });
+    m.start();
+    m.invincible = 100;
+    run(m, 1);
+    const aim = m.enemies[0].aimAngle!;
+    for (let i = 0; i < 45; i++) m.update(1 / 60, 1, 0);
+    expect(m.enemies[0].volleyFired).toBe(true);
+    expect(
+      m.enemyBullets.some(
+        (b) => Math.abs(Math.atan2(b.vx, b.vy) - aim) < 0.001,
+      ),
+    ).toBe(true);
+    run(m, 6.4);
+    expect(m.enemies).toHaveLength(1);
+    expect(m.enemies[0].active).toBe(true);
+    expect(m.enemies[0].volleyFired).toBe(false);
+  });
+  it.each([30, 60, 120])(
+    "center-fire route exposes escort warning and volley at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let warning = false,
+        volley = false;
+      for (let i = 0; i < 58 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        for (const e of m.enemies)
+          if (e.behavior === "escort") {
+            warning ||= !!e.active && (e.telegraph ?? 0) > 0;
+            volley ||= !!e.volleyFired;
+          }
+      }
+      expect(warning).toBe(true);
+      expect(volley).toBe(true);
+    },
+  );
+});
+
+describe("ground readability under real continuous fire", () => {
+  it.each([30, 60, 120])(
+    "center-fire sees battery warning, firing and then destruction at %i FPS",
+    (fps) => {
+      const m = new FlightModel(stage01);
+      m.start();
+      let visible = 0,
+        warning = false,
+        shot = false,
+        deadAt = 0,
+        watchId = 0;
+      for (let i = 0; i < 42 * fps; i++) {
+        m.update(1 / fps, 0, 0, true);
+        const e = m.enemies.find(
+          (e) =>
+            e.behavior === "groundBattery" && (!watchId || e.id === watchId),
+        );
+        if (e) {
+          if (!watchId) watchId = e.id;
+          if (e.visibleSince !== undefined && !visible)
+            visible = e.visibleSince;
+          warning ||= e.active && (e.telegraph ?? 0) > 0;
+          shot ||= (e.shotsFired ?? 0) > 0;
+          if (!e.active && !deadAt) deadAt = m.time;
+        }
+      }
+      expect(visible).toBeGreaterThan(32);
+      expect(warning).toBe(true);
+      expect(shot).toBe(true);
+      expect(m.groundShotCount).toBeGreaterThanOrEqual(2);
+      expect(deadAt - visible).toBeGreaterThan(1.5);
+      console.log(
+        "battery visible/shot/dead",
+        fps,
+        visible,
+        m.groundShotCount,
+        deadAt,
+      );
+    },
+  );
+  it("hidden ground cannot be missile-locked, bombed, shot or shoot", () => {
+    const m = new FlightModel({
+      ...empty,
+      waves: [
+        {
+          at: 0,
+          x: 180,
+          spawnY: GROUND_VISIBLE_Y - 18,
+          speed: 32,
+          hp: 18,
+          points: 1,
+          behavior: "groundBattery",
+          fireEvery: 0.1,
+          firstFireDelay: 0.1,
+        },
+      ],
+    });
+    m.start();
+    m.switchWeapon();
+    m.switchWeapon();
+    m.update(0, 0, 0, true);
+    expect(m.bullets[0].targetId).toBeUndefined();
+    m.bullets.push({
+      id: 999,
+      x: 180,
+      y: GROUND_VISIBLE_Y - 18,
+      active: true,
+      damage: 100,
+    });
+    m.update(0);
+    expect(m.enemies[0].hp).toBe(18);
+    m.useBomb();
+    expect(m.enemies[0].hp).toBe(18);
+    expect(m.enemies[0].visibleSince).toBeUndefined();
+    run(m, 0.3);
+    expect(m.groundShotCount).toBe(0);
+    m.start();
+    expect(m.groundShotCount).toBe(0);
+  });
+  it("14-second continuous-fire screenshot route still has a living escort", () => {
+    const m = new FlightModel(stage01);
+    m.start();
+    run(m, 14, true);
+    expect(m.enemies.some((e) => e.active && e.behavior === "escort")).toBe(
+      true,
+    );
+  });
 });
