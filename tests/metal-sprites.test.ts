@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { METAL_SPRITES } from "../src/game/metal-sprites";
+import { METAL_SPRITES, readMetalSpriteStatus } from "../src/game/metal-sprites";
 import { createRaiderTextures } from "../src/game/raider-art";
 import { createCannonTextures } from "../src/game/cannon-art";
 import { createEnemyModuleTextures } from "../src/game/enemy-modules-art";
@@ -23,4 +23,18 @@ it("preloaded hulls and intact/broken pods are never replaced by flat canvas fal
   const scene:any={textures:{exists:(k:string)=>keys.has(k),createCanvas:()=>{allocations++;throw new Error("preloaded sprite was overwritten");}}};
   createRaiderTextures(scene);createCannonTextures(scene);createEnemyModuleTextures(scene);
   expect(allocations).toBe(0);
+});
+
+it("pre-boot diagnostics stay readable before even the missing texture exists", () => {
+  const pending=readMetalSpriteStatus({exists:()=>false,get:()=>{throw new Error("get must not be called before ready");}});
+  expect(pending).toHaveLength(7);
+  expect(pending.every(a=>!a.ready && !a.bitmap)).toBe(true);
+  expect(readMetalSpriteStatus({exists:()=>true,get:()=>undefined}).every(a=>!a.bitmap)).toBe(true);
+});
+it("bitmap readiness distinguishes loaded image sources from canvas fallback", () => {
+  const bitmap={kind:"bitmap"};
+  const loaded=readMetalSpriteStatus({exists:()=>true,get:()=>({source:[{image:bitmap}]})},image=>image===bitmap);
+  expect(loaded.every(a=>a.ready && a.bitmap)).toBe(true);
+  const canvas=readMetalSpriteStatus({exists:()=>true,get:()=>({source:[{image:{kind:"canvas"}}]})},image=>image===bitmap);
+  expect(canvas.every(a=>a.ready && !a.bitmap)).toBe(true);
 });

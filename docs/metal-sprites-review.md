@@ -11,3 +11,11 @@
 - 源圖與匯入接觸表已目視：細節與材質已不同於平塗版本，但實際同場戰鬥、受擊/爆炸和Boss連接仍需最終CI畫面逐一覆核，不能把靜態素材接觸表當作遊戲驗收。
 
 本機461項（含新增資產契約）、typecheck、build通過；破損Boss實戰截圖與完整E2E，必須以新head CI結果為準。環境本機Chromium仍受socket EPERM限制，實際瀏覽器依最終CI，未聲稱真人手機或音樂聽感驗證。不得自行合併或部署。
+
+## CI 發現並修復：載入前的診斷讀取
+
+26f20dde／ca9c7c38 的完整CI為31/33 E2E。普通鍵盤與完整CDP觸控皆到通關，正常/破損Boss也實際取到原生畫面；失敗是兩個GL/RAF取樣觀察者：第一關等不到done，第二關renderer仍null。
+
+具體原因：新增診斷直接讀`textures.get(key).source`，但初始RAF可能早於Phaser建立`__MISSING`貼圖；`get`此時回undefined，觀察者只執行一幀便拋錯停止。不是讓取樣器吞錯或降低門檻，而是把產品的診斷契約修成「未就緒回false、不可拋錯」，先查exists，再安全讀source。新增未建立missing texture與bitmap/canvas區別兩項回歸。本機463 unit/typecheck/build通過。最後精確head的完整E2E/GL結果看PR11 checks與Notion，不以這兩個失敗版的功能通過冒稱全套通過。
+
+當前環境重新`npm ci`成功；官方Playwright Chromium下載回0MiB/截斷ZIP，安裝失敗，未繞過。這是本輪本機瀏覽器受阻的直接證據；較早的socket EPERM另保留為歷史。實際畫面來自GitHub runner，而非本機已操作。

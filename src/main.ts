@@ -1,4 +1,4 @@
-import { METAL_SPRITES, METAL_EXHAUST } from "./game/metal-sprites";
+import { METAL_SPRITES, METAL_EXHAUST, readMetalSpriteStatus } from "./game/metal-sprites";
 import { enemyMount, enemyBank } from "./game/enemy-mounts";
 import {
   configureTextureBatch,
@@ -1384,7 +1384,7 @@ Object.defineProperty(window, "__P01__", {
         ? bossChargeSources(model.boss)
         : [],
     background: readBackgroundInfo(),
-    metalSprites: METAL_SPRITES.map(({key}) => ({key, ready: game.textures.exists(key), bitmap: game.textures.get(key).source[0]?.image instanceof HTMLImageElement})),
+    metalSprites: readMetalSpriteStatus(game.textures),
     renderer: {
       type: game.renderer.type,
       batchSize: game.config.batchSize,

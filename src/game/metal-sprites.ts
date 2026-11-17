@@ -18,3 +18,19 @@ export const METAL_EXHAUST = {
   brakeRaider: { x: 7.5, y: -24 },
   gatekeeper: { x: 39, y: -41 },
 } as const;
+
+interface TextureReader {
+  exists(key: string): boolean;
+  get(key: string): { source?: { image?: unknown }[] } | undefined;
+}
+/** RAF observers may run before Phaser has created even its missing texture.
+ * Readiness is a value, never a reason for diagnostics to stop the sampler. */
+export function readMetalSpriteStatus(
+  textures: TextureReader,
+  isBitmap = (image: unknown) => typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement,
+) {
+  return METAL_SPRITES.map(({ key }) => {
+    const ready = textures.exists(key);
+    return { key, ready, bitmap: ready && isBitmap(textures.get(key)?.source?.[0]?.image) };
+  });
+}
