@@ -94,9 +94,27 @@ export async function evadeUntil(page: Page, seconds: number) {
       ).toBe("playing");
       const dx = dodgeInput(s);
       const key = dx < 0 ? "ArrowLeft" : dx > 0 ? "ArrowRight" : "";
-      // A bounded real key pulse cannot remain held across a slow screenshot/evaluate.
-      if (key) await page.keyboard.press(key, { delay: 30 });
-      else await page.waitForTimeout(20);
+      // A 30ms press can fall entirely between software-rendered frames.
+      // Keep the real key down only until the visible ship has moved 6px,
+      // then release before another decision or screenshot. No model writes.
+      if (key) {
+        await page.keyboard.down(key);
+        try {
+          await page.waitForFunction(
+            ({ x, direction }) => {
+              const current = (window as any).__P01__();
+              return (
+                current.mode !== "playing" ||
+                (current.player.x - x) * direction >= 6
+              );
+            },
+            { x: s.player.x, direction: dx },
+            { polling: "raf", timeout: 2000 },
+          );
+        } finally {
+          await page.keyboard.up(key);
+        }
+      } else await page.waitForTimeout(20);
     }
     throw new Error(`Evading pilot did not reach ${seconds}s`);
   } finally {
