@@ -1,13 +1,16 @@
 import { expect, it } from "vitest";
-import { canyonBanks } from "../src/game/canyon-background";
-it("canyon banks stay smooth, keep roads on land and preserve readable combat water", () => {
-  for (let world = -700; world < 6500; world += 1) {
-    const a = canyonBanks(world),
-      b = canyonBanks(world + 1);
-    expect(a.left).toBeGreaterThan(65);
-    expect(a.right).toBeLessThan(295);
-    expect(a.right - a.left).toBeGreaterThan(165);
-    expect(Math.abs(a.left - b.left)).toBeLessThan(0.1);
-    expect(Math.abs(a.right - b.right)).toBeLessThan(0.1);
+import { canyonLayout } from "../src/game/canyon-background";
+it("keeps scrolling coverage and transitions into an open basin before Boss entry", () => {
+  for (let t = 0; t < 190; t += 0.1) {
+    const layout = canyonLayout(t);
+    expect(layout.tileY[0]).toBeLessThanOrEqual(0);
+    expect(layout.tileY[2] + 450).toBeGreaterThanOrEqual(640);
+    expect(layout.tileY[1] - layout.tileY[0]).toBeCloseTo(450);
+    expect(layout.basinMix).toBeGreaterThanOrEqual(0);
+    expect(layout.basinMix).toBeLessThanOrEqual(1);
   }
+  expect(canyonLayout(135).basinMix).toBe(0);
+  expect(canyonLayout(140.5).basinMix).toBeCloseTo(0.5);
+  expect(canyonLayout(145).basinMix).toBe(1);
+  expect(canyonLayout(29).landmarks[0].y).toBe(-160);
 });

@@ -1,0 +1,67 @@
+[
+  {
+    "name": "river",
+    "prompt": "Use case: stylized-concept. Production background asset for an ORIGINAL top-down 2D vertical arcade aircraft shooter. Orthographic straight-down camera, NOT isometric, NO horizon. Detailed painted pixel-art-like pre-rendered arcade terrain, natural granular materials, warm sandstone cliffs with craggy strata, shaded depth, scattered varied boulders and worn service infrastructure. Muted rust/ochre rock and dark desaturated teal water; center low contrast for bright bullets. No aircraft, turrets, characters, projectiles, explosions, HUD, writing, logos or watermark. Edge-to-edge landscape, no borders. Portrait 1024x1536. Upper-left diffuse light, coherent material scale. A vertically repeating canyon river terrain strip. Natural irregular deeply layered cliffs occupy outer 25% left/right. River gently meanders within central half, water subtle eddies, current texture, irregular sandbars near edges; center remains clear. Broken winding service tracks and small concrete pads on outer banks, not two straight highways. Rich natural depth, no large landmark. Top and bottom shore/water arrangement should match for seamless vertical scrolling; no hard horizontal divides.",
+    "file": "public/assets/original/canyon-river.webp",
+    "sha256": "fc23b921d2e22c703a7839298282495955140b7dee3ae008cf2caef797719604",
+    "bytes": 233506,
+    "dimensions": [
+      720,
+      1080
+    ],
+    "source": "OpenAI built-in image_gen; original generated terrain; 2026-11-17",
+    "processing": "Downsampled and encoded WebP quality88; no external source art"
+  },
+  {
+    "name": "bridge",
+    "prompt": "Use case: stylized-concept. Production background asset for an ORIGINAL top-down 2D vertical arcade aircraft shooter. Orthographic straight-down camera, NOT isometric, NO horizon. Detailed painted pixel-art-like pre-rendered arcade terrain, natural granular materials, warm sandstone cliffs with craggy strata, shaded depth, scattered varied boulders and worn service infrastructure. Muted rust/ochre rock and dark desaturated teal water; center low contrast for bright bullets. No aircraft, turrets, characters, projectiles, explosions, HUD, writing, logos or watermark. Edge-to-edge landscape, no borders. Portrait 1024x1536. Upper-left diffuse light, coherent material scale. A complete terrain section containing ONE substantial industrial steel truss bridge running horizontally across the canyon river at the vertical center. Detailed girders, riveted piers, thick concrete abutments, cast shadows, worn deck, narrow approach roads curving into rock. Natural irregular cliffs both sides and calm dark teal water above/below. Bridge is ground scenery under flying aircraft, not enemy. Top and bottom 20% plain canyon terrain for soft blending into adjacent scrolling terrain. No repeated bridges.",
+    "file": "public/assets/original/canyon-bridge.webp",
+    "sha256": "d23c4daf30fc0702071aa97ad725448bc5818fe02f1dba274ae9350e102d3fbb",
+    "bytes": 247038,
+    "dimensions": [
+      720,
+      1080
+    ],
+    "source": "OpenAI built-in image_gen; original generated terrain; 2026-11-17",
+    "processing": "Downsampled and encoded WebP quality88; no external source art"
+  },
+  {
+    "name": "mine",
+    "prompt": "Use case: stylized-concept. Production background asset for an ORIGINAL top-down 2D vertical arcade aircraft shooter. Orthographic straight-down camera, NOT isometric, NO horizon. Detailed painted pixel-art-like pre-rendered arcade terrain, natural granular materials, warm sandstone cliffs with craggy strata, shaded depth, scattered varied boulders and worn service infrastructure. Muted rust/ochre rock and dark desaturated teal water; center low contrast for bright bullets. No aircraft, turrets, characters, projectiles, explosions, HUD, writing, logos or watermark. Edge-to-edge landscape, no borders. Portrait 1024x1536. Upper-left diffuse light, coherent material scale. A complete canyon terrain section with an old ore-processing mine on BOTH outer banks: layered rock cuttings, small conveyors, crushers, corrugated machine buildings, storage hoppers, rails and worn pads with believable mechanical volume. Keep central 50% as unobstructed dark teal winding river for flying combat. Facilities confined to side banks, asymmetric layouts, coherent shadows, no giant central building. Top/bottom20% plain canyon for blending.",
+    "file": "public/assets/original/canyon-mine.webp",
+    "sha256": "85a6c8ed772acf6996458ae744900933b8d6e438f8292dbd53761787057114ab",
+    "bytes": 248712,
+    "dimensions": [
+      720,
+      1080
+    ],
+    "source": "OpenAI built-in image_gen; original generated terrain; 2026-11-17",
+    "processing": "Downsampled and encoded WebP quality88; no external source art"
+  },
+  {
+    "name": "dam",
+    "prompt": "Use case: stylized-concept. Production background asset for an ORIGINAL top-down 2D vertical arcade aircraft shooter. Orthographic straight-down camera, NOT isometric, NO horizon. Detailed painted pixel-art-like pre-rendered arcade terrain, natural granular materials, warm sandstone cliffs with craggy strata, shaded depth, scattered varied boulders and worn service infrastructure. Muted rust/ochre rock and dark desaturated teal water; center low contrast for bright bullets. No aircraft, turrets, characters, projectiles, explosions, HUD, writing, logos or watermark. Edge-to-edge landscape, no borders. Portrait 1024x1536. Upper-left diffuse light, coherent material scale. A complete canyon terrain section with ONE massive hydroelectric dam across river at vertical center. Believable thick concrete crown and downstream face seen from straight above, deep buttresses, metal sluice gates, dark water above, narrow turbulent white-water channels immediately below, restrained foam, shadows giving height and structural thickness. Rock-cut service approaches on both banks, detailed machinery without guns. Top/bottom20% plain dark teal water/rock for blending; no repeated dams.",
+    "file": "public/assets/original/canyon-dam.webp",
+    "sha256": "86cd2d621d1fa1c625ba22fe8c29489b06a55eba8b0e3d5096c3d24948eb666d",
+    "bytes": 209766,
+    "dimensions": [
+      720,
+      1080
+    ],
+    "source": "OpenAI built-in image_gen; original generated terrain; 2026-11-17",
+    "processing": "Downsampled and encoded WebP quality88; no external source art"
+  },
+  {
+    "name": "reservoir",
+    "prompt": "Use case: stylized-concept. Production background asset for an ORIGINAL top-down 2D vertical arcade aircraft shooter. Orthographic straight-down camera, NOT isometric, NO horizon. Detailed painted pixel-art-like pre-rendered arcade terrain, natural granular materials, warm sandstone cliffs with craggy strata, shaded depth, scattered varied boulders and worn service infrastructure. Muted rust/ochre rock and dark desaturated teal water; center low contrast for bright bullets. No aircraft, turrets, characters, projectiles, explosions, HUD, writing, logos or watermark. Edge-to-edge landscape, no borders. Portrait 1024x1536. Upper-left diffuse light, coherent material scale. A distinct Boss arena terrain: broad open dark desaturated teal reservoir occupying center 80% width, irregular crescent rocky shore at far left/right edges, large concrete spillway and maintenance structures along outer perimeter, craggy sandstone cliffs, shoreline depth and submerged rock. Quiet readable water in center, no island or object in combat area. This is a wide basin after a narrow canyon, not a straight canal. Top/bottom shore edges and water should match for a vertically repeating basin. No dam across center.",
+    "file": "public/assets/original/canyon-reservoir.webp",
+    "sha256": "99c3cff50e5e928b8ad364a3f280fa2505cc0fc67f2f3ae67bca7e3c917e3448",
+    "bytes": 153166,
+    "dimensions": [
+      720,
+      1080
+    ],
+    "source": "OpenAI built-in image_gen; original generated terrain; 2026-11-17",
+    "processing": "Downsampled and encoded WebP quality88; no external source art"
+  }
+]

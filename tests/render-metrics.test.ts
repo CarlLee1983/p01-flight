@@ -66,3 +66,18 @@ describe("render metrics", () => {
     });
   });
 });
+
+it("indexes actual visible/fire/hit/death moments without changing enemies or unbounded event histories", () => {
+ const m = new RenderMetrics();
+ const enemy = {id: 1, active: true, behavior: "groundBattery", x: 50, y: 130, hp: 12, maxHp: 12, shotsFired: 1, turretAngle: 0.3};
+ m.sample({enemies: [enemy], bullets: [], enemyBullets: [], time: 30},1,1,0);
+ const before = JSON.stringify(enemy);
+ m.sample({enemies: [enemy], bullets: [], enemyBullets: [], time: 31},1,1,0);
+ expect(JSON.stringify(enemy)).toBe(before);
+ m.sample({enemies: [{...enemy, hp: 0, active: false, hitUntil: 32.05}], bullets: [], enemyBullets: [], time: 32},1,1,0);
+ const row = m.snapshot().presentationCoverage.groundBattery!;
+ expect(row.visible.time).toBe(30); expect(row.fired.time).toBe(30);
+ expect(row.hit.time).toBe(32); expect(row.destroyed.time).toBe(32);
+ expect(Object.keys(row).sort()).toEqual(["destroyed", "fired", "hit", "visible"]);
+ m.reset(); expect(m.snapshot().presentationCoverage).toEqual({});
+});

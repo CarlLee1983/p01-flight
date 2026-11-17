@@ -261,6 +261,8 @@ class FlightScene extends Phaser.Scene {
         file,
         import.meta.env.BASE_URL + "assets/original/" + file + ".png",
       );
+    for (const kind of ["river", "bridge", "mine", "dam", "reservoir"])
+      this.load.image("canyon-" + kind, import.meta.env.BASE_URL + "assets/original/canyon-" + kind + ".webp");
     for (const file of [
       "playerShip1_blue",
       "enemyRed1",

@@ -43,6 +43,8 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
   await page.screenshot({ path: "docs/stage02-menu.png" });
   await page.locator("#start").click();
   await page.keyboard.down("Space");
+  const roleFrames: {role: string; id: number; requestedGameTime: number; completedGameTime: number; file: string}[] = [];
+  const photographed = new Set<string>();
   let first = false,
     second = false,
     observingBossEntry = false;
@@ -58,6 +60,13 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
       if (s.mode !== "playing") {
         expect(s.mode).toBe("won");
         break;
+      }
+      const actor = s.activeEnemies.find((e: any) => !photographed.has(e.behavior) && e.y >= 112 && e.y <= 400 && e.x >= 20 && e.x <= 340);
+      if (actor) {
+        photographed.add(actor.behavior);
+        const file = `docs/stage02-role-${actor.behavior}.png`;
+        await page.screenshot({path: file, timeout: 15000});
+        roleFrames.push({role: actor.behavior, id: actor.id, requestedGameTime: s.time, completedGameTime: (await state(page)).time, file});
       }
       // Ordinary fire release makes the intact hull inspectable. Movement and
       // enemy damage continue normally, no pause/health/time mutation is used.
@@ -113,6 +122,13 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     .toBe("won");
   const done = await state(page);
   expect(done.bossDefeated).toBe(true);
+  const presentation = done.renderMetrics.presentationCoverage;
+  for (const role of ["straight", "weave", "cross", "brakeRaider", "hookWing", "carrier", "groundBattery", "groundDepot", "gatekeeper"]) expect(presentation[role]?.visible, role + " actually appeared").toBeTruthy();
+  await testInfo.attach("stage02-actual-enemy-presentation", {body: JSON.stringify({presentation, roleFrames, note: "Source timing indexes are observations, not a claim every role fired or died. Match the full video and screenshot before accepting visual quality."}, null, 2), contentType: "application/json"});
+  console.log("STAGE02_ACTUAL_ENEMY_PRESENTATION", JSON.stringify(presentation));
+  expect(done.background.artReady).toBe(true);
+  expect(done.background.basinMix).toBe(1);
+
   await saveStage02Sampler(page, testInfo);
   expect(done.save.stages["stage-02"].cleared).toBe(true);
   expect(done.save.stages["stage-01"].bestScore).toBe(2000);
@@ -222,6 +238,8 @@ test("Stage02 mobile selection, touch, pause, reset and retry preserve controls"
     await page.locator("#touch-pause").click();
     expect((await state(page)).mode).toBe("paused");
     await page.locator("#menu").click();
+    await page.getByText("設定與本機紀錄", { exact: true }).click();
+    await expect(page.locator("#reset")).toBeVisible();
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator("#reset").click();
     await expect(
