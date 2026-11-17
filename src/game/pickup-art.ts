@@ -344,6 +344,39 @@ function paintPickup(context: CanvasRenderingContext2D, kind: PickupArtKind) {
       }
       break;
   }
+  // Physical identification paint, not a surrounding glowing UI badge.
+  // Shape remains the primary cue; the separately rendered text label adds a non-colour cue.
+  const accent = `#${PICKUP_VISUALS[kind].color.toString(16).padStart(6, "0")}`;
+  switch (kind) {
+    case "heal":
+      rect(19, 48, 26, 4, accent);
+      rect(28, 48, 8, 2, "#f4f2df");
+      break;
+    case "power":
+      rect(16, 29, 32, 4, accent);
+      for (const x of [20, 30, 40]) rect(x, 29, 3, 4, "#172d37");
+      break;
+    case "spread":
+      rect(23, 42, 18, 7, accent);
+      for (const x of [26, 31, 36]) rect(x, 43, 2, 5, "#263641");
+      break;
+    case "beam":
+      for (const x of [21, 40]) rect(x, 15, 3, 22, accent);
+      rect(29, 48, 6, 3, "#eaf5e8");
+      break;
+    case "missile":
+      for (const x of [11, 27, 43]) {
+        rect(x + 1, 27, 8, 4, accent);
+        rect(x + 1, 27, 8, 1, "#fff0df");
+      }
+      break;
+    case "support":
+      for (const x of [19, 45]) {
+        rect(x - 3, 25, 6, 11, accent);
+        rect(x - 2, 25, 4, 3, "#edf1ef");
+      }
+      break;
+  }
 }
 
 /** Call once in Scene.create after texture manager is ready; safe on scene restart. */

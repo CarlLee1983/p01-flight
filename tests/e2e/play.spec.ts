@@ -46,12 +46,27 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
     expect(response.headers()["content-type"]).toContain("image/png");
   }
   await page.screenshot({ path: "docs/menu.png" });
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.screenshot({ path: "docs/pickup-guide-320.png" });
+  await page
+    .locator("canvas")
+    .evaluate((canvas) => (canvas.style.filter = "grayscale(1)"));
+  await page.screenshot({ path: "docs/pickup-guide-monochrome.png" });
+  await page.locator("canvas").evaluate((canvas) => (canvas.style.filter = ""));
+  await page.setViewportSize({ width: 1000, height: 900 });
   await page.getByRole("button", { name: "開始飛行" }).click();
   await page.keyboard.down("Space");
   // Normal keyboard input only. Center route naturally collects stage pickups.
+  await waitGameTime(page, 7.5);
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.screenshot({ path: "docs/falling-module-320.png" });
+  await page.setViewportSize({ width: 1000, height: 900 });
   await expect
     .poll(async () => (await state(page)).weaponLevel, { timeout: 25000 })
     .toBeGreaterThan(1);
+  await expect
+    .poll(async () => (await state(page)).pickupNoticeText)
+    .toMatch(/火力 LV[23]\/3/);
   await page.screenshot({ path: "docs/playing.png" });
   await waitGameTime(page, 14);
   expect(

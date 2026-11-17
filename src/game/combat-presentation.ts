@@ -1,7 +1,13 @@
 import { bossMuzzle } from "./boss-muzzles";
 import type { Boss } from "./model";
 /** All combat imagery is below the opaque HUD plate; labels stay above it. */
-export const PRESENTATION_LAYERS = { combatMax: 4, hud: 4.5, text: 5 } as const;
+export const PRESENTATION_LAYERS = {
+  pickupLabel: 2.5,
+  projectiles: 3,
+  combatMax: 4,
+  hud: 4.5,
+  text: 5,
+} as const;
 export const CANNON_ART = { width: 32, height: 48, muzzleY: 22 } as const;
 /** A fan may have several rays from one reactor. Charge that source once,
  * without drawing any trajectory guides. Attack angles remain model data. */

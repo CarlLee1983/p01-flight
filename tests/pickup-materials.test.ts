@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createPickupTextures } from "../src/game/pickup-art";
+import { createPickupTextures, PICKUP_VISUALS } from "../src/game/pickup-art";
 
 it("mechanical pickups stay within the texture, avoid icon glow/text and have bounded paint work", () => {
   const records: { key: string; calls: number; colors: Set<string> }[] = [];
@@ -59,5 +59,11 @@ it("mechanical pickups stay within the texture, avoid icon glow/text and have bo
   for (const record of records) {
     expect(record.calls).toBeLessThan(85);
     expect(record.colors.size).toBeGreaterThanOrEqual(7);
+    const spec = Object.values(PICKUP_VISUALS).find(
+      (item) => item.key === record.key,
+    )!;
+    expect(
+      record.colors.has(`#${spec.color.toString(16).padStart(6, "0")}`),
+    ).toBe(true);
   }
 });

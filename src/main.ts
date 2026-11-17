@@ -1,3 +1,8 @@
+import {
+  createPickupLabelTextures,
+  pickupLabel,
+  pickupMessage,
+} from "./game/pickup-labels";
 import { RAIDER_GEOMETRY, raiderMuzzle } from "./game/raider-geometry";
 import { createRaiderTextures, RAIDER_ART } from "./game/raider-art";
 import { createCannonTextures } from "./game/cannon-art";
@@ -35,6 +40,7 @@ let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
+let readPickupNotice = (): string | null => null;
 let readBackgroundInfo: () => Record<string, unknown> = () => ({});
 const renderMetrics = new RenderMetrics();
 let frameCount = 0,
@@ -234,15 +240,9 @@ class FlightScene extends Phaser.Scene {
           .map((image) => image.depth),
       );
     createPickupTextures(this);
+    createPickupLabelTextures(this);
     createCannonTextures(this);
     createRaiderTextures(this);
-    this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
-      (text, i) =>
-        this.add
-          .text(55 + i * 50, 602, text, { fontSize: "10px", color: "#e2eefa" })
-          .setOrigin(0.5)
-          .setDepth(5),
-    );
     this.pickupNotice = this.add
       .text(180, 90, "", {
         fontFamily: "monospace",
@@ -264,6 +264,8 @@ class FlightScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(5);
+    readPickupNotice = () =>
+      this.pickupNotice.visible ? this.pickupNotice.text : null;
     this.bossAdvice = this.add
       .text(180, 600, "", {
         fontSize: "10px",
@@ -276,7 +278,7 @@ class FlightScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(5);
     graphics = this.add.graphics();
-    overlay = this.add.graphics().setDepth(3);
+    overlay = this.add.graphics().setDepth(PRESENTATION_LAYERS.projectiles);
     hud = this.add.graphics().setDepth(PRESENTATION_LAYERS.hud);
     label = this.add
       .text(16, 14, "", {
@@ -465,14 +467,8 @@ class FlightScene extends Phaser.Scene {
     }
     if (model.pickupCount > previous.pickup) {
       audio.play("power");
-      const picked = pickupVisual(model.lastPickup ?? "power");
       this.pickupNotice.setText(
-        picked.label +
-          (model.lastPickup === "support"
-            ? " 8s"
-            : model.lastPickup === "heal"
-              ? ""
-              : ` LV${model.weaponLevel}`),
+        pickupMessage(model.lastPickup ?? "power", model.weaponLevel, model.hp),
       );
       this.pickupNoticeUntil = model.time + 1.6;
     }
@@ -907,6 +903,15 @@ class FlightScene extends Phaser.Scene {
             1,
             Math.sin(model.time * 3) * 4,
           ).setDepth(4);
+          if (pickup.y >= 88) {
+            this.sprite(
+              pickupLabel(pickup.kind).key,
+              pickup.x,
+              pickup.y + 24,
+              36,
+              14,
+            ).setDepth(PRESENTATION_LAYERS.pickupLabel);
+          }
         }
       const moduleAge = model.time - (this.pickupNoticeUntil - 1.6);
       if (this.pickupNoticeUntil > 0 && moduleAge >= 0 && moduleAge < 0.5) {
@@ -1122,14 +1127,18 @@ class FlightScene extends Phaser.Scene {
       graphics.lineBetween(180, 265, 180, 520);
       graphics.lineBetween(55, 390, 305, 390);
       ["heal", "power", "spread", "beam", "missile", "support"].forEach(
-        (kind, i) =>
+        (kind, i) => {
           this.sprite(
             pickupVisual(kind).key,
             55 + i * 50,
             576,
             30,
             30,
-          ).setDepth(4),
+          ).setDepth(4);
+          this.sprite(pickupLabel(kind).key, 55 + i * 50, 600, 36, 14).setDepth(
+            4,
+          );
+        },
       );
       this.sprite("player", 180, 82, 80, 80, 0.85, Math.sin(this.ambience) * 3);
       this.sprite("fire03", 180, 127, 10, 20, 0.9, 180);
@@ -1272,6 +1281,7 @@ Object.defineProperty(window, "__P01__", {
       .filter((p) => p.active)
       .map((p) => ({ kind: p.kind, x: p.x, y: p.y })),
     lastPickup: model.lastPickup,
+    pickupNoticeText: readPickupNotice(),
     supportTime: model.supportTime,
     supportShots: model.supportShots,
     supportDrones: model.supportDrones,

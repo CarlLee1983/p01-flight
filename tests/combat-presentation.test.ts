@@ -50,3 +50,10 @@ it("new cannon art keeps the existing barrel endpoint, not a cosmetic offset", (
   expect(m.y - b.cannons[0].y).toBe(CANNON_ART.muzzleY);
   expect(CANNON_ART.height / 2 - 2).toBe(CANNON_ART.muzzleY);
 });
+
+it("falling pickup labels stay behind hostile bullets and HUD", () => {
+  expect(PRESENTATION_LAYERS.pickupLabel).toBeLessThan(
+    PRESENTATION_LAYERS.projectiles,
+  );
+  expect(PRESENTATION_LAYERS.projectiles).toBeLessThan(PRESENTATION_LAYERS.hud);
+});
