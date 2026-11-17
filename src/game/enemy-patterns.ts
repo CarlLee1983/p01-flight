@@ -7,6 +7,10 @@ export function fastAttackAngles(
   volley: number,
   direction = 1,
 ): number[] {
+  if (behavior === "hookWing") {
+    const lean = direction * (volley % 2 ? -0.32 : 0.32);
+    return [lean - 0.13, lean + 0.13];
+  }
   if (behavior === "weave") {
     const lean = volley % 2 ? 0.22 : -0.22;
     return [lean - 0.14, lean + 0.14];
@@ -17,6 +21,10 @@ export function fastAttackAngles(
 }
 export function isFastShooter(behavior: Behavior | undefined): boolean {
   return (
-    behavior === "straight" || behavior === "weave" || behavior === "cross"
+    behavior === "straight" ||
+    behavior === "weave" ||
+    behavior === "cross" ||
+    behavior === "brakeRaider" ||
+    behavior === "hookWing"
   );
 }

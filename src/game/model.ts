@@ -1,3 +1,4 @@
+import { raiderMuzzle } from "./raider-geometry";
 import {
   groundMuzzle,
   hostileStyle,
@@ -26,6 +27,7 @@ export interface Body {
 }
 export interface Enemy extends Body {
   enteredPlayfield?: boolean;
+  brakeElapsed?: number;
   maxHp?: number;
   speed: number;
   hp: number;
@@ -315,9 +317,18 @@ export class FlightModel {
       const speed = Math.hypot(vx, vy);
       angles.forEach((angle, i) => {
         const muzzle = i === 0 ? -9 : 9;
+        // These two hulls have fixed twin barrels, not gimballed muzzles.
+        const fixedBarrels =
+          source.behavior === "brakeRaider" || source.behavior === "hookWing";
+        const socket = fixedBarrels
+          ? raiderMuzzle(source, i)
+          : {
+              x: x + Math.cos(angle) * muzzle,
+              y: y - Math.sin(angle) * muzzle,
+            };
         this.emitEnemyBullet(
-          x + Math.cos(angle) * muzzle,
-          y - Math.sin(angle) * muzzle,
+          socket.x,
+          socket.y,
           Math.sin(angle) * speed,
           Math.cos(angle) * speed,
           false,
@@ -564,6 +575,7 @@ export class FlightModel {
           shotsFired: 0,
           visibleSince: undefined,
           enteredPlayfield: false,
+          brakeElapsed: undefined,
           formationPhase: w.formationPhase ?? 0,
           volleyFired: false,
           holdFor: w.holdFor,
@@ -761,6 +773,28 @@ export class FlightModel {
             }
           }
         }
+        if (e.behavior === "brakeRaider") {
+          if (e.brakeElapsed === undefined) {
+            e.y = Math.min(145, e.y + e.speed * dt);
+            if (e.y >= 145) e.brakeElapsed = 0;
+          } else {
+            e.brakeElapsed += dt;
+            if (e.brakeElapsed > 0.75) e.y += e.speed * 1.15 * dt;
+          }
+        }
+        if (e.behavior === "hookWing") {
+          // One smooth in-and-out banking pass, mirrored for each entry side.
+          e.x = Math.max(
+            25,
+            Math.min(
+              this.stage.width - 25,
+              (e.originX ?? e.x) +
+                (e.direction ?? 1) *
+                  65 *
+                  Math.sin(Math.min(e.age / 2.7, 1) * Math.PI),
+            ),
+          );
+        }
         if (e.behavior === "weave")
           e.x = Math.max(
             25,
@@ -773,6 +807,7 @@ export class FlightModel {
           !ground &&
           e.behavior !== "gatekeeper" &&
           e.behavior !== "dive" &&
+          e.behavior !== "brakeRaider" &&
           e.behavior !== "cross" &&
           e.behavior !== "carrier" &&
           !(
@@ -796,6 +831,8 @@ export class FlightModel {
         }
         if (
           e.fireEvery &&
+          (e.behavior !== "brakeRaider" ||
+            (e.brakeElapsed !== undefined && (e.shotsFired ?? 0) < 2)) &&
           this.interactable(e) &&
           e.behavior !== "gatekeeper" &&
           e.behavior !== "escort" &&
@@ -825,11 +862,10 @@ export class FlightModel {
             e.fireCooldown <= 0.6 &&
             !e.attackAngles?.length
           )
-            e.attackAngles = fastAttackAngles(
-              e.behavior,
-              e.shotsFired ?? 0,
-              e.direction,
-            );
+            e.attackAngles =
+              e.behavior === "brakeRaider"
+                ? [e.aimAngle! - 0.18, e.aimAngle! + 0.18]
+                : fastAttackAngles(e.behavior, e.shotsFired ?? 0, e.direction);
           if (
             e.behavior === "heavy" &&
             e.fireCooldown <= 0.6 &&

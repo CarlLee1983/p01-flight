@@ -96,7 +96,7 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect((await state(page)).section.at).toBe(56);
   await page.screenshot({ path: "docs/resupply-approach.png" });
   await keyboardShoreCounterattack(page);
-  for (const t of [78, 88, 100, 105, 112, 123]) {
+  for (const t of [78, 80.2, 84.2, 100, 105, 112, 123]) {
     await evadeUntil(page, t);
     await page.screenshot({ path: `docs/sortie-${t}.png` });
   }
@@ -112,7 +112,7 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   await page.screenshot({ path: "docs/boss-320.png" });
   await page.setViewportSize({ width: 1000, height: 900 });
   // Capture warning and angles from one frame. A second page.evaluate can run
-  // after the volley fired and legitimately cleared its forecast.
+  // after the volley fired and legitimately cleared its charge state.
   let warning: any;
   await expect
     .poll(
@@ -134,7 +134,7 @@ test("full Stage 01 boss clear, score, retry and reload", async ({ page }) => {
   expect(new Set(sources.map((p: any) => `${p.x}:${p.y}`)).size).toBe(
     sources.length,
   );
-  await page.screenshot({ path: "docs/boss-attack-forecast.png" });
+  await page.screenshot({ path: "docs/boss-charge-no-guides.png" });
   await expect
     .poll(async () => (await state(page)).audio.musicSection, { timeout: 5000 })
     .toBe("boss");

@@ -307,6 +307,13 @@ describe("weapon and encounter progression", () => {
         ),
     ).toBe(true);
     expect(
+      stage01.waves
+        .filter(
+          (w) => w.behavior === "brakeRaider" || w.behavior === "hookWing",
+        )
+        .every((w) => w.at > 52),
+    ).toBe(true);
+    expect(
       stage01.waves.some((w) => w.behavior === "gatekeeper" && w.hp >= 5),
     ).toBe(true);
     expect(stage01.waves.every((w) => w.at < 121)).toBe(true);

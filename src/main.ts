@@ -1,3 +1,5 @@
+import { RAIDER_GEOMETRY, raiderMuzzle } from "./game/raider-geometry";
+import { createRaiderTextures, RAIDER_ART } from "./game/raider-art";
 import { createCannonTextures } from "./game/cannon-art";
 import {
   bossChargeSources,
@@ -5,7 +7,6 @@ import {
   PRESENTATION_LAYERS,
 } from "./game/combat-presentation";
 import { groundMuzzle, BOSS_BODY } from "./game/hostile-visuals";
-import { bossMuzzle } from "./game/boss-muzzles";
 import Phaser from "phaser";
 import { stage01, GROUND_VISIBLE_Y } from "./data/stage";
 import { FlightModel, type Mode } from "./game/model";
@@ -87,7 +88,7 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / 01</p><h2>雲際航線</h2><p class="brief">穿越沿岸防線，擊破重裝指揮艦。</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">原創電子配樂與音效，Boss 戰切換專屬主題。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意預告後移位，避免留在鎖定線上。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? "Stage 01 通關" : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${stage01.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p><button id="retry">再飛一次</button><button id="menu" class="secondary">返回標題</button>${warning}`;
   document.querySelector("#start")?.addEventListener("click", start);
@@ -234,6 +235,7 @@ class FlightScene extends Phaser.Scene {
       );
     createPickupTextures(this);
     createCannonTextures(this);
+    createRaiderTextures(this);
     this.pickupGuide = ["修復", "升級", "散射", "貫穿", "追蹤", "僚機"].map(
       (text, i) =>
         this.add
@@ -537,7 +539,7 @@ class FlightScene extends Phaser.Scene {
     );
     this.bossAdvice.setText(
       patrol
-        ? "避開金色預告線 · 移位後追擊巡邏艦"
+        ? "留意炮口充能 · 移位後追擊巡邏艦"
         : model.boss?.cannons.some((c) => c.active)
           ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
           : "側炮全毀 · 集中攻擊核心",
@@ -642,31 +644,13 @@ class FlightScene extends Phaser.Scene {
               4,
             );
             if ((e.telegraph ?? 0) > 0) {
-              overlay.lineStyle(
-                1.5,
+              // Local weapon charging only: no prediction of the future bullet path.
+              overlay.fillStyle(
                 0xffc66e,
-                0.55 + Math.sin(model.time * 16) * 0.18,
+                0.65 + Math.sin(model.time * 16) * 0.2,
               );
-              for (const lane of e.attackLanes ?? []) {
-                overlay.lineBetween(lane, e.y + 34, lane, 620);
-                overlay.strokeTriangle(
-                  lane - 5,
-                  e.y + 42,
-                  lane + 5,
-                  e.y + 42,
-                  lane,
-                  e.y + 51,
-                );
-              }
-              if (e.attackPattern === "aim") {
-                const angle = e.aimAngle ?? 0;
-                overlay.lineBetween(
-                  e.x,
-                  e.y + 35,
-                  e.x + Math.sin(angle) * 600,
-                  e.y + 35 + Math.cos(angle) * 600,
-                );
-              }
+              for (const side of [-1, 1])
+                overlay.fillCircle(e.x + side * 39, e.y + 32, 4);
             }
             continue;
           }
@@ -715,15 +699,6 @@ class FlightScene extends Phaser.Scene {
                 muzzle.y,
                 11 + Math.sin(model.time * 20) * 3,
               );
-              // Locked aim, not a tracking laser: the player can step aside.
-              overlay.lineStyle(1.5, 0xffbc73, 0.65);
-              for (let distance = 32; distance < 360; distance += 28)
-                overlay.lineBetween(
-                  muzzle.x + Math.sin(angle) * distance,
-                  muzzle.y + Math.cos(angle) * distance,
-                  muzzle.x + Math.sin(angle) * (distance + 12),
-                  muzzle.y + Math.cos(angle) * (distance + 12),
-                );
             }
             continue;
           }
@@ -754,15 +729,31 @@ class FlightScene extends Phaser.Scene {
               overlay.fillCircle(e.x + side * 23, e.y + 11, 3);
             }
             if ((e.telegraph ?? 0) > 0) {
-              overlay.lineStyle(1.5, 0xffcc80, 0.7);
-              for (const offset of [-0.28, 0, 0.28]) {
-                const angle = (e.aimAngle ?? 0) + offset;
-                overlay.lineBetween(
-                  e.x,
-                  e.y + 18,
-                  e.x + Math.sin(angle) * 40,
-                  e.y + 18 + Math.cos(angle) * 40,
+              overlay.fillStyle(0xffcc80, 0.8);
+              for (const side of [-1, 1])
+                overlay.fillCircle(e.x + side * 23, e.y + 11, 4);
+            }
+            continue;
+          }
+          if (e.behavior === "brakeRaider" || e.behavior === "hookWing") {
+            const art = RAIDER_ART[e.behavior];
+            this.sprite(art.key, e.x, e.y, art.width, art.height);
+            for (const side of [-1, 1]) {
+              this.sprite(
+                "fire03",
+                e.x + side * RAIDER_GEOMETRY.engineX,
+                e.y + RAIDER_GEOMETRY.engineY - 4,
+                4,
+                e.behavior === "brakeRaider" ? 8 : 12,
+                0.75,
+              ).setDepth(1);
+              if ((e.telegraph ?? 0) > 0) {
+                overlay.fillStyle(
+                  0xffce84,
+                  0.75 + Math.sin(model.time * 20) * 0.2,
                 );
+                const muzzle = raiderMuzzle(e, side === -1 ? 0 : 1);
+                overlay.fillCircle(muzzle.x, muzzle.y, 3);
               }
             }
             continue;
@@ -826,38 +817,7 @@ class FlightScene extends Phaser.Scene {
             overlay.fillRect(e.x + 17, e.y, 8, 23);
           }
         }
-      // Amber dashed rays are locked attack forecasts, never damaging beams.
-      // Rays stop at the playfield edge; the gap is intentionally left clear.
-      for (const e of model.enemies) {
-        if (!e.active || (e.telegraph ?? 0) <= 0) continue;
-        const angles =
-          e.behavior === "dive" && e.aimAngle !== undefined
-            ? [e.aimAngle]
-            : (e.attackAngles ?? []);
-        for (const [index, angle] of angles.entries()) {
-          overlay.lineStyle(1.3, 0xffd179, 0.55);
-          const fast =
-            e.behavior === "straight" ||
-            e.behavior === "weave" ||
-            e.behavior === "cross";
-          for (let d = 20; d < (fast ? 120 : 480); d += 24) {
-            const muzzle = fast ? (index === 0 ? -9 : 9) : 0;
-            const x = e.x + Math.cos(angle) * muzzle + Math.sin(angle) * d;
-            const y =
-              e.y +
-              (e.behavior === "dive" ? 0 : 20) -
-              Math.sin(angle) * muzzle +
-              Math.cos(angle) * d;
-            if (x < 10 || x > 350 || y < 84 || y > 625) break;
-            overlay.lineBetween(
-              x,
-              y,
-              x + Math.sin(angle) * 10,
-              y + Math.cos(angle) * 10,
-            );
-          }
-        }
-      }
+      // Enemy attacks retain their charge timing, but never draw trajectory guides.
       for (const shot of model.enemyBullets)
         if (shot.active) {
           const speed = Math.hypot(shot.vx, shot.vy) || 1;
@@ -932,12 +892,12 @@ class FlightScene extends Phaser.Scene {
       for (const pickup of model.pickups)
         if (pickup.active) {
           const art = pickupVisual(pickup.kind);
-          overlay.lineStyle(
-            1,
-            art.color,
-            0.25 + Math.sin(model.time * 4) * 0.1,
-          );
-          overlay.strokeCircle(pickup.x, pickup.y, 20);
+          graphics.fillStyle(0x04131e, 0.3);
+          graphics.fillEllipse(pickup.x + 4, pickup.y + 7, 28, 13);
+          overlay.fillStyle(art.color, 0.55 + Math.sin(model.time * 4) * 0.2);
+          for (const side of [-1, 1]) {
+            overlay.fillRect(pickup.x + side * 19 - 1, pickup.y - 2, 2, 4);
+          }
           this.sprite(
             art.key,
             pickup.x,
@@ -948,6 +908,29 @@ class FlightScene extends Phaser.Scene {
             Math.sin(model.time * 3) * 4,
           ).setDepth(4);
         }
+      const moduleAge = model.time - (this.pickupNoticeUntil - 1.6);
+      if (this.pickupNoticeUntil > 0 && moduleAge >= 0 && moduleAge < 0.5) {
+        const art = pickupVisual(model.lastPickup ?? "power");
+        // Brief installation feedback beside the hull, never over the hitbox.
+        const y = Math.min(605, model.player.y + 22);
+        const x =
+          model.player.x < 300 ? model.player.x + 27 : model.player.x - 27;
+        this.sprite(
+          art.key,
+          x,
+          y - moduleAge * 12,
+          20,
+          20,
+          1 - moduleAge * 1.6,
+        ).setDepth(4);
+        overlay.lineStyle(1, art.color, 1 - moduleAge * 2);
+        overlay.lineBetween(
+          x,
+          y + 9,
+          model.player.x,
+          Math.min(620, model.player.y + 20),
+        );
+      }
       if (model.boss?.active) {
         this.sprite(
           "boss",
@@ -1020,26 +1003,6 @@ class FlightScene extends Phaser.Scene {
               source.x + 3,
               source.y + 6,
             );
-          }
-          for (const [index, angle] of model.boss.attackAngles.entries()) {
-            const muzzle = bossMuzzle(
-              model.boss,
-              index,
-              model.boss.attackAngles.length,
-            );
-            if (!muzzle.active) continue;
-            overlay.lineStyle(1.8, 0xffd179, 0.65);
-            for (let d = 40; d < 580; d += 26) {
-              const x = muzzle.x + Math.sin(angle) * d;
-              const y = muzzle.y + Math.cos(angle) * d;
-              if (x < 10 || x > 350 || y > 625) break;
-              overlay.lineBetween(
-                x,
-                y,
-                x + Math.sin(angle) * 13,
-                y + Math.cos(angle) * 13,
-              );
-            }
           }
         }
         // Reactor pulses convey phase escalation without altering collision bounds.

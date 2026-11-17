@@ -148,6 +148,8 @@ it("new route uses distinct roles and fixed-time supplies instead of extending B
   expect(new Set(added.map((w) => w.behavior))).toEqual(
     new Set([
       "weave",
+      "brakeRaider",
+      "hookWing",
       "groundBattery",
       "carrier",
       "escort",
@@ -177,8 +179,10 @@ it("provides 405 airborne opponents with bounded firing roles, not phantom groun
       (counts[wave.behavior ?? "straight"] ?? 0) + 1;
   }
   expect(counts).toEqual({
-    straight: 120,
-    weave: 132,
+    straight: 112,
+    weave: 128,
+    brakeRaider: 6,
+    hookWing: 6,
     cross: 125,
     escort: 12,
     carrier: 6,
