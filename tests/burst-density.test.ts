@@ -61,7 +61,7 @@ it.each([30, 60, 120])(
         while (m.time < 40) {
           m.update(1 / fps);
           if (m.boss!.attackCycle === 8 && !finalShot) finalShot = m.time;
-          if (finalShot && m.time >= finalShot + 0.4) break;
+          if (finalShot && m.time >= finalShot + 1.0) break;
         }
         expect(m.boss!.attackCycle).toBe(8);
         totals.push(m.emittedBossShots);
@@ -86,6 +86,7 @@ it("burst tails freeze on pause and cancel on bomb, emitter destruction, restart
         points: 1,
         fireEvery: 1,
         firstFireDelay: 0.6,
+        behavior: "turret",
       },
     ],
     pickups: [],
@@ -121,6 +122,7 @@ it("a recycled enemy slot cannot inherit a previous emitter's pending tail", () 
         points: 1,
         fireEvery: 1,
         firstFireDelay: 0.6,
+        behavior: "turret",
       },
       { at: 0.7, x: 40, speed: 100, hp: 1, points: 2 },
     ],

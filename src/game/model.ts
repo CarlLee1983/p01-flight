@@ -1,3 +1,4 @@
+import { fastAttackAngles, isFastShooter } from "./enemy-patterns";
 import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
 export type Mode = "menu" | "playing" | "paused" | "won" | "lost";
@@ -280,10 +281,43 @@ export class FlightModel {
     const count = boss
       ? (this.stage.boss?.burstShots ?? 1)
       : (this.stage.enemyBurstShots ?? 1);
+    if (
+      !boss &&
+      "behavior" in source &&
+      isFastShooter(source.behavior) &&
+      count > 1
+    ) {
+      const angles = source.attackAngles?.length
+        ? source.attackAngles
+        : fastAttackAngles(
+            source.behavior,
+            source.shotsFired ?? 0,
+            source.direction,
+          );
+      const speed = Math.hypot(vx, vy);
+      angles.forEach((angle, i) => {
+        const muzzle = i === 0 ? -9 : 9;
+        this.emitEnemyBullet(
+          x + Math.cos(angle) * muzzle,
+          y - Math.sin(angle) * muzzle,
+          Math.sin(angle) * speed,
+          Math.cos(angle) * speed,
+          false,
+        );
+      });
+      return;
+    }
     this.emitEnemyBullet(x, y, vx, vy, boss);
+    // Slow emitters use genuinely separated pulses. The earlier 0.12s train
+    // was visually merged; Boss now has 30.8px nominal separation, not 16.8px.
+    const spacing = boss
+      ? 0.22
+      : "behavior" in source && source.behavior === "escort"
+        ? 0.4
+        : 0.34;
     for (let i = 1; i < count; i++)
       this.pendingShots.push({
-        at: this.time + i * 0.12,
+        at: this.time + i * spacing,
         x: x - source.x,
         y: y - source.y,
         vx,
@@ -741,6 +775,16 @@ export class FlightModel {
             e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
           e.telegraph =
             e.fireCooldown > 0 && e.fireCooldown <= 0.6 ? e.fireCooldown : 0;
+          if (
+            isFastShooter(e.behavior) &&
+            e.fireCooldown <= 0.6 &&
+            !e.attackAngles?.length
+          )
+            e.attackAngles = fastAttackAngles(
+              e.behavior,
+              e.shotsFired ?? 0,
+              e.direction,
+            );
           if (
             e.behavior === "heavy" &&
             e.fireCooldown <= 0.6 &&

@@ -804,12 +804,20 @@ class FlightScene extends Phaser.Scene {
           e.behavior === "dive" && e.aimAngle !== undefined
             ? [e.aimAngle]
             : (e.attackAngles ?? []);
-        for (const angle of angles) {
+        for (const [index, angle] of angles.entries()) {
           overlay.lineStyle(1.3, 0xffd179, 0.55);
-          for (let d = 20; d < 480; d += 24) {
-            const x = e.x + Math.sin(angle) * d;
+          const fast =
+            e.behavior === "straight" ||
+            e.behavior === "weave" ||
+            e.behavior === "cross";
+          for (let d = 20; d < (fast ? 120 : 480); d += 24) {
+            const muzzle = fast ? (index === 0 ? -9 : 9) : 0;
+            const x = e.x + Math.cos(angle) * muzzle + Math.sin(angle) * d;
             const y =
-              e.y + (e.behavior === "heavy" ? 20 : 0) + Math.cos(angle) * d;
+              e.y +
+              (e.behavior === "dive" ? 0 : 20) -
+              Math.sin(angle) * muzzle +
+              Math.cos(angle) * d;
             if (x < 10 || x > 350 || y < 84 || y > 625) break;
             overlay.lineBetween(
               x,

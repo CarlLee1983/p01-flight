@@ -1,3 +1,4 @@
+import { dodgeDirection } from "./dodge-route";
 import { describe, it, expect } from "vitest";
 import { FlightModel } from "../src/game/model";
 import { stage01, GROUND_VISIBLE_Y, type StageConfig } from "../src/data/stage";
@@ -450,7 +451,7 @@ describe("focused dual weapons", () => {
     });
     m.start();
     m.invincible = 100;
-    run(m, 3.5);
+    run(m, 3.8);
     expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(6);
     expect(m.enemies[0].y).toBeLessThan(153);
     run(m, 4);
@@ -461,7 +462,7 @@ describe("focused dual weapons", () => {
 });
 
 it.each([30, 60, 120])(
-  "focused six-second dodge sweep can clear at %i FPS",
+  "focus aim with normal-speed evasive steering can clear at %i FPS",
   (fps) => {
     const m = new FlightModel(stage01);
     m.start();
@@ -479,9 +480,10 @@ it.each([30, 60, 120])(
           (bomb1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
       )
         bomb2 = m.useBomb();
-      const cycle = (m.time - 125) % 6;
-      const dx = m.time < 125 ? 0 : cycle < 1.5 ? -1 : cycle < 4.5 ? 1 : -1;
-      m.update(1 / fps, dx, 0, true, true);
+      // Release focus to evade visible incoming shots, then recenter and focus.
+      const dx = 0;
+      const steer = dodgeDirection(m, dx);
+      m.update(1 / fps, steer, 0, true, steer === 0);
     }
     expect(m.mode).toBe("won");
     expect(m.hp).toBeGreaterThan(0);
@@ -642,7 +644,8 @@ it.each([30, 60, 120])("missile boss route is playable at %i FPS", (fps) => {
         (b1 && m.boss?.active && m.hp === 1 && m.invincible < 0.1))
     )
       b2 = m.useBomb();
-    m.update(1 / fps, m.time >= 149 && m.time < 149.5 ? 1 : 0, 0, true, true);
+    const steer = dodgeDirection(m, m.time >= 149 && m.time < 149.5 ? 1 : 0);
+    m.update(1 / fps, steer, 0, true, steer === 0);
   }
   console.log("missile route", fps, m.mode, m.time, m.hp, m.boss?.hp);
   expect(m.mode).toBe("won");
