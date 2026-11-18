@@ -77,7 +77,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
         observingBossEntry = true;
       }
       if (s.time >= 146.8 && s.boss?.active && !bossCaptured) {
-        expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(2);
+        expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(3);
         bossCaptured = true;
         // The parallel keyboard pilot continues ordinary steering during captures.
         await captureStage02Frame(page, "stage02-boss-desktop");
@@ -326,7 +326,7 @@ test("Stage02 full CDP touch sortie clears and preserves its result", async ({},
         if (after.mode === "won") break;
       }
       const hullHazards = visibleHulls.observe(s.time, s.activeEnemies);
-      const next = chooseTouchTarget({...s, hostileProjectiles: [...s.hostileProjectiles, ...hullHazards]}, target, budget);
+      const next = chooseTouchTarget({...s, hostileProjectiles: [...s.hostileProjectiles, ...hullHazards]}, target, budget, s.boss?.active?s.boss.x:undefined);
       const changed = Math.abs(next - target) > 1;
       target = next;
       anchor.x = box.x + box.width / 2 + ((target - 180) * box.width) / 360;

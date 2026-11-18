@@ -1,0 +1,49 @@
+{
+  "tool": "built-in image_gen",
+  "ownership": "Original generated mechanical sprites for P01; no external copyrighted game art or paid assets.",
+  "import": "Only calibrated final WebP files are tracked. Original PNGs also exist as unreferenced GitHub blobs for transfer; they are not committed to a branch.",
+  "sources": [
+    {
+      "key": "river-hull",
+      "blob": "e40922a090acd366c7fa9303ef4a676e60b8f729",
+      "prompt": "Use case: stylized-concept. Asset type: transparent top-down 2D arcade shooter game sprite. A single original long armoured river battleship hull, strictly orthographic overhead, bow pointing DOWN. Long narrow silhouette approximately width 120 to height 156, chunky steel prow, stepped stern engineering deck, olive bronze gunmetal armour, riveted plates, vents, exposed drive machinery, readable detailed 16-bit arcade pixel clusters like a high-quality 1990s mechanical shoot-em-up. THREE EMPTY ROUND TURRET MOUNT SOCKETS along the longitudinal deck, alternately slightly left/right of centre at 25%, 50%, 75% of hull length; NO guns attached. This is one continuous waterborne vessel with substantial hull and layered deck, NOT a plane, NOT one central pod with two external side cannons. No outrigger pods, no water, no wake, no shadow outside the hull, no glowing UI. Complete unclipped object centred on a genuinely transparent square background with generous clear margins. Crisp pixel-art texture and directional mechanical shading, no smooth vector/flat geometric icon, no text, no logos.",
+      "reference": null
+    },
+    {
+      "key": "river-turret",
+      "blob": "4ee3def46b8959d0afb645f2600c53b43c6d7fe1",
+      "prompt": "Use case: stylized-concept. Asset type: one transparent top-down 2D shooter rotating naval turret sprite. Single compact bronze/olive gunmetal armoured naval gun turret, strict orthographic overhead. Rounded octagonal rotating base, two long parallel mechanical gun barrels pointing DOWN, clear front muzzle tips, visible pivots, breech details, rivets, ammo mechanisms. Base centre must be readable as rotation pivot; entire turret isolated, no vessel deck/background. Detailed textured 16-bit arcade shooter pixel clusters, coherent mechanical shading, dark recesses and warm metal highlights; not a vector shape, not a photoreal product render. Complete unclipped silhouette centred on transparent square canvas, generous padding, no ground shadow, no bullets, no muzzle flashes, no labels.",
+      "reference": null
+    },
+    {
+      "key": "polar-rotor",
+      "blob": "e46b1273f5e787df226acf0caf61730160974c20",
+      "prompt": "Use case: stylized-concept. Asset type: transparent overhead 2D mechanical boss rotor sprite. One perfectly circular POLAR RADAR REACTOR, original 16-bit arcade shoot-em-up pixel art, strict orthographic top view. Symmetric round ivory/blue steel turbine wheel, layered radial teeth and mechanical spokes, purple reactor crystal at exact centre, visible concentric bearing and machinery. Distinct ring silhouette rather than an airplane body. Four subtle docking pads on circumference but NO attached cannons, NO arms, NO side pods, NO weapons. It must look like a rotating machine at 104x104 game size, crisp intricate pixel clusters with controlled steel/ivory/gold highlights and dark recesses, not neon glass, not vector diagram. Complete circular silhouette, centred on transparent square canvas, no ground shadow, no glow outside silhouette, no text or background.",
+      "reference": null
+    },
+    {
+      "key": "polar-sector",
+      "blob": "7acaec5b12fe07b519e50da76fe2fcef9f543a86",
+      "prompt": "Use case: stylized-concept. Asset type: ONE modular transparent shield-sector sprite for a top-down 2D mechanical ring boss. A single small CURVED armour sector, shaped like approximately a 60-degree curved arc of a circular industrial ring, NOT a complete ring. Strict overhead view, crescent opening toward UP and broad convex outer edge facing DOWN. Ivory/navy gunmetal plates, brass joins, violet power conduit embedded in the arc and one small central emitter notch at DOWN edge. Detailed crisp 16-bit mechanical arcade pixel-art clusters, layered thickness with tiny rivets, dark recesses, mechanical clamps. This is orbiting curved armour, NOT a turret, NOT a spherical pod, NOT a standalone aircraft. Complete unclipped isolated crescent with transparent open middle and transparent surrounding canvas, centred, generous margins. No background, shadows, glowing aura, projectiles, text or labels.",
+      "reference": null
+    },
+    {
+      "key": "river-turret-wreck",
+      "blob": "4dfe9d17b74187834d1aac20d1c46c265c05a2ee",
+      "prompt": "Edit this exact isolated naval turret into its destroyed state. Preserve exact overhead silhouette, size, pivot at central round screw, overall layout and transparent canvas. Retain the circular base and both barrels as recognisable physical wreckage attached to the base, with bent cracked barrels, dark charred steel, missing armour patches, small dull ember details. NO active glow, NO firing, NO explosion cloud, NO unrelated objects or background. Same detailed textured 16-bit mechanical arcade pixel art. Do not replace it with a flat black shape. Genuinely transparent background.",
+      "reference": "river-turret.png"
+    },
+    {
+      "key": "polar-sector-short",
+      "blob": "25cde34a6b067d3b1d107e95ee34e3cda097e2d3",
+      "prompt": "Edit this armour sector into ONE much shorter 70-degree curved ring segment, not the current semicircle. Keep only a short convex-down crescent around the central violet emitter and its two nearest ivory plate groups. Maintain the same mechanical pixel-art materials, centre emitter and strict overhead viewpoint. Shorten the long outer arms substantially and remove their large end blocks; the remaining segment should be gently curved, around width 3 to height 1, and fit as one of FOUR separate arc sectors surrounding a circular rotor. Remove ALL exterior glow, haze and ground shadow: only the solid crisp metal object on genuinely transparent surrounding canvas and transparent opening. No complete ring, no duplicate pieces, no labels or background.",
+      "reference": "polar-sector.png"
+    },
+    {
+      "key": "polar-sector-wreck",
+      "blob": "ae5898a9dcf98b5c8f9473f4765c2ea545170ad5",
+      "prompt": "Create the destroyed inactive state of this exact pixel art game sprite. Preserve its exact short curved shield silhouette, dimensions, central downward emitter position, perspective, and every plate position. Retain attached recognisable dark ivory/navy mechanical armour but crack and scorch plates, power off all purple lighting, broken central emitter. No explosion, smoke, particles, aura or outside shadow. A transparent-background isolated game component, same crisp detailed 16-bit pixel material, matching intact sprite for direct swapping at identical pivot.",
+      "reference": null
+    }
+  ]
+}

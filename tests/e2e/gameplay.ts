@@ -60,8 +60,14 @@ export async function withKeyboardPilot<T>(
       const s = await state(page);
       if (s.mode === "won") break; // Work retains its own outcome assertions.
       expect(s.mode).toBe("playing");
-      const hazards = avoidHulls ? tracker.observe(s.time,s.activeEnemies) : [];
-      const next = chooseAction({...s,hostileProjectiles:[...s.hostileProjectiles,...hazards]}, held, goalX);
+      const hazards = avoidHulls
+        ? tracker.observe(s.time, s.activeEnemies)
+        : [];
+      const next = chooseAction(
+        { ...s, hostileProjectiles: [...s.hostileProjectiles, ...hazards] },
+        held,
+        goalX ?? (s.boss?.active && (s.stageId !== "stage-01" || s.bombs === 0) ? s.boss.x : undefined),
+      );
       if (next !== held) {
         if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
         held = 0;

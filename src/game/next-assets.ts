@@ -1,6 +1,10 @@
 export const NEXT_ASSETS = [
-  "boss-canyon",
-  "boss-polar",
+  "boss-river-hull-v2",
+  "boss-river-turret-v2",
+  "boss-river-turret-wreck-v2",
+  "boss-polar-rotor-v2",
+  "boss-polar-sector-v2",
+  "boss-polar-sector-wreck-v2",
   "enemy-outrider",
   "enemy-bomber",
   "missile-truck-base",

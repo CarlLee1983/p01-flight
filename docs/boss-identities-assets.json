@@ -1,0 +1,98 @@
+[
+  {
+    "key": "boss-river-hull-v2",
+    "source": "river-hull.png",
+    "sourceSHA256": "d2d76bb2491709d9118fd63721bb34454e80a4313b064ddfb7110911beb39c8e",
+    "sha256": "a7b2cc9096d461e457da4c77c48a2d2b56b74e307844dafebe8c45d949cfd2d6",
+    "pixels": [
+      256,
+      736
+    ],
+    "pivot": [
+      627,
+      632.5
+    ],
+    "scale": 0.6274509803921569,
+    "alphaCutoff": 16
+  },
+  {
+    "key": "boss-river-turret-v2",
+    "source": "river-turret.png",
+    "sourceSHA256": "dce2efafbe65ed52c8fc7b5dfc9a5a78ecca25245fa9633162a5e20b2db69047",
+    "sha256": "e7ad1823d3bcb12d650f3cbf7269a162edb18c8be01649e3f5f8e25f10b32312",
+    "pixels": [
+      128,
+      224
+    ],
+    "pivot": [
+      627,
+      418
+    ],
+    "scale": 0.11702127659574468,
+    "alphaCutoff": 16
+  },
+  {
+    "key": "boss-river-turret-wreck-v2",
+    "source": "river-turret-wreck.png",
+    "sourceSHA256": "a189fb7f2b76fc8ae9267ec743b4b3925dd8223a3620c4c3eb380d6c660ae027",
+    "sha256": "34930ae730c7805cb5fd73779ccdeeab1acb0d7136650402845e73d1e87e8c53",
+    "pixels": [
+      128,
+      224
+    ],
+    "pivot": [
+      627,
+      418
+    ],
+    "scale": 0.11702127659574468,
+    "alphaCutoff": 16
+  },
+  {
+    "key": "boss-polar-rotor-v2",
+    "source": "polar-rotor.png",
+    "sourceSHA256": "4e22616fc3391a0aa12aa9efceb712831850c9c42d28ef862a89ee10378fb4c1",
+    "sha256": "3216cf50ff15b8369ccc5a394be3fe169d3e86b224e75caa90d875921f306a52",
+    "pixels": [
+      416,
+      416
+    ],
+    "pivot": [
+      627,
+      626
+    ],
+    "scale": 0.35135135135135137,
+    "alphaCutoff": 16
+  },
+  {
+    "key": "boss-polar-sector-v2",
+    "source": "polar-sector-short.png",
+    "sourceSHA256": "1e0b594e229e0430e66bf0cbb1f95cba6204b09bfd342d5ed603ae66916e530b",
+    "sha256": "9c54e7d501cd4caba624d5f6d7aaca402ce0da029d4c6a87f6b51284d6a2e795",
+    "pixels": [
+      224,
+      96
+    ],
+    "pivot": [
+      1086,
+      400
+    ],
+    "scale": 0.19858156028368795,
+    "alphaCutoff": 16
+  },
+  {
+    "key": "boss-polar-sector-wreck-v2",
+    "source": "polar-sector-wreck.png",
+    "sourceSHA256": "b073e21a1d18db773ed8169ee22673259a82b4956ca66cd16278009288d95343",
+    "sha256": "060ed9e748c29493ceca2b26802319c0e290ba71fc22aad833c0647ec89e9a1a",
+    "pixels": [
+      224,
+      96
+    ],
+    "pivot": [
+      1086,
+      400
+    ],
+    "scale": 0.19858156028368795,
+    "alphaCutoff": 16
+  }
+]
