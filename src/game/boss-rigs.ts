@@ -172,8 +172,14 @@ export function bossPose(
     const q = t % 3.6,
       cycle = Math.floor(t / 3.6);
     ringAngle = ((cycle + ease(q / 0.65)) * Math.PI) / 3;
-    x += Math.sin(t * 0.45) * (phase === 3 ? 45 : 36);
-    y += Math.sin(t * 0.65) * 6;
+    if (phase === 3) {
+      const from = cycle % 2 ? 230 : 130;
+      x = from + (360 - 2 * from) * ease(q / 0.65);
+      y = 210 + Math.sin(t * 0.65) * 10;
+    } else {
+      x += Math.sin(t * 0.45) * 36;
+      y += Math.sin(t * 0.65) * 6;
+    }
     roll = age * 0.25 + (phase === 3 ? phaseAge * 0.35 : 0);
     state = q < 0.65 ? "index-ring" : "locked-ring";
     canFire = q >= 0.65;
@@ -181,13 +187,21 @@ export function bossPose(
   }
   if (!entered) {
     const approach = ease(age / rig.entrySeconds);
-    x = skin === "riverFortress" ? 180 - 42 * approach : 180;
-    y = -60 + (rig.restY + 60) * approach;
+    x =
+      skin === "riverFortress"
+        ? 180 - 42 * approach
+        : skin === "polarRadar" && phase === 3
+          ? 180 - 50 * approach
+          : 180;
+    y =
+      -60 +
+      ((skin === "polarRadar" && phase === 3 ? 210 : rig.restY) + 60) *
+        approach;
     roll =
       skin === "command"
         ? -0.14 * approach
         : skin === "polarRadar"
-          ? age * 0.25 * approach
+          ? (age * 0.25 + (phase === 3 ? phaseAge * 0.35 : 0)) * approach
           : 0;
     state = "approach";
     canFire = false;
@@ -306,4 +320,49 @@ export function bossCoreContains(
   const c = bossCorePoint(boss),
     p = rotateLocal(x - c.x, y - c.y, -(boss.roll ?? 0));
   return (p.x / (22 + padding)) ** 2 + (p.y / (18 + padding)) ** 2 < 1;
+}
+
+/** Half-size shared naval turret forms the core's visible bow launcher.
+ * Its pivot and barrel endpoint use the same imported art calibration. */
+export const RIVER_BOW_ART = {
+  width: 16,
+  height: 28,
+  muzzleY: 11,
+  barrelX: 1.5,
+  deckY: 71,
+} as const;
+export function bossBowMount(boss: {
+  x: number;
+  y: number;
+  roll?: number;
+  coreAimAngle?: number;
+}) {
+  const p = rotateLocal(0, RIVER_BOW_ART.deckY, boss.roll ?? 0);
+  return {
+    x: boss.x + p.x,
+    y: boss.y + p.y,
+    angle: boss.coreAimAngle ?? -(boss.roll ?? 0),
+  };
+}
+
+export function bossCoreState(boss: {
+  skin?: BossSkin;
+  cannons: { active: boolean }[];
+  motion?: Pick<BossPose, "state">;
+  phase?: BossPhase;
+}): "armored" | "indexing" | "open" {
+  if (boss.skin !== "polarRadar") return "open";
+  if (bossArmourRemaining(boss) > 0) return "armored";
+  return boss.motion?.state === "index-ring" ? "indexing" : "open";
+}
+
+/** Each phase redirects the surviving generators: break 2, then 1, then 1. */
+export function bossArmourRemaining(boss: {
+  skin?: BossSkin;
+  phase?: BossPhase;
+  cannons: { active: boolean }[];
+}) {
+  if (boss.skin !== "polarRadar") return 0;
+  const limit = (boss.phase ?? 1) === 1 ? 2 : boss.phase === 2 ? 1 : 0;
+  return Math.max(0, boss.cannons.filter((p) => p.active).length - limit);
 }

@@ -1,6 +1,12 @@
 import type Phaser from "phaser";
 import type { Boss } from "./model";
-import { bossRig, bossCorePoint } from "./boss-rigs";
+import {
+  bossRig,
+  bossCoreState,
+  bossCorePoint,
+  bossBowMount,
+  RIVER_BOW_ART,
+} from "./boss-rigs";
 import { bossChargeSources } from "./combat-presentation";
 type Sprite = (
   key: string,
@@ -41,6 +47,19 @@ export function drawBoss(
     (boss.roll ?? 0) * degrees,
     boss,
   );
+  if (boss.skin === "riverFortress") {
+    const bow = bossBowMount(boss);
+    sprite(
+      rig.partKey,
+      bow.x,
+      bow.y,
+      RIVER_BOW_ART.width,
+      RIVER_BOW_ART.height,
+      1,
+      -bow.angle * degrees,
+      boss,
+    ).setDepth(2);
+  }
   for (const part of boss.cannons) {
     sprite(
       part.active ? rig.partKey : rig.wreckKey,
@@ -72,6 +91,23 @@ export function drawBoss(
         .lineBetween(p.x - 6, p.y + 2, p.x - 3, p.y + 6)
         .lineBetween(p.x + 6, p.y + 2, p.x + 3, p.y + 6);
     }
+  if (bossCoreState(boss) !== "open") {
+    const flash = (boss.shieldHitUntil ?? 0) > time;
+    overlay
+      .lineStyle(
+        flash ? 2 : 1,
+        flash ? 0xffffff : 0x8ee2ed,
+        flash ? 0.95 : 0.65,
+      )
+      .strokeCircle(boss.x, boss.y, 16);
+    for (const side of [-1, 1])
+      overlay.lineBetween(
+        boss.x + side * 12,
+        boss.y - 8,
+        boss.x + side * 12,
+        boss.y + 8,
+      );
+  }
   const core = bossCorePoint(boss);
   overlay
     .fillStyle(boss.phase === 3 ? 0xff805a : 0xffbf73, 0.55)

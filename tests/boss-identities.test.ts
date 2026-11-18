@@ -1,3 +1,4 @@
+import { bossAimGoal } from "./boss-counterplay";
 import { describe, it, expect } from "vitest";
 import {
   bossRig,
@@ -6,11 +7,13 @@ import {
   bossPartBudget,
   bossPartContains,
   bossCoreContains,
+  bossCoreState,
   type BossSkin,
+  RIVER_BOW_ART,
 } from "../src/game/boss-rigs";
 import { FlightModel } from "../src/game/model";
 import { stage01 } from "../src/data/stage";
-import { resolveBossRay } from "../src/game/boss-muzzles";
+import { resolveBossRay, bossShotOrigin } from "../src/game/boss-muzzles";
 import { bossAttackPlan } from "../src/game/boss-attacks";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -128,4 +131,212 @@ it("river bridge can be hit without treating the whole hull as a core shield", (
   const b = { skin: "riverFortress" as const, x: 180, y: 185, roll: 0 };
   expect(bossCoreContains(b, 180, 117)).toBe(true);
   expect(bossCoreContains(b, 180, 220)).toBe(false);
+});
+
+it("destroyed river deck guns retain distinct phase counterplay from a visible bow launcher", () => {
+  const m = new FlightModel({
+    ...stage01,
+    waves: [],
+    pickups: [],
+    boss: { ...stage01.boss!, skin: "riverFortress", at: 0 },
+  });
+  m.start();
+  m.update(1 / 60);
+  const b = m.boss!;
+  b.cannons.forEach((p) => (p.active = false));
+  const signatures = [];
+  for (const phase of [1, 2, 3] as const) {
+    b.phase = phase;
+    b.attackCycle = 0;
+    const rays = bossAttackPlan(b, { x: 180, y: 540 });
+    expect(rays).toHaveLength(phase === 3 ? 5 : 2);
+    expect(
+      rays.every((ray) => ray.mount === null && ray.style === "rocket"),
+    ).toBe(true);
+    signatures.push(JSON.stringify(rays.map((ray) => [ray.angle, ray.delay])));
+    if (phase === 2) {
+      const mean = rays.reduce((n, r) => n + r.angle, 0) / rays.length;
+      b.attackCycle = 1;
+      const next = bossAttackPlan(b, { x: 180, y: 540 });
+      expect(
+        mean - next.reduce((n, r) => n + r.angle, 0) / next.length,
+      ).toBeCloseTo(0.44);
+    }
+  }
+  expect(new Set(signatures).size).toBe(3);
+});
+
+it("bow launcher display scale and rotated physical barrel agree with imported pixel calibration", () => {
+  const source = assets.find((a) => a.key === "boss-river-turret-v2")!;
+  expect(RIVER_BOW_ART.muzzleY).toBeCloseTo(
+    ((1170 - source.pivot[1]) * source.scale) / 8,
+  );
+  const m = new FlightModel({
+    ...stage01,
+    waves: [],
+    pickups: [],
+    boss: { ...stage01.boss!, skin: "riverFortress", at: 0 },
+  });
+  m.start();
+  m.update(1 / 60);
+  const b = m.boss!;
+  for (const roll of [-0.2, 0, 0.2])
+    for (const aim of [-0.7, 0, 0.7])
+      for (const lateral of [-1.5, 1.5]) {
+        b.roll = roll;
+        b.coreAimAngle = aim;
+        const p = bossShotOrigin(b, { mount: null, lateral });
+        expect(p.x).toBeCloseTo(
+          b.x -
+            Math.sin(roll) * 71 +
+            Math.sin(aim) * 11 +
+            Math.cos(aim) * lateral,
+        );
+        expect(p.y).toBeCloseTo(
+          b.y +
+            Math.cos(roll) * 71 +
+            Math.cos(aim) * 11 -
+            Math.sin(aim) * lateral,
+        );
+      }
+});
+
+it("aimed cones keep distinct rays at screen corners and when the player flies behind the Boss", () => {
+  for (const skin of skins) {
+    const m = new FlightModel({
+      ...stage01,
+      waves: [],
+      pickups: [],
+      boss: { ...stage01.boss!, skin, at: 0 },
+    });
+    m.start();
+    m.update(1 / 60);
+    const b = m.boss!;
+    b.phase = 3;
+    b.x = 180;
+    b.y = 190;
+    b.cannons.forEach((p) => (p.active = false));
+    for (const player of [
+      { x: 18, y: 18 },
+      { x: 342, y: 18 },
+      { x: 18, y: 620 },
+      { x: 342, y: 620 },
+    ]) {
+      const rays = bossAttackPlan(b, player),
+        angles = rays.map((r) => r.angle).sort((a, b) => a - b);
+      expect(new Set(angles.map((a) => a.toFixed(8))).size).toBe(rays.length);
+      expect(angles[0]).toBeGreaterThanOrEqual(-1.100000001);
+      expect(angles.at(-1)!).toBeLessThanOrEqual(1.100000001);
+      for (let i = 1; i < angles.length; i++)
+        expect(angles[i] - angles[i - 1]).toBeGreaterThan(0.22);
+    }
+  }
+});
+it("polar core and collinear rim pulses are half a burst beat apart instead of stacking", () => {
+  const m = new FlightModel({
+    ...stage01,
+    waves: [],
+    pickups: [],
+    boss: { ...stage01.boss!, skin: "polarRadar", at: 0 },
+  });
+  m.start();
+  m.update(1 / 60);
+  const b = m.boss!;
+  b.x = 180;
+  b.y = 190;
+  for (const phase of [2, 3] as const)
+    for (let bottom = 0; bottom < 4; bottom++) {
+      b.phase = phase;
+      b.cannons.forEach((p, i) => {
+        p.aimAngle = ((i - bottom) * Math.PI) / 2;
+        p.x = 180 + Math.sin(p.aimAngle) * 70;
+        p.y = 190 + Math.cos(p.aimAngle) * 70;
+      });
+      const rays = bossAttackPlan(b, { x: 180, y: 540 }),
+        core = rays.find((r) => r.mount === null && Math.abs(r.angle) < 0.001)!,
+        rim = rays.find((r) => r.mount === bottom)!;
+      for (let c = 0; c < 4; c++)
+        for (let r = 0; r < 4; r++) {
+          const gap = Math.abs(
+            70 - 150 * (rim.delay - core.delay + (r - c) * 0.22),
+          );
+          expect(gap).toBeGreaterThan(12);
+        }
+    }
+});
+
+it("polar core clearly requires two armour breaks and opens only between ring shifts", () => {
+  const m = new FlightModel({
+    ...stage01,
+    waves: [],
+    pickups: [],
+    boss: { ...stage01.boss!, skin: "polarRadar", at: 0 },
+  });
+  m.start();
+  for (let i = 0; i < 204; i++) m.update(1 / 60);
+  const b = m.boss!;
+  const hp = b.hp;
+  const shoot = (id: number) => {
+    m.bullets.push({ id, x: b.x, y: b.y, active: true, damage: 10 });
+    m.update(0);
+  };
+  expect(bossCoreState(b)).toBe("armored");
+  shoot(10001);
+  expect(b.hp).toBe(hp);
+  expect(b.shieldHitUntil).toBeGreaterThan(m.time);
+  b.cannons[0].active = false;
+  shoot(10002);
+  expect(b.hp).toBe(hp);
+  b.cannons[1].active = false;
+  expect(bossCoreState(b)).toBe("open");
+  shoot(10003);
+  expect(b.hp).toBe(hp - 10);
+  b.age = 2.7;
+  m.update(0);
+  expect(bossCoreState(b)).toBe("indexing");
+  shoot(10004);
+  expect(b.hp).toBe(hp - 10);
+});
+it("armour counterplay uses visible reachable parts and returns to the core after two breaks", () => {
+  const b = {
+    active: true,
+    skin: "polarRadar",
+    x: 180,
+    y: 190,
+    cannons: [
+      { active: true, x: 145, y: 250 },
+      { active: true, x: 240, y: 225 },
+      { active: true, x: 180, y: 120 },
+      { active: true, x: 110, y: 160 },
+    ],
+  };
+  expect(bossAimGoal(b, 180)).toBe(145);
+  b.cannons[0].active = false;
+  expect(bossAimGoal(b, 180)).toBe(240);
+  b.cannons[1].active = false;
+  expect(bossAimGoal(b, 180)).toBe(180);
+  expect(bossAimGoal(null, 180)).toBeUndefined();
+});
+
+it("polar phase escalation requires two, then one, then the last surviving generator", () => {
+  const b = {
+    skin: "polarRadar" as const,
+    phase: 1 as 1 | 2 | 3,
+    cannons: [
+      { active: false },
+      { active: false },
+      { active: true },
+      { active: true },
+    ],
+    motion: { state: "locked-ring" },
+  };
+  expect(bossCoreState(b)).toBe("open");
+  b.phase = 2;
+  expect(bossCoreState(b)).toBe("armored");
+  b.cannons[2].active = false;
+  expect(bossCoreState(b)).toBe("open");
+  b.phase = 3;
+  expect(bossCoreState(b)).toBe("armored");
+  b.cannons[3].active = false;
+  expect(bossCoreState(b)).toBe("open");
 });

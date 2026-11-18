@@ -1,5 +1,7 @@
 # 第二關獨立 Boss 與第三關極光前哨
 
+本文保留 PR #12 的實作與驗證歷史。Carl 試玩後另要求修正三關 Boss 結構與動作；最新實作及驗證入口見 [boss-identities.md](boss-identities.md)／PR #13，下列雙側炮與舊核心描述不代表最新結構。
+
 本輪承接已試玩的 PR11 head `8d6d6003f5fc9cabfe23fc9ed1d88597b1882805`，不從預設分支重建。新工作分支 `feat/next-fronts` 以 `feat/stage-two-canyon` 為 PR base；PR11 又依賴 PR10。未自行合併或部署。
 
 Carl 新授權為第二關 Boss 外觀變更、更多不同空中/地面敵方，並依可重用元件延伸關卡。本輪具體完成第三關，不預建空的第四到十關；每一關必須有實際地圖、節奏、Boss、結算與驗收。

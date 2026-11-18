@@ -1,4 +1,5 @@
 export const NEXT_ASSETS = [
+  "hostile-missile-v2",
   "boss-river-hull-v2",
   "boss-river-turret-v2",
   "boss-river-turret-wreck-v2",

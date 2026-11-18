@@ -1,3 +1,4 @@
+import { bossAimGoal } from "./boss-counterplay";
 import { describe, it, expect } from "vitest";
 import { createStage03, STAGE03_REST } from "../src/data/stage03";
 import { createStage02 } from "../src/data/stage02";
@@ -229,6 +230,7 @@ it.each([
             ],
           },
           held,
+          bossAimGoal(m.boss, m.player.x),
         );
         next = m.time + 0.08;
       }
@@ -265,18 +267,47 @@ it("new asset diagnostics remain readable before any Phaser missing texture exis
 
 it("places the final polar supply on water and clears surface metadata on pool reuse", () => {
   const stage = createStage03(42);
-  expect(stage.waves.filter(w => w.behavior === "groundDepot").map(w => [w.at,w.groundSurface]))
-    .toEqual([[51,"land"],[109,"land"],[146,"water"]]);
-  const model = new FlightModel({...stage, boss:undefined, waves:[
-    {at:0,x:58,spawnY:90,speed:32,hp:5,points:250,behavior:"groundDepot",groundSurface:"water"},
-    {at:1,x:58,spawnY:90,speed:32,hp:5,points:250,behavior:"groundDepot"},
-  ]});
-  model.start(); model.update(0.01,0,0,false);
-  const first=model.enemies.find(e=>e.active)!;
+  expect(
+    stage.waves
+      .filter((w) => w.behavior === "groundDepot")
+      .map((w) => [w.at, w.groundSurface]),
+  ).toEqual([
+    [51, "land"],
+    [109, "land"],
+    [146, "water"],
+  ]);
+  const model = new FlightModel({
+    ...stage,
+    boss: undefined,
+    waves: [
+      {
+        at: 0,
+        x: 58,
+        spawnY: 90,
+        speed: 32,
+        hp: 5,
+        points: 250,
+        behavior: "groundDepot",
+        groundSurface: "water",
+      },
+      {
+        at: 1,
+        x: 58,
+        spawnY: 90,
+        speed: 32,
+        hp: 5,
+        points: 250,
+        behavior: "groundDepot",
+      },
+    ],
+  });
+  model.start();
+  model.update(0.01, 0, 0, false);
+  const first = model.enemies.find((e) => e.active)!;
   expect(first.groundSurface).toBe("water");
-  first.active=false;
-  for(let i=0;i<65;i++) model.update(1/60,0,0,false);
-  const reused=model.enemies.find(e=>e.active)!;
+  first.active = false;
+  for (let i = 0; i < 65; i++) model.update(1 / 60, 0, 0, false);
+  const reused = model.enemies.find((e) => e.active)!;
   expect(reused).toBe(first);
   expect(reused.groundSurface).toBeUndefined();
 });

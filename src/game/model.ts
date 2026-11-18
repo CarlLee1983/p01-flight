@@ -1,5 +1,6 @@
 import {
   bossRig,
+  bossCoreState,
   bossPose,
   bossMount,
   bossPartBudget,
@@ -101,6 +102,8 @@ export interface BossPart {
 }
 export interface Boss {
   roll?: number;
+  coreAimAngle?: number;
+  shieldHitUntil?: number;
   phaseAge?: number;
   phaseFrom?: { x: number; y: number; roll: number };
   motion?: BossPose;
@@ -1096,6 +1099,11 @@ export class FlightModel {
           const lastDelay = Math.max(0, ...plan.map((ray) => ray.delay));
           if (pose.fireWindow >= 0.65 + lastDelay + tail) {
             boss.attackPlan = plan;
+            const coreRays = plan.filter((ray) => ray.mount === null);
+            if (coreRays.length)
+              boss.coreAimAngle =
+                coreRays.reduce((sum, ray) => sum + ray.angle, 0) /
+                coreRays.length;
             boss.attackAngles = plan.map(
               (ray) => resolveBossRay(boss, ray).angle,
             );
@@ -1287,10 +1295,12 @@ export class FlightModel {
         ) {
           b.active = false;
           (b.hitIds ??= []).push(-1);
-          boss.hp -= b.damage ?? 1;
-          boss.hitUntil = this.time + 0.055;
-          this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
-          this.finishBoss();
+          if (bossCoreState(boss) === "open") {
+            boss.hp -= b.damage ?? 1;
+            boss.hitUntil = this.time + 0.055;
+            this.effects.push({ x: b.x, y: b.y, life: 0.25, kind: "hit" });
+            this.finishBoss();
+          } else boss.shieldHitUntil = this.time + 0.08;
         }
       }
     for (const e of this.enemies)

@@ -9,6 +9,14 @@ export interface BossRay {
   style: HostileStyle;
   target?: { x: number; y: number };
 }
+/** Clamp the cone centre, never individual rays (which would merge at an edge). */
+function fanAngles(centre: number, offsets: number[]) {
+  const safe = Math.max(
+    -1.1 - Math.min(...offsets),
+    Math.min(1.1 - Math.max(...offsets), centre),
+  );
+  return offsets.map((offset) => safe + offset);
+}
 const clamp = (n: number) => Math.max(-1.1, Math.min(1.1, n));
 /** Plan once during a local charge. Delayed pulses recompute the LIVE muzzle,
  * retain this warned direction and cancel with their destroyed mount. */
@@ -43,18 +51,27 @@ export function bossAttackPlan(
             : i === 2
               ? [-0.46, -0.2, 0.2, 0.46]
               : [-0.02, 0.02];
-      for (const [j, offset] of offsets.entries())
+      for (const [j, angle] of fanAngles(a, offsets).entries())
+        add(i, angle, i * 0.06, j < offsets.length / 2 ? -3 : 3, "shell");
+    }
+    if (!active.length) {
+      const offsets =
+        phase === 1
+          ? [-0.12, 0.12]
+          : phase === 2
+            ? boss.attackCycle % 2
+              ? [-0.34, -0.1]
+              : [0.1, 0.34]
+            : [-0.46, -0.23, 0, 0.23, 0.46];
+      for (const [i, angle] of fanAngles(aim(null), offsets).entries())
         add(
-          i,
-          clamp(a + offset),
-          i * 0.06,
-          j < offsets.length / 2 ? -3 : 3,
-          "shell",
+          null,
+          angle,
+          phase === 2 ? i * 0.08 : 0,
+          i % 2 ? -1.5 : 1.5,
+          "rocket",
         );
     }
-    if (!active.length)
-      for (const [i, a] of [-0.12, 0.12].entries())
-        add(null, clamp(aim(null) + a), 0, i === 0 ? -4 : 4, "rocket");
   } else if (boss.skin === "polarRadar") {
     if (phase === 1) {
       const down = active.filter(
@@ -64,15 +81,15 @@ export function bossAttackPlan(
         for (const offset of [-0.12, 0.12])
           add(i, (boss.cannons[i].aimAngle ?? 0) + offset, (i % 2) * 0.04);
     } else if (phase === 2) {
-      for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, i * 0.04);
-      add(null, aim(null), 0.08);
+      for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, 0.13);
+      add(null, aim(null), 0.02);
     } else {
-      for (const a of [-0.5, -0.25, 0, 0.25, 0.5])
-        add(null, clamp(aim(null) + a));
-      for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, i * 0.04);
+      for (const a of fanAngles(aim(null), [-0.5, -0.25, 0, 0.25, 0.5]))
+        add(null, a);
+      for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, 0.11);
     }
     if (!rays.length)
-      for (const a of [-0.3, 0, 0.3]) add(null, clamp(aim(null) + a));
+      for (const a of fanAngles(aim(null), [-0.3, 0, 0.3])) add(null, a);
   } else if (phase === 1 && active.length) {
     const target = bossSideTargets(player.x, player.y, boss.attackCycle);
     for (const i of active) {
@@ -87,13 +104,8 @@ export function bossAttackPlan(
         : phase === 2
           ? [-0.5, -0.25, 0, 0.25, 0.5]
           : [-0.3, 0, 0.3];
-    for (const a of offsets)
-      add(
-        null,
-        clamp(
-          a + (phase === 3 ? aim(null) : boss.attackCycle % 2 ? 0.1 : -0.1),
-        ),
-      );
+    const centre = phase === 3 ? aim(null) : boss.attackCycle % 2 ? 0.1 : -0.1;
+    for (const a of fanAngles(centre, offsets)) add(null, a);
   }
   return rays;
 }

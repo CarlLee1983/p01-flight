@@ -3,7 +3,8 @@ import { FlightModel } from "../../src/game/model";
 import { stage01 } from "../../src/data/stage";
 import { drawBoss } from "../../src/game/boss-presentation";
 import { NEXT_ASSETS } from "../../src/game/next-assets";
-import { createRaiderTextures } from "../../src/game/raider-art";
+import { createEnemyModuleTextures } from "../../src/game/enemy-modules-art";
+import { METAL_SPRITES } from "../../src/game/metal-sprites";
 import { createCannonTextures } from "../../src/game/cannon-art";
 import { configureTextureBatch } from "../../src/game/texture-batching";
 import type { BossSkin } from "../../src/game/boss-rigs";
@@ -27,17 +28,39 @@ class Studio extends Phaser.Scene {
   g!: Phaser.GameObjects.Graphics;
   keys!: Phaser.Types.Input.Keyboard.CursorKeys;
   preload() {
+    for (const asset of METAL_SPRITES)
+      this.load.image(asset.key, "/" + asset.path);
     for (const key of NEXT_ASSETS)
       this.load.image(key, "/assets/original/" + key + ".webp");
     for (const key of ["boss", "player"])
       this.load.image(key, "/assets/original/" + key + ".png");
   }
   create() {
-    createRaiderTextures(this);
+    createEnemyModuleTextures(this);
     createCannonTextures(this);
     this.g = this.add.graphics().setDepth(3);
     this.keys = this.input.keyboard!.createCursorKeys();
     reset();
+    Object.defineProperty(window, "__BOSS_STUDIO__", {
+      value: () => ({
+        time: model.time,
+        skin: model.boss?.skin,
+        phase: model.boss?.phase,
+        pose: model.boss?.motion,
+        parts: model.boss?.cannons,
+        textures: [
+          ...NEXT_ASSETS,
+          "boss",
+          "boss-cannon",
+          "boss-cannon-broken",
+          "boss-support",
+        ].map((key) => ({
+          key,
+          ready: this.textures.exists(key),
+          source: this.textures.get(key)?.source?.[0]?.image?.constructor.name,
+        })),
+      }),
+    });
     document.querySelector("#reset")!.addEventListener("click", reset);
     document.querySelector("#rig")!.addEventListener("change", reset);
     document.querySelector("#break")!.addEventListener("click", () => {

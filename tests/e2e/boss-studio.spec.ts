@@ -46,6 +46,17 @@ for (const [skin, count] of [
     await page.locator("#rig").selectOption(skin);
     await expect(page.locator("#status")).toContainText(`部件 ${count}`);
     await page.waitForTimeout(3000);
+    const snapshot = await page.evaluate(() =>
+      (window as any).__BOSS_STUDIO__(),
+    );
+    expect(snapshot.textures.every((t: any) => t.ready)).toBe(true);
+    for (const key of ["boss-cannon", "boss-cannon-broken"])
+      expect(snapshot.textures.find((t: any) => t.key === key).source).toBe(
+        "HTMLImageElement",
+      );
+    expect(
+      snapshot.textures.find((t: any) => t.key === "boss-support").source,
+    ).toBe("HTMLCanvasElement");
     await page.screenshot({
       path: `docs/boss-${skin}-intact.png`,
       fullPage: true,
@@ -71,6 +82,10 @@ for (const [skin, count] of [
       fullPage: true,
     });
     await page.setViewportSize({ width: 320, height: 700 });
+    const box = await page.locator("canvas").boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
     await page.screenshot({
       path: `docs/boss-${skin}-320.png`,
       fullPage: true,

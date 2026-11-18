@@ -1,5 +1,10 @@
+import {
+  ROCKET_ART,
+  rocketPresentation,
+  drawRocketExhaust,
+} from "./game/hostile-rocket";
 import { drawBoss } from "./game/boss-presentation";
-import { bossRig } from "./game/boss-rigs";
+import { bossRig, bossCoreState, bossArmourRemaining } from "./game/boss-rigs";
 import { keyboardEdge } from "./game/keyboard-event";
 import { NEXT_ASSETS, nextAssetStatus } from "./game/next-assets";
 import { isGroundRole, isNewAirRole, NEW_ENEMY_ART } from "./game/enemy-roles";
@@ -75,6 +80,7 @@ let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
 let impacts: Phaser.GameObjects.Graphics;
 let renderedImpactPrimitives = 0;
+let renderedHostileMissiles = 0;
 
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
@@ -149,7 +155,7 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / ${stageNumber}</p><h2>${stageDetails(selectedStage).title}</h2><p class="brief">${stageDetails(selectedStage).brief}</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><label>選擇關卡<select id="stage-select">${STAGE_CATALOG.map((stage) => `<option value="${stage.id}" ${selectedStage === stage.id ? "selected" : ""} ${stageUnlocked(stage.id, saves.data) ? "" : "disabled"}>Stage ${stage.number} ${stage.title}${stageUnlocked(stage.id, saves.data) ? "" : "（前關通關後解鎖）"}</option>`).join("")}</select></label><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">授權街機配樂與原創音效，Boss 戰切換戰鬥曲。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目武器可分別擊破：指揮艦翼炮、河艦甲板炮、雷眼護甲環。留意充能後移位，河艦艦尾艦橋是弱點。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目武器可分別擊破：指揮艦翼炮、河艦甲板炮、雷眼護甲環。留意充能後移位，河艦艦尾艦橋是弱點；雷眼須先破護甲，再趁核心開放反擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? `Stage ${stageNumber} 通關` : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${model.stage.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p>${model.mode === "won" && nextStage(selectedStage) ? `<button id="next-stage">前往 Stage ${stageDetails(nextStage(selectedStage)!).number}</button>` : ""}<button id="retry">再飛一次</button>${selectedStage !== "stage-01" ? '<button id="new-sortie" class="secondary">重新編隊出擊</button>' : ""}<button id="menu" class="secondary">返回標題</button>${warning}`;
   document
@@ -700,9 +706,16 @@ class FlightScene extends Phaser.Scene {
     this.bossAdvice.setText(
       patrol
         ? "留意炮口充能 · 移位後追擊巡邏艦"
-        : model.boss?.cannons.some((c) => c.active)
-          ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
-          : "武器全毀 · 集中攻擊核心",
+        : model.boss?.skin === "polarRadar" &&
+            bossCoreState(model.boss) !== "open"
+          ? bossCoreState(model.boss) === "armored"
+            ? `核心防護中 · 本階段再擊破${bossArmourRemaining(model.boss)}片護甲`
+            : "核心換位封閉 · 留意護甲充能"
+          : model.boss?.cannons.some((c) => c.active)
+            ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
+            : model.boss?.skin === "riverFortress"
+              ? "甲板炮已毀 · 避開船首火力，攻擊艦橋"
+              : `${bossRig(model.boss?.skin).partLabel}已毀 · 集中攻擊核心`,
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
 
@@ -710,6 +723,7 @@ class FlightScene extends Phaser.Scene {
     overlay.clear();
     impacts.clear();
     renderedImpactPrimitives = 0;
+    renderedHostileMissiles = 0;
     hud.clear();
     for (const item of this.coastalObjects) {
       if ("setVisible" in item)
@@ -1008,46 +1022,37 @@ class FlightScene extends Phaser.Scene {
           const style = shot.visual ?? "needle";
           const color =
             style === "rocket"
-              ? 0xb2df73
+              ? 0xffb66f
               : style === "plasma"
                 ? 0xd78dff
                 : style === "shell"
                   ? 0xffbc69
                   : 0xff6d91;
-          // Short, bounded afterimage; collision remains the existing model radius.
-          overlay.lineStyle(3, color, 0.32);
-          overlay.lineBetween(
-            shot.x - dx * 10,
-            shot.y - dy * 10,
-            shot.x,
-            shot.y,
-          );
+          if (style !== "rocket") {
+            // Short, bounded afterimage; collision remains the existing model radius.
+            overlay.lineStyle(3, color, 0.32);
+            overlay.lineBetween(
+              shot.x - dx * 10,
+              shot.y - dy * 10,
+              shot.x,
+              shot.y,
+            );
+          }
           overlay.fillStyle(color);
           overlay.lineStyle(1.5, 0xfff2e2);
           if (style === "rocket") {
-            overlay.lineStyle(4, 0x8eb55a);
-            overlay.lineBetween(
-              shot.x - dx * 4,
-              shot.y - dy * 4,
-              shot.x + dx * 4,
-              shot.y + dy * 4,
-            );
-            overlay.fillStyle(0xfff0c0);
-            overlay.fillTriangle(
-              shot.x + dx * 8,
-              shot.y + dy * 8,
-              shot.x + dy * 3,
-              shot.y - dx * 3,
-              shot.x - dy * 3,
-              shot.y + dx * 3,
-            );
-            overlay.lineStyle(2, 0xff9b51, 0.85);
-            overlay.lineBetween(
-              shot.x - dx * 7,
-              shot.y - dy * 7,
-              shot.x - dx * 12,
-              shot.y - dy * 12,
-            );
+            const pose = rocketPresentation(shot, model.time);
+            this.sprite(
+              ROCKET_ART.key,
+              shot.x,
+              shot.y,
+              ROCKET_ART.width,
+              ROCKET_ART.height,
+              1,
+              pose.angle,
+            ).setDepth(PRESENTATION_LAYERS.projectiles + 0.01);
+            drawRocketExhaust(overlay, pose);
+            renderedHostileMissiles++;
           } else if (style === "needle") {
             overlay.fillTriangle(
               shot.x + dx * 6,
@@ -1408,7 +1413,16 @@ Object.defineProperty(window, "__P01__", {
     background: readBackgroundInfo(),
     metalSprites: readMetalSpriteStatus(game.textures),
     nextAssets: nextAssetStatus(game.textures),
-    bossPresentation: bossVisual(model.stage.boss?.skin),
+    hostileMissiles: {
+      textureKey: ROCKET_ART.key,
+      rendered: renderedHostileMissiles,
+      bodyPixels: [ROCKET_ART.width, ROCKET_ART.height],
+    },
+    bossPresentation: {
+      ...bossVisual(model.stage.boss?.skin),
+      coreState: model.boss ? bossCoreState(model.boss) : null,
+      remainingArmour: model.boss ? bossArmourRemaining(model.boss) : 0,
+    },
     renderer: {
       type: game.renderer.type,
       batchSize: game.config.batchSize,

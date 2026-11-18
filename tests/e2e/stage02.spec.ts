@@ -46,6 +46,8 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
   await page.keyboard.down("Space");
   const roleFrames: {role: string; id: number; requestedGameTime: number; completedGameTime: number; file: string}[] = [];
   const photographed = new Set<string>();
+  const bossPhases=new Set<number>();
+  const bossPhaseFrames: unknown[]=[];
   let first = false,
     second = false,
     observingBossEntry = false,
@@ -59,6 +61,12 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     const deadline = Date.now() + 550000;
     while (Date.now() < deadline) {
       const s = await state(page);
+      if(s.boss?.active&&s.boss.motion?.entered&&!bossPhases.has(s.boss.phase)){
+        bossPhases.add(s.boss.phase);
+        await captureStage02Frame(page,`stage02-boss-phase${s.boss.phase}`);
+        const after=await state(page);
+        bossPhaseFrames.push({requested:{time:s.time,phase:s.boss.phase},completed:{time:after.time,phase:after.boss?.phase}});
+      }
       if (s.mode !== "playing") {
         expect(s.mode).toBe("won");
         break;
@@ -129,6 +137,8 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     .toBe("won");
   const done = await state(page);
   expect(done.bossDefeated).toBe(true);
+  expect([...bossPhases].sort()).toEqual([1,2,3]);
+  await testInfo.attach('stage02-boss-phase-frames',{body:JSON.stringify(bossPhaseFrames,null,2),contentType:'application/json'});
   expect(brokenCaptured, "damaged Boss pods were captured during normal combat").toBe(true);
   const presentation = done.renderMetrics.presentationCoverage;
   for (const role of ["straight", "weave", "cross", "brakeRaider", "hookWing", "carrier", "groundBattery", "groundDepot", "gatekeeper", "outrider", "bomber", "missileTruck", "flakBattery"]) expect(presentation[role]?.visible, role + " actually appeared").toBeTruthy();
