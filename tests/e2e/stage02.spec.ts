@@ -122,7 +122,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
       }
       await page.waitForTimeout(100);
     }
-  });
+  }, undefined, true); // Observe aircraft hulls as in the full Stage02→03 route.
   await page.keyboard.up("Space");
   await expect
     .poll(async () => (await state(page)).mode, { timeout: 10000 })
