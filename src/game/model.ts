@@ -20,9 +20,11 @@ import {
   type HostileStyle,
 } from "./hostile-visuals";
 import { resolveBossRay } from "./boss-muzzles";
+import { SIMULATION_STEP } from "./frame-step";
 import { fastAttackAngles, isFastShooter } from "./enemy-patterns";
 import { GROUND_SCROLL_SPEED, GROUND_VISIBLE_Y } from "../data/stage";
 import type { Behavior, PickupKind, StageConfig } from "../data/stage";
+const MAX_MODEL_STEP = 0.05;
 export type Mode = "menu" | "playing" | "paused" | "won" | "lost";
 export interface Body {
   hitUntil?: number;
@@ -463,7 +465,7 @@ export class FlightModel {
     moveTarget?: { x: number; y: number },
   ) {
     if (this.mode !== "playing") return;
-    dt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.05) : 0;
+    dt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), MAX_MODEL_STEP) : 0;
     this.focus = focus;
     this.time += dt;
     this.invincible = Math.max(0, this.invincible - dt);
@@ -1098,8 +1100,17 @@ export class FlightModel {
             tail = ((this.stage.boss.burstShots ?? 1) - 1) * 0.22;
           const lastDelay = Math.max(0, ...plan.map((ray) => ray.delay));
           // Cooldown pauses while a phase announcement is still active.
-          // Reserve that time as well, so movement never cuts off a volley.
-          if (pose.fireWindow >= boss.telegraph + 0.65 + lastDelay + tail) {
+          // Reserve it plus two simulation steps: warning expiry and delayed
+          // emission each round to an update. advanceFrame bounds browser
+          // steps; direct lower-frequency model callers also reserve their dt.
+          if (
+            pose.fireWindow >
+            boss.telegraph +
+              0.65 +
+              lastDelay +
+              tail +
+              2 * Math.max(dt, SIMULATION_STEP)
+          ) {
             boss.attackPlan = plan;
             const coreRays = plan.filter((ray) => ray.mount === null);
             if (coreRays.length)

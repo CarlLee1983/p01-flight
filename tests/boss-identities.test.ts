@@ -344,9 +344,13 @@ it("polar phase escalation requires two, then one, then the last surviving gener
 // Geometry fixture: force a mid-fight phase announcement at different points
 // in each movement cycle. This does not stand in for normal victory tests.
 describe.each(skins)("%s phase-transition volley budget", (skin) => {
-  it.each([2, 3] as const)(
-    "finishes every accepted four-pulse volley after entering phase %i",
-    (phase) => {
+  it.each(
+    [2, 3].flatMap((phase) =>
+      ["30", "60", "120", "jitter"].map((profile) => ({ phase, profile })),
+    ),
+  )(
+    "finishes every accepted four-pulse volley after entering phase $phase at $profile FPS",
+    ({ phase, profile }) => {
       let observed = 0;
       for (const transitionAt of [3.1, 3.8, 4.4, 5.2, 6.1, 7.3, 8.2, 9.4]) {
         const m = new FlightModel({
@@ -356,15 +360,21 @@ describe.each(skins)("%s phase-transition volley budget", (skin) => {
           pickups: [],
           boss: { ...stage01.boss!, skin, at: 0, fireEvery: 1.2 },
         });
+        let frame = 0;
+        const nextStep = () =>
+          profile === "jitter"
+            ? [1 / 120, 0.05, 1 / 60, 1 / 30][frame++ % 4]
+            : 1 / Number(profile);
         m.start();
         m.invincible = 100;
-        while (m.time < transitionAt) m.update(1 / 60);
+        while (m.time < transitionAt) m.update(nextStep());
         m.boss!.hp = m.boss!.maxHp * (phase === 2 ? 0.5 : 0.2);
-        m.update(1 / 60);
+        m.update(nextStep());
         let cycle = m.boss!.attackCycle;
         let plan: { count: number; tail: number } | undefined;
         let volley: { count: number; before: number; end: number } | undefined;
-        for (let frame = 0; frame < 14 * 60; frame++) {
+        const until = m.time + 14;
+        while (m.time < until) {
           const b = m.boss!;
           if (b.attackWarning > 0 && b.attackPlan?.length) {
             plan = {
@@ -373,20 +383,20 @@ describe.each(skins)("%s phase-transition volley budget", (skin) => {
             };
           }
           const before = m.emittedBossShots;
-          m.update(1 / 60);
+          m.update(nextStep());
           if (b.attackCycle !== cycle) {
             if (plan)
               volley = {
                 count: plan.count,
                 before,
-                end: m.time + plan.tail + 1 / 30,
+                end: m.time + plan.tail + 0.1,
               };
             cycle = b.attackCycle;
           }
           if (volley && m.time >= volley.end) {
             expect(
               m.emittedBossShots - volley.before,
-              `phase ${phase} transition at ${transitionAt}s`,
+              `phase ${phase}, ${profile} FPS, transition at ${transitionAt}s`,
             ).toBe(volley.count);
             observed++;
             volley = undefined;
