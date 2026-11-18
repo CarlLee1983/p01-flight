@@ -27,6 +27,7 @@ export type PickupKind =
   | "missile"
   | "support";
 export interface Wave {
+  groundSurface?: "land" | "water";
   at: number;
   x: number;
   speed: number;

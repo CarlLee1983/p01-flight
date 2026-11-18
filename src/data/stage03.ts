@@ -120,6 +120,7 @@ export function createStage03(seed: number): StageConfig {
       hp: 5,
       points: 250,
       behavior: "groundDepot",
+      groundSurface: at === 146 ? "water" : "land",
       drop: "support",
     });
   return {

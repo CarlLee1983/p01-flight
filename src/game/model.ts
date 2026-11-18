@@ -29,6 +29,7 @@ export interface Body {
   hitIds?: number[];
 }
 export interface Enemy extends Body {
+  groundSurface?: "land" | "water";
   enteredPlayfield?: boolean;
   brakeElapsed?: number;
   maxHp?: number;
@@ -576,6 +577,7 @@ export class FlightModel {
         {
           id: ++this.serial,
           maxHp: w.hp,
+          groundSurface: w.groundSurface,
           hitUntil: 0,
           y: w.spawnY ?? -24,
           active: true,

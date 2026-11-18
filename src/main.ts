@@ -792,8 +792,8 @@ class FlightScene extends Phaser.Scene {
           }
           if (isGroundRole(e.behavior)) {
             if (e.behavior === "groundDepot") {
-              if (selectedStage === "stage-03") this.sprite("missile-truck-base",e.x,e.y,72,72,1,0,e).setDepth(0);
-              else this.sprite(selectedStage === "stage-02" ? "river-supply-barge" : "ground-depot", e.x, e.y, 70, 48, 1, 0, e).setDepth(0);
+              if (selectedStage === "stage-03" && e.groundSurface !== "water") this.sprite("missile-truck-base",e.x,e.y,72,72,1,0,e).setDepth(0);
+              else this.sprite(selectedStage !== "stage-01" ? "river-supply-barge" : "ground-depot", e.x, e.y, 70, 48, 1, 0, e).setDepth(0);
             } else {
               this.sprite(e.behavior === "missileTruck" ? "missile-truck-base" : "ground-base", e.x, e.y, 72, 72).setDepth(0);
               // Texture is down-facing; Phaser clockwise rotation is opposite our aim-from-down axis.
@@ -1343,6 +1343,7 @@ Object.defineProperty(window, "__P01__", {
         x: e.x,
         y: e.y,
         behavior: e.behavior,
+        groundSurface: e.groundSurface,
         hp: e.hp,
         maxHp: e.maxHp,
         telegraph: e.telegraph,
