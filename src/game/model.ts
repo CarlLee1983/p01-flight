@@ -1097,7 +1097,9 @@ export class FlightModel {
           const plan = bossAttackPlan(boss, this.player),
             tail = ((this.stage.boss.burstShots ?? 1) - 1) * 0.22;
           const lastDelay = Math.max(0, ...plan.map((ray) => ray.delay));
-          if (pose.fireWindow >= 0.65 + lastDelay + tail) {
+          // Cooldown pauses while a phase announcement is still active.
+          // Reserve that time as well, so movement never cuts off a volley.
+          if (pose.fireWindow >= boss.telegraph + 0.65 + lastDelay + tail) {
             boss.attackPlan = plan;
             const coreRays = plan.filter((ray) => ray.mount === null);
             if (coreRays.length)

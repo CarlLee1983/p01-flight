@@ -412,7 +412,7 @@ class FlightScene extends Phaser.Scene {
     this.bossAdvice = this.add
       .text(180, 600, "", {
         fontFamily: "monospace",
-        fontSize: "11px",
+        fontSize: "13px",
         color: "#ffc69f",
         align: "center",
         backgroundColor: "#102935dd",

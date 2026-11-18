@@ -340,3 +340,60 @@ it("polar phase escalation requires two, then one, then the last surviving gener
   b.cannons[3].active = false;
   expect(bossCoreState(b)).toBe("open");
 });
+
+// Geometry fixture: force a mid-fight phase announcement at different points
+// in each movement cycle. This does not stand in for normal victory tests.
+describe.each(skins)("%s phase-transition volley budget", (skin) => {
+  it.each([2, 3] as const)(
+    "finishes every accepted four-pulse volley after entering phase %i",
+    (phase) => {
+      let observed = 0;
+      for (const transitionAt of [3.1, 3.8, 4.4, 5.2, 6.1, 7.3, 8.2, 9.4]) {
+        const m = new FlightModel({
+          ...stage01,
+          duration: 60,
+          waves: [],
+          pickups: [],
+          boss: { ...stage01.boss!, skin, at: 0, fireEvery: 1.2 },
+        });
+        m.start();
+        m.invincible = 100;
+        while (m.time < transitionAt) m.update(1 / 60);
+        m.boss!.hp = m.boss!.maxHp * (phase === 2 ? 0.5 : 0.2);
+        m.update(1 / 60);
+        let cycle = m.boss!.attackCycle;
+        let plan: { count: number; tail: number } | undefined;
+        let volley: { count: number; before: number; end: number } | undefined;
+        for (let frame = 0; frame < 14 * 60; frame++) {
+          const b = m.boss!;
+          if (b.attackWarning > 0 && b.attackPlan?.length) {
+            plan = {
+              count: b.attackPlan.length * 4,
+              tail: Math.max(...b.attackPlan.map((ray) => ray.delay)) + 0.66,
+            };
+          }
+          const before = m.emittedBossShots;
+          m.update(1 / 60);
+          if (b.attackCycle !== cycle) {
+            if (plan)
+              volley = {
+                count: plan.count,
+                before,
+                end: m.time + plan.tail + 1 / 30,
+              };
+            cycle = b.attackCycle;
+          }
+          if (volley && m.time >= volley.end) {
+            expect(
+              m.emittedBossShots - volley.before,
+              `phase ${phase} transition at ${transitionAt}s`,
+            ).toBe(volley.count);
+            observed++;
+            volley = undefined;
+          }
+        }
+      }
+      expect(observed).toBeGreaterThan(20);
+    },
+  );
+});
