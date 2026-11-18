@@ -1,3 +1,4 @@
+import { keyboardEdge } from "./game/keyboard-event";
 import { NEXT_ASSETS, nextAssetStatus } from "./game/next-assets";
 import { isGroundRole, isNewAirRole, NEW_ENEMY_ART } from "./game/enemy-roles";
 import { bossVisual } from "./game/boss-visual";
@@ -411,25 +412,22 @@ class FlightScene extends Phaser.Scene {
     this.input.keyboard!.disableGlobalCapture();
     // Handle edge-triggered actions on keydown so a press released between
     // render frames is not lost. Ignore OS key-repeat to avoid pause toggles.
-    this.input.keyboard!.on("keydown-P", (event: KeyboardEvent) => {
-      if (!event.repeat) {
-        model.pause();
-        renderPanel();
-      }
-    });
-    this.input.keyboard!.on("keydown-ENTER", (event: KeyboardEvent) => {
-      if (!event.repeat && ["menu", "won", "lost"].includes(model.mode))
-        start();
-    });
-    this.input.keyboard!.on("keydown-C", (event: KeyboardEvent) => {
-      if (!event.repeat && model.switchWeapon()) audio.play("power");
-    });
-    this.input.keyboard!.on("keydown-X", (event: KeyboardEvent) => {
-      if (!event.repeat && model.useBomb()) {
+    this.input.keyboard!.on("keydown-P", keyboardEdge<KeyboardEvent>(() => {
+      model.pause();
+      renderPanel();
+    }));
+    this.input.keyboard!.on("keydown-ENTER", keyboardEdge<KeyboardEvent>(() => {
+      if (["menu", "won", "lost"].includes(model.mode)) start();
+    }));
+    this.input.keyboard!.on("keydown-C", keyboardEdge<KeyboardEvent>(() => {
+      if (model.switchWeapon()) audio.play("power");
+    }));
+    this.input.keyboard!.on("keydown-X", keyboardEdge<KeyboardEvent>(() => {
+      if (model.useBomb()) {
         audio.play("bomb");
         this.cameras.main.shake(180, 0.008);
       }
-    });
+    }));
     const canvas = this.game.canvas;
     const clearTouch = () => touch.cancel();
     canvas.addEventListener("pointerdown", (event) => {

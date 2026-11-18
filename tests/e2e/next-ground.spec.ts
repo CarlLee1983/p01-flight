@@ -39,12 +39,18 @@ test("mobile missile vehicle and flak emplacement rotate, fire and are destroyed
       undefined,
       true,
     );
-    await keyboardMoveTo(page, role === "missileTruck" ? 120 : 180, 16);
-    const until = (await state(page)).time + 0.9;
+    // The evasive pilot can already be near a fixed goal. Cross to the
+    // opposite side of the observed player instead, then observe this same gun.
+    const turnGoal = (await state(page)).player.x < 180 ? 300 : 60;
+    await keyboardMoveTo(page, turnGoal, 16);
     await withKeyboardPilot(
       page,
-      () => waitGameTime(page, until),
-      role === "missileTruck" ? 120 : 180,
+      () => expect.poll(async () => {
+        const current = (await state(page)).activeEnemies.find((e: any) => e.id === id);
+        expect(current).toBeTruthy();
+        return Math.abs(current.turretAngle - angle);
+      }, { timeout: 5000, intervals: [40] }).toBeGreaterThan(0.02),
+      turnGoal,
       true,
     );
     snapshot = await state(page);
