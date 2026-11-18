@@ -1,3 +1,4 @@
+import { VisibleHullTracker } from "../visible-hull-policy";
 import { goalControl } from "../keyboard-goal-control";
 import { chooseAction, type Steering } from "../keyboard-policy";
 import { expect, type Page } from "@playwright/test";
@@ -37,7 +38,9 @@ export async function withKeyboardPilot<T>(
   page: Page,
   work: () => Promise<T>,
   goalX?: number,
+  avoidHulls = false,
 ): Promise<T> {
+  const tracker = new VisibleHullTracker();
   let done = false,
     result: T | undefined,
     failure: unknown,
@@ -57,7 +60,8 @@ export async function withKeyboardPilot<T>(
       const s = await state(page);
       if (s.mode === "won") break; // Work retains its own outcome assertions.
       expect(s.mode).toBe("playing");
-      const next = chooseAction(s, held, goalX);
+      const hazards = avoidHulls ? tracker.observe(s.time,s.activeEnemies) : [];
+      const next = chooseAction({...s,hostileProjectiles:[...s.hostileProjectiles,...hazards]}, held, goalX);
       if (next !== held) {
         if (held) await page.keyboard.up(held < 0 ? "ArrowLeft" : "ArrowRight");
         held = 0;

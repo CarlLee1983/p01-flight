@@ -1,3 +1,4 @@
+import { isGroundRole } from "./enemy-roles";
 import { enemyMount } from "./enemy-mounts";
 import { raiderMuzzle } from "./raider-geometry";
 import {
@@ -79,6 +80,7 @@ export interface BossPart {
   active: boolean;
 }
 export interface Boss {
+  skin?: import("./boss-visual").BossSkin;
   hitUntil?: number;
   attackWarning: number;
   attackAngles: number[];
@@ -253,7 +255,7 @@ export class FlightModel {
   }
   private interactable(e: Enemy): boolean {
     const ground =
-      e.behavior === "groundBattery" || e.behavior === "groundDepot";
+      isGroundRole(e.behavior);
     // Let an aircraft enter below the HUD / inside the side edge before it can
     // be hit or missile-locked. This also makes entrances observable at low FPS.
     return (
@@ -551,9 +553,7 @@ export class FlightModel {
     ) {
       const w = this.stage.waves[this.nextWave++];
       if (
-        !["groundBattery", "groundDepot", "gatekeeper"].includes(
-          w.behavior ?? "straight",
-        )
+        !isGroundRole(w.behavior) && w.behavior !== "gatekeeper"
       )
         this.spawnedAir++;
       let e = this.enemies.find((e) => !e.active);
@@ -616,6 +616,7 @@ export class FlightModel {
     }
     if (this.stage.boss && !this.boss && this.time >= this.stage.boss.at)
       this.boss = {
+        skin: this.stage.boss.skin,
         cannons: this.stage.boss.sideCannonHp
           ? ([-1, 1] as const).map((side) => ({
               id: side === -1 ? -2 : -3,
@@ -693,12 +694,18 @@ export class FlightModel {
       if (e.active) {
         e.age = (e.age ?? 0) + dt;
         const ground =
-          e.behavior === "groundBattery" || e.behavior === "groundDepot";
+          isGroundRole(e.behavior);
         if (ground) {
+          if (e.behavior === "missileTruck") e.x = (e.originX ?? e.x) + Math.sin(e.age * 0.7) * 8;
           e.y += (this.stage.groundSpeed ?? GROUND_SCROLL_SPEED) * dt;
           if (this.interactable(e) && e.visibleSince === undefined)
             e.visibleSince = this.time;
         }
+        if (e.behavior === "outrider") {
+          e.x += (e.direction ?? 1) * e.speed * dt;
+          e.y += e.speed * 0.35 * dt;
+        }
+        if (e.behavior === "bomber") e.x = (e.originX ?? e.x) + Math.sin(e.age * 0.7) * 24;
         if (e.behavior === "cross" || e.behavior === "carrier") {
           e.x += (e.direction ?? 1) * e.speed * dt;
         }
@@ -835,6 +842,7 @@ export class FlightModel {
           e.behavior !== "dive" &&
           e.behavior !== "brakeRaider" &&
           e.behavior !== "cross" &&
+          e.behavior !== "outrider" &&
           e.behavior !== "carrier" &&
           !(
             (e.behavior === "turret" || e.behavior === "heavy") &&
@@ -867,7 +875,7 @@ export class FlightModel {
           e.y < 400
         ) {
           e.fireCooldown = (e.fireCooldown ?? e.fireEvery) - dt;
-          if (e.behavior === "groundBattery") {
+          if (isGroundRole(e.behavior)) {
             const target =
               e.aimAngle ??
               Math.atan2(this.player.x - e.x, this.player.y - e.y);
@@ -876,7 +884,7 @@ export class FlightModel {
           }
           if (e.fireCooldown <= 0.6 && e.aimAngle === undefined)
             e.aimAngle = Math.atan2(this.player.x - e.x, this.player.y - e.y);
-          if (e.behavior === "groundBattery" && e.aimAngle !== undefined) {
+          if (isGroundRole(e.behavior) && e.aimAngle !== undefined) {
             // Lock the current barrel heading, never snap to a new target.
             if ((e.telegraph ?? 0) <= 0) e.aimAngle = e.turretAngle ?? 0;
             e.turretAngle = e.aimAngle;
@@ -902,21 +910,24 @@ export class FlightModel {
           }
           if (e.fireCooldown <= 0) {
             const aim = e.aimAngle ?? 0;
-            if (e.behavior === "turret" || e.behavior === "groundBattery") {
-              if (e.behavior === "groundBattery")
+            if (e.behavior === "turret" || isGroundRole(e.behavior)) {
+              if (isGroundRole(e.behavior))
                 e.turretHoldUntil = this.time + 0.4;
               const muzzle =
-                e.behavior === "groundBattery"
+                isGroundRole(e.behavior)
                   ? groundMuzzle(e, aim)
                   : { x: e.x, y: e.y + 20 };
-              for (const a of [0])
-                this.shootEnemy(
-                  muzzle.x,
-                  muzzle.y,
-                  Math.sin(aim + a) * 145,
-                  Math.cos(aim + a) * 145,
-                  e,
-                );
+              const spreads = e.behavior === "flakBattery" ? [-0.42,-0.21,0.21,0.42] : e.behavior === "missileTruck" ? [-0.1,0.1] : [0];
+              spreads.forEach((a,i) => {
+                const socket = e.behavior === "flakBattery" || e.behavior === "missileTruck" ? groundMuzzle(e,aim,i < spreads.length/2 ? -5 : 5) : muzzle;
+                const speed = e.behavior === "missileTruck" ? 125 : 145;
+                this.shootEnemy(socket.x,socket.y,Math.sin(aim+a)*speed,Math.cos(aim+a)*speed,e);
+              });
+            } else if (e.behavior === "outrider" || e.behavior === "bomber") {
+              const angles = e.behavior === "outrider" ? [aim-0.13,aim+0.13] : [-0.48,-0.24,0.24,0.48].map(a=>a+((e.shotsFired??0)%2 ? 0.07 : -0.07));
+              const socket = enemyMount(e);
+              const speed = e.behavior === "bomber" ? 125 : 160;
+              for (const a of angles) this.shootEnemy(socket.x,socket.y,Math.sin(a)*speed,Math.cos(a)*speed,e);
             } else if (e.behavior === "heavy") {
               for (const a of e.attackAngles ?? [-0.4, 0, 0.4])
                 this.shootEnemy(
@@ -928,7 +939,7 @@ export class FlightModel {
                 );
             } else this.shootEnemy(e.x, e.y + 20, 0, 155, e);
             e.shotsFired = (e.shotsFired ?? 0) + 1;
-            if (e.behavior === "groundBattery") this.groundShotCount++;
+            if (isGroundRole(e.behavior)) this.groundShotCount++;
             e.fireCooldown = e.fireEvery;
             e.aimAngle = undefined;
             e.attackAngles = [];
@@ -985,7 +996,13 @@ export class FlightModel {
           );
           const sweep = boss.attackCycle % 2 ? 0.1 : -0.1;
           boss.attackAngles =
-            this.stage.boss.pattern === "canyon"
+            this.stage.boss.pattern === "polar"
+              ? phase === 1
+                ? (boss.attackCycle%2 ? [0.15,0.4,0.65] : [-0.65,-0.4,-0.15])
+                : phase === 2
+                  ? [-0.6,-0.36,-0.12,0.12,0.36,0.6].map(a=>a+sweep)
+                  : [-0.55,-0.28,0,0.28,0.55].map(a=>a+Math.max(-0.2,Math.min(0.2,aim)))
+              : this.stage.boss.pattern === "canyon"
               ? phase === 1
                 ? [-0.45, -0.15, 0.15, 0.45].map((a) => a + sweep)
                 : phase === 2
@@ -1141,8 +1158,7 @@ export class FlightModel {
     for (const e of this.enemies)
       if (
         e.active &&
-        e.behavior !== "groundBattery" &&
-        e.behavior !== "groundDepot" &&
+        !isGroundRole(e.behavior) &&
         Math.hypot(e.x - this.player.x, e.y - this.player.y) < 25 &&
         this.invincible <= 0
       ) {

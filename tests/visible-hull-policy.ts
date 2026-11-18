@@ -1,3 +1,4 @@
+import { isGroundRole } from "../src/game/enemy-roles";
 /** Test-only observation of current/previous visible hull positions. No model
  * methods, future waves, HP writes or production gameplay changes. */
 export class VisibleHullTracker {
@@ -6,7 +7,7 @@ export class VisibleHullTracker {
     const next = new Map<number, {x: number; y: number; time: number; vx: number; vy: number}>();
     const hazards: {x: number; y: number; vx: number; vy: number}[] = [];
     for (const enemy of enemies) {
-      if (["groundBattery", "groundDepot"].includes(enemy.behavior ?? "") || enemy.x < 18 || enemy.x > 342 || enemy.y < 108 || enemy.y > 640) continue;
+      if (isGroundRole(enemy.behavior) || enemy.x < 18 || enemy.x > 342 || enemy.y < 108 || enemy.y > 640) continue;
       const old = this.previous.get(enemy.id);
       let vx = old?.vx ?? 0, vy = old?.vy ?? 0;
       if (old && time > old.time + 0.001) {

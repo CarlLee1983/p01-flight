@@ -1,4 +1,6 @@
+import { isGroundRole } from "./enemy-roles";
 const COVERAGE_KINDS = new Set([
+  "outrider", "bomber", "missileTruck", "flakBattery",
   "straight",
   "weave",
   "cross",
@@ -95,8 +97,7 @@ export class RenderMetrics {
           if ((e.telegraph ?? 0) > 0) entry.chargeFrames++;
         }
         if (
-          e.behavior !== "groundBattery" &&
-          e.behavior !== "groundDepot" &&
+          !isGroundRole(e.behavior) &&
           e.behavior !== "gatekeeper"
         )
           air++;

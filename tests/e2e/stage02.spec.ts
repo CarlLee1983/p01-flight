@@ -131,7 +131,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
   expect(done.bossDefeated).toBe(true);
   expect(brokenCaptured, "damaged Boss pods were captured during normal combat").toBe(true);
   const presentation = done.renderMetrics.presentationCoverage;
-  for (const role of ["straight", "weave", "cross", "brakeRaider", "hookWing", "carrier", "groundBattery", "groundDepot", "gatekeeper"]) expect(presentation[role]?.visible, role + " actually appeared").toBeTruthy();
+  for (const role of ["straight", "weave", "cross", "brakeRaider", "hookWing", "carrier", "groundBattery", "groundDepot", "gatekeeper", "outrider", "bomber", "missileTruck", "flakBattery"]) expect(presentation[role]?.visible, role + " actually appeared").toBeTruthy();
   await testInfo.attach("stage02-actual-enemy-presentation", {body: JSON.stringify({presentation, roleFrames, note: "Source timing indexes are observations, not a claim every role fired or died. Match the full video and screenshot before accepting visual quality."}, null, 2), contentType: "application/json"});
   console.log("STAGE02_ACTUAL_ENEMY_PRESENTATION", JSON.stringify(presentation));
   expect(done.background.artReady).toBe(true);

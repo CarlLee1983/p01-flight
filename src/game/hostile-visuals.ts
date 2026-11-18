@@ -1,20 +1,22 @@
 import type { Enemy } from "./model";
 import type { Behavior } from "../data/stage";
-export type HostileStyle = "needle" | "shell" | "plasma";
+export type HostileStyle = "needle" | "shell" | "plasma" | "rocket";
 export function hostileStyle(boss: boolean, behavior?: Behavior): HostileStyle {
   return boss
     ? "plasma"
-    : behavior === "groundBattery" ||
+    : behavior === "missileTruck"
+      ? "rocket"
+      : behavior === "flakBattery" || behavior === "bomber" || behavior === "groundBattery" ||
         behavior === "turret" ||
         behavior === "heavy"
       ? "shell"
       : "needle";
 }
 /** Same locked axis for turret drawing, warning and projectile spawn. */
-export function groundMuzzle(enemy: Pick<Enemy, "x" | "y">, angle: number) {
+export function groundMuzzle(enemy: Pick<Enemy, "x" | "y">, angle: number, side = 0) {
   return {
-    x: enemy.x + Math.sin(angle) * 20,
-    y: enemy.y + Math.cos(angle) * 20,
+    x: enemy.x + Math.sin(angle) * 20 + Math.cos(angle) * side,
+    y: enemy.y + Math.cos(angle) * 20 - Math.sin(angle) * side,
   };
 }
 export function turnToward(current: number, target: number, dt: number) {

@@ -1,6 +1,10 @@
 export const GROUND_SCROLL_SPEED = 32;
 export const GROUND_VISIBLE_Y = 108;
 export type Behavior =
+  | "outrider"
+  | "bomber"
+  | "missileTruck"
+  | "flakBattery"
   | "brakeRaider"
   | "hookWing"
   | "straight"
@@ -62,7 +66,8 @@ export interface StageConfig {
     bulletSpeed: number;
     burstShots?: number;
     sideCannonHp?: number;
-    pattern?: "canyon";
+    pattern?: "canyon" | "polar";
+    skin?: import("../game/boss-visual").BossSkin;
     points: number;
   };
 }
