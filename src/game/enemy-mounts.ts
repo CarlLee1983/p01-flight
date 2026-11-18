@@ -23,6 +23,7 @@ export function enemyBank(
 }
 /** Shared presentation sockets mirror the existing projectile launch geometry. */
 export function enemyMount(e: MountBody, index = 0) {
+  if (e.behavior === "bomber") return { x: e.x, y: e.y + 25 };
   if (e.behavior === "gatekeeper")
     return { x: e.x + (index % 2 ? -39 : 39), y: e.y + 32 };
   if (e.behavior === "brakeRaider" || e.behavior === "hookWing")

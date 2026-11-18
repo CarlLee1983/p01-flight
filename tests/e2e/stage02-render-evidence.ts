@@ -11,8 +11,8 @@ export const STAGE02_PERF_WINDOWS = [
  * Calls are actual GL submission counts. RAF intervals are wall-clock intervals,
  * not GPU execution duration. Screenshot/video overhead is explicitly recorded.
  */
-export async function installStage02Sampler(page: Page) {
-  await page.addInitScript((windows) => {
+export async function installStage02Sampler(page: Page, stageId = "stage-02", windows: readonly (readonly [number,number])[] = STAGE02_PERF_WINDOWS) {
+  await page.addInitScript(({windows,stageId}) => {
     const w = window as any;
     let calls = 0,
       last = 0,
@@ -43,6 +43,7 @@ export async function installStage02Sampler(page: Page) {
       }
     }
     const result = {
+      stageId,
       windows,
       buckets,
       patchedMethods,
@@ -52,7 +53,7 @@ export async function installStage02Sampler(page: Page) {
     w.__STAGE02_RENDER__ = result;
     const sample = (now: number) => {
       const s = w.__P01__?.();
-      if (s?.stageId === "stage-02" && s.mode === "playing") {
+      if (s?.stageId === stageId && s.mode === "playing") {
         result.renderer = s.renderer;
         for (let i = 0; i < windows.length; i++)
           if (s.time >= windows[i][0] && s.time < windows[i][1] && last) {
@@ -63,16 +64,17 @@ export async function installStage02Sampler(page: Page) {
       }
       calls = 0;
       last = now;
-      if (!s || s.stageId !== "stage-02" || s.time < 150)
+      if (!s || s.stageId !== stageId || s.time < windows[windows.length-1][1])
         requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
-  }, STAGE02_PERF_WINDOWS);
+  }, {windows,stageId});
 }
-export async function saveStage02Sampler(page: Page, info: TestInfo) {
+export async function saveStage02Sampler(page: Page, info: TestInfo, name = "stage02") {
   const result = await page.evaluate(() => (window as any).__STAGE02_RENDER__);
   expect(result.patchedMethods).toBeGreaterThan(0);
   expect(result.overflow).toBe(false);
+  expect(result.renderer, "renderer was observed during normal play").toBeTruthy();
   expect(result.renderer.batchSize).toBe(4096);
   const quantile = (numbers: number[], fraction: number) => {
     const a = [...numbers].sort((a, b) => a - b);
@@ -109,20 +111,21 @@ export async function saveStage02Sampler(page: Page, info: TestInfo) {
   });
   const report = {
     seed: 42,
+    stageId: result.stageId,
     summaries,
     raw: result,
     limitations:
-      "Single shared CI software-rendered run with video and three screenshot captures. GL command counts and RAF intervals, not GPU duration or real-phone performance; no acceleration assertion.",
+      "Single shared CI software-rendered run with video, screenshots and observer overhead. GL command counts and RAF intervals, not GPU duration or real-phone performance; no acceleration assertion.",
   };
-  await info.attach("stage02-render-sampling", {
+  await info.attach(`${name}-render-sampling`, {
     body: JSON.stringify(report, null, 2),
     contentType: "application/json",
   });
   await writeFile(
-    "docs/stage02-render-sampling.json",
+    `docs/${name}-render-sampling.json`,
     JSON.stringify(report, null, 2),
   );
-  console.log("STAGE02_RENDER_SAMPLING", JSON.stringify(summaries));
+  console.log(name.toUpperCase()+"_RENDER_SAMPLING", JSON.stringify(summaries));
 }
 export async function captureStage02Frame(page: Page, name: string) {
   await page.screenshot({ path: `docs/${name}.png`, timeout: 15000 });

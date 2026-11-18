@@ -109,6 +109,11 @@ export function createStage02(seed: number): StageConfig {
       behavior: "carrier",
       drop: "power",
     });
+  // Specialist inserts are fixed readable encounters; seeded flights remain unchanged.
+  for (const [i,at] of [38,40,102,104].entries()) waves.push({at,x:i%2?390:-30,spawnY:118,direction:i%2?-1:1,speed:170,hp:3,points:220,behavior:"outrider",fireEvery:1.15,firstFireDelay:0.7});
+  for (const at of [66,128]) waves.push({at,x:180,speed:58,hp:12,points:650,behavior:"bomber",fireEvery:2.6,firstFireDelay:1.1});
+  waves.push({at:45,x:58,spawnY:85,speed:32,hp:12,points:600,behavior:"missileTruck",fireEvery:2.8,firstFireDelay:1.5});
+  waves.push({at:100,x:302,spawnY:85,speed:32,hp:14,points:650,behavior:"flakBattery",fireEvery:3,firstFireDelay:1.6});
   return {
     id: "stage-02",
     title: "赤岩峽谷",
@@ -141,7 +146,7 @@ export function createStage02(seed: number): StageConfig {
         title: "最後整備",
         hint: "保留炸彈，兩側砲座可破壞",
       },
-      { id: "boss", at: 145, title: "峽谷守衛", hint: "觀察炮口，輪替閃避" },
+      { id: "boss", at: 145, title: "鐵閘守衛", hint: "觀察炮口，輪替閃避" },
     ],
     pickups: [
       { at: 6, x: 180, kind: "power" },
@@ -155,6 +160,7 @@ export function createStage02(seed: number): StageConfig {
     ],
     boss: {
       pattern: "canyon",
+      skin: "riverFortress",
       at: 145,
       hp: 175,
       fireEvery: 1.2,

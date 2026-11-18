@@ -1,0 +1,270 @@
+[
+  {
+    "key": "boss-canyon",
+    "path": "assets/original/boss-canyon.webp",
+    "width": 480,
+    "height": 248,
+    "source": "canyon-boss.png",
+    "sourceBlob": "e0a73afcc0ed5e1d687a8f4e36feb20cc26757e8",
+    "sourceSha256": "a5a3835d4282f0f0b1b9ab3b1877ca78e8f2178123f8e1dded100d9b828b1bb4",
+    "sourceSize": [
+      1746,
+      901
+    ],
+    "rowRig": null,
+    "sha256": "299bfd8ff69564e84ec782e0c3d49aeb9920617509829605f8fe38f9132cf184",
+    "bytes": 54304,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Wide low river-fortress monitor core, normalized1200x620. A distinctly blunt armored twin-pontoon river siege platform, NOT wings, NOT an airplane; dark olive steel, weathered brass, red-orange reactor aperture. Wide rectangular rounded shoulders, thick layered ship deck, two large circular turbine/engine recesses at rear/top, armored bridge and forward central reactor weapon mouth at600,590. Fill x10..1190 y10..610, center600,310. No detached side weapon pods; those are separate game components. Single complete central hull with natural round/angled plate details."
+  },
+  {
+    "key": "boss-polar",
+    "path": "assets/original/boss-polar.webp",
+    "width": 480,
+    "height": 248,
+    "source": "polar-boss.png",
+    "sourceBlob": "f478e22fb689876dd018ed6c08426817a48a8b03",
+    "sourceSha256": "026d57b8485a6271b57ef0f8617dfb7861c9ff5653001509dec24d76d71c025f",
+    "sourceSize": [
+      1746,
+      901
+    ],
+    "rowRig": null,
+    "sha256": "bc07e5fab2547edd0ba0fc18b1d854487dbac1e5aabd7958187b1d03279c9588",
+    "bytes": 55172,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Wide low airborne radar siege core normalized1200x620, broad circular/octagonal disk silhouette with serrated mechanical shoulders and compact twin rear engines. Ivory ceramic armor over navy steel, copper edges, central violet radar-reactor dome, forward central weapon mouth600,590. Completely different from a winged jet or river monitor. Fill x10..1190 y10..610, center600,310. No detached side cannon pods; separate game components."
+  },
+  {
+    "key": "enemy-outrider",
+    "path": "assets/original/enemy-outrider.webp",
+    "width": 224,
+    "height": 176,
+    "source": "enemy-outrider.png",
+    "sourceBlob": "b2eedf6c964947e83c019aa18208cb12440cbbbf",
+    "sourceSha256": "aaddee0418553d5f2a223423cb03308c680337b327d3d5538da60ff8afafc764",
+    "sourceSize": [
+      1416,
+      1111
+    ],
+    "rowRig": [
+      [
+        0,
+        555,
+        1101,
+        1111
+      ],
+      [
+        0,
+        88,
+        168,
+        176
+      ]
+    ],
+    "sha256": "2fbbcd8605a65e015796ab8c12a3bca6ab7110fceca78142c3c550709757c754",
+    "bytes": 13696,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Fast diagonal raiding jet, 56:44 aspect, bronze-orange swept diamond wings with one long central nose gun, navy narrow cockpit, paired recessed rear turbines. Visually distinctive compact single-nose interceptor. Normalized560x440 canvas center280,220, central gun mouth280,420. Full hull inside x8..552 y8..430."
+  },
+  {
+    "key": "enemy-bomber",
+    "path": "assets/original/enemy-bomber.webp",
+    "width": 352,
+    "height": 216,
+    "source": "enemy-bomber.png",
+    "sourceBlob": "3b770eb258414f268b3e75f66144f874572f7960",
+    "sourceSha256": "a89a453e29530c87e4cff12dc5793369a997a525d7308648f5d3003e557a7a7a",
+    "sourceSize": [
+      1601,
+      983
+    ],
+    "rowRig": [
+      [
+        0,
+        491,
+        972,
+        983
+      ],
+      [
+        0,
+        108,
+        208,
+        216
+      ]
+    ],
+    "sha256": "29e30f32691dcdee3e9c08e6c11ead5f1a22bbf1aa1ccdeceafdd763b399cbc8",
+    "bytes": 27104,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Slow heavy area-denial bomber,88:54 aspect, broad batwing heavy airframe with four round turbine pods, ochre/brown steel outer armor and gunmetal center, orange reactor vents. Single central under-nose cannon mouth normalized440,520 on880x540 canvas. Broad physically deep mechanical wings, not twin-barrel fighter, no extra protruding forward guns. Complete hull inside x8..872 y8..530."
+  },
+  {
+    "key": "missile-truck-base",
+    "path": "assets/original/missile-truck-base.webp",
+    "width": 288,
+    "height": 288,
+    "source": "truck-base.png",
+    "sourceBlob": "23bb941c37b1b423470862936f4218121a30aa40",
+    "sourceSha256": "50da1044a26e07d2db7e64fad81009f13d9f4847a0a53841c6bb094ca838a4fc",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "rowRig": null,
+    "sha256": "2a1c006cabc231e01cdf8f508f5def0e9920a0b8a89d3f2630657b8d9beab9d1",
+    "bytes": 33056,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Tracked mobile ground missile-launcher CHASSIS ONLY, square72:72 aspect, olive steel hull with two long caterpillar tracks, detailed bogies, forward cab low front corners, central circular recessed empty turret mount. Nose down, no launcher/turret/barrel on chassis. Distinct heavy truck silhouette, full chassis fits square with small transparent margin."
+  },
+  {
+    "key": "missile-truck-head",
+    "path": "assets/original/missile-truck-head.webp",
+    "width": 192,
+    "height": 192,
+    "source": "truck-launcher.png",
+    "sourceBlob": "e3bcf1df6c754752c7322beb7ee9c7565ecc972d",
+    "sourceSha256": "1cf2057d3826d2ab111870705f13d4fe36b6fb02c3fb7c371336eafb7deb7dc4",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "rowRig": [
+      [
+        0,
+        627,
+        1076,
+        1254
+      ],
+      [
+        0,
+        96,
+        176,
+        192
+      ]
+    ],
+    "sha256": "57d30fb14a81bd30e93c0ce9db345daddab3af674f833afb959effae60a7698c",
+    "bytes": 12112,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Rotating paired missile-launcher turret ONLY, square48:48 aspect, dark olive armored twin rocket canisters seated on circular mechanical azimuth ring, two short pointed rockets visible inside paired forward tubes. Aiming down. Tubes integrated into one rotating unit, no vehicle chassis. Central forward launch opening aligned at240,440 on480x480 canvas, pivot240,240. Full object within canvas, true transparent empty outside metal."
+  },
+  {
+    "key": "flak-head",
+    "path": "assets/original/flak-head.webp",
+    "width": 192,
+    "height": 192,
+    "source": "flak-head.png",
+    "sourceBlob": "8e04ac8c04db86da42f365848f98bb3fd1268770",
+    "sourceSha256": "3b8404fab47bad66f92ee67cbd2ef4141b404250109ebcb0c8b4f4bf803307f2",
+    "sourceSize": [
+      1254,
+      1254
+    ],
+    "rowRig": [
+      [
+        0,
+        627,
+        1221,
+        1254
+      ],
+      [
+        0,
+        96,
+        176,
+        192
+      ]
+    ],
+    "sha256": "43443d8afc353cbb5ee864a3767d1d4bfe59f2fde4a2d197cd863b2023057740",
+    "bytes": 15392,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original production sprite for a detailed 2D arcade vertical shooter. Strict orthographic overhead camera, front faces DOWN, no perspective tilt. Prerendered pixel mechanical game art with physically shaded bevelled steel/brass plates, recessed seams, scratches, restrained orange vent lamps, dark outlines, upper-left lighting. Genuine transparent background, isolated SINGLE coherent complete object, no text or insignia, no background/drop shadow/glow outside hull, no exhaust flames. Not flat vector art, not a logo. Rotating four-port anti-aircraft flak turret ONLY, square48:48 aspect, steel/navy armored angular central breech with copper drum magazines and short paired main barrels pointing DOWN, physically layered gimbal on circular pivot, no ground base. Pivot240,240 on480x480 canvas; average mouth at240,440. No long shadow or halo."
+  },
+  {
+    "key": "polar-river",
+    "path": "assets/original/polar-river.webp",
+    "width": 720,
+    "height": 1080,
+    "source": "polar-river.png",
+    "sourceBlob": "5c85c0351beded0aeac4428792751063c257a954",
+    "sourceSha256": "85c1eeb49d421750b437ee1dee3b94d3792fae4f1b277db37a679b73a3640bbc",
+    "sourceSize": [
+      1024,
+      1536
+    ],
+    "rowRig": null,
+    "sha256": "b7ea5d90fc67b8a580af9facbc273381682103b3675e639caa1af227b6792e87",
+    "bytes": 310746,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original scrolling top-down 2D arcade shooter terrain texture, portrait720x1080 aspect, strict orthographic overhead map. Rich high-quality late-1990s prerendered pixel terrain, realistic industrial material shading and depth, coherent large forms. An Arctic military outpost, fractured blue ice, irregular snow-covered rocks, dark evergreen patches, service roads and structures at SIDE EDGES. Central 65% is quiet dark desaturated ice/water for readable bullets, no close-up giant props or aircraft/enemies/characters/text/UI. Continuous irregular terrain runs to all edges, no frame/vignette, no perspective horizon, avoid repeating identical blocks or simple geometry. Light from upper-left. Base repeating traversable Arctic inlet: winding fractured dark teal ice/water channel down middle, broad snowbanks and irregular frozen rocky shelves to left and right, subtle blue ice cracks, winding service roads at x10\u201320% and80\u201390%. No landmark spanning central combat area; tile composition natural continuous top and bottom."
+  },
+  {
+    "key": "polar-bridge",
+    "path": "assets/original/polar-bridge.webp",
+    "width": 720,
+    "height": 1080,
+    "source": "polar-bridge.png",
+    "sourceBlob": "327c01f98787b723dc103a532617d7eb5fb052e3",
+    "sourceSha256": "e09109752b93d758734efd1c384661ede115f9b60db8326f64a21a6894436d92",
+    "sourceSize": [
+      1024,
+      1536
+    ],
+    "rowRig": null,
+    "sha256": "f6cb7878c46324d47b0ef59d4ffc23448546d1095c3664caf2a5a9fcad533a99",
+    "bytes": 305500,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original scrolling top-down 2D arcade shooter terrain texture, portrait720x1080 aspect, strict orthographic overhead map. Rich high-quality late-1990s prerendered pixel terrain, realistic industrial material shading and depth, coherent large forms. An Arctic military outpost, fractured blue ice, irregular snow-covered rocks, dark evergreen patches, service roads and structures at SIDE EDGES. Central 65% is quiet dark desaturated ice/water for readable bullets, no close-up giant props or aircraft/enemies/characters/text/UI. Continuous irregular terrain runs to all edges, no frame/vignette, no perspective horizon, avoid repeating identical blocks or simple geometry. Light from upper-left. A detailed steel railway bridge crosses the icy channel in upper-middle, thick lattice trusses and visible railroad sleepers, side rail sidings and tiny cargo sheds. Bridge has natural depth and structural perspective from overhead, no fake flat line. Quiet ice channel continues above and below."
+  },
+  {
+    "key": "polar-mine",
+    "path": "assets/original/polar-mine.webp",
+    "width": 720,
+    "height": 1080,
+    "source": "polar-mine.png",
+    "sourceBlob": "b8861c6ebd1e391d4ddbfa83a41e92943b6278f7",
+    "sourceSha256": "63c6c57c3f6e857a80c5f8a8ea55922db651b2a63ff9d039142a75333cbc4c50",
+    "sourceSize": [
+      1024,
+      1536
+    ],
+    "rowRig": null,
+    "sha256": "253fc5a210da6ef52f2e763a95c451af73fa0505c8297ac93a12ed25e4a04c57",
+    "bytes": 284156,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original scrolling top-down 2D arcade shooter terrain texture, portrait720x1080 aspect, strict orthographic overhead map. Rich high-quality late-1990s prerendered pixel terrain, realistic industrial material shading and depth, coherent large forms. An Arctic military outpost, fractured blue ice, irregular snow-covered rocks, dark evergreen patches, service roads and structures at SIDE EDGES. Central 65% is quiet dark desaturated ice/water for readable bullets, no close-up giant props or aircraft/enemies/characters/text/UI. Continuous irregular terrain runs to all edges, no frame/vignette, no perspective horizon, avoid repeating identical blocks or simple geometry. Light from upper-left. A military ice runway and hangar service complex along RIGHT bank in upper-middle, snow plough tracks, deep hangar roofs, fuel tanks and parked tiny service vehicles at edges only. Left bank has frozen forest/rock shelves. Central dark ice channel stays open and readable, no aircraft painted into map."
+  },
+  {
+    "key": "polar-dam",
+    "path": "assets/original/polar-dam.webp",
+    "width": 720,
+    "height": 1080,
+    "source": "polar-dam.png",
+    "sourceBlob": "a4b354b0a18e9bb706dbceb2c88c4aa19c88df4c",
+    "sourceSha256": "cc800370c8d64fd436b95053c9550d8f45d6c1629af569f258a2f2108a503c12",
+    "sourceSize": [
+      1221,
+      1288
+    ],
+    "rowRig": null,
+    "sha256": "811760f1c817fd563cae4cb116488ef944fa6c269ad386ed23b8605ddb7da9d3",
+    "bytes": 272704,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original scrolling top-down 2D arcade shooter terrain texture, portrait720x1080 aspect, strict orthographic overhead map. Rich high-quality late-1990s prerendered pixel terrain, realistic industrial material shading and depth, coherent large forms. An Arctic military outpost, fractured blue ice, irregular snow-covered rocks, dark evergreen patches, service roads and structures at SIDE EDGES. Central 65% is quiet dark desaturated ice/water for readable bullets, no close-up giant props or aircraft/enemies/characters/text/UI. Continuous irregular terrain runs to all edges, no frame/vignette, no perspective horizon, avoid repeating identical blocks or simple geometry. Light from upper-left. Arctic radar and communications installation on two banks, large satellite/radar dishes seen from overhead at upper-left and lower-right, cylindrical generator housings and cable gantries, thick snow on machinery, roads winding around textured basalt. Center channel dark ice and meltwater, no giant full-screen dish or building."
+  },
+  {
+    "key": "polar-reservoir",
+    "path": "assets/original/polar-reservoir.webp",
+    "width": 720,
+    "height": 1080,
+    "source": "polar-reservoir.png",
+    "sourceBlob": "eed85a195b51b42fcd66d6fe673883ceede375f2",
+    "sourceSha256": "4d1796f4fc3e2b7c5aaed7a63b8eb95e06384a520aa4e1e0432a9819d73b4079",
+    "sourceSize": [
+      1221,
+      1288
+    ],
+    "rowRig": null,
+    "sha256": "63edcb8663dc59888c98e141d1f11773c8b0f791d51f86fbb269b5068e966052",
+    "bytes": 177636,
+    "tool": "builtin image_gen",
+    "prompt": "Use case: stylized-concept. Original scrolling top-down 2D arcade shooter terrain texture, portrait720x1080 aspect, strict orthographic overhead map. Rich high-quality late-1990s prerendered pixel terrain, realistic industrial material shading and depth, coherent large forms. An Arctic military outpost, fractured blue ice, irregular snow-covered rocks, dark evergreen patches, service roads and structures at SIDE EDGES. Central 65% is quiet dark desaturated ice/water for readable bullets, no close-up giant props or aircraft/enemies/characters/text/UI. Continuous irregular terrain runs to all edges, no frame/vignette, no perspective horizon, avoid repeating identical blocks or simple geometry. Light from upper-left. Boss arena on an open broad frozen lagoon: central 80% dark desaturated blue-green ice/water with subtle cracks and soft underwater detail, irregular thin snow/rock margins at far left/right. Small distant radar cables/structures only at extreme banks. No bridge/dam across middle and no obstacles in central combat space."
+  }
+]
