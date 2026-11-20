@@ -57,7 +57,7 @@ npm run test:e2e
 
 完整出擊在 Chromium 驗證；Firefox/WebKit 為啟動、輸入或音訊 smoke，不冒稱完整跨瀏覽器通關。
 
-最新 Boss 修訂見 [boss-identities.md](docs/boss-identities.md) 與 [PR #13](https://github.com/CarlLee1983/p01-flight/pull/13)。中間版 b5384104 的 push CI 已通過527 unit／41 E2E，實頁覆核另發現展示資源與河艦全毀後攻擊重複，已修正；本提交最終CI／畫面結果以 PR 說明的精確 head 與產物為準，不用中間版綠燈代替。原38項正常遊玩與新增3項隔離展示分開記錄，展示不是通關證據。手機模擬不等於實體手機手感；音訊解碼不等於人工聽感。沒有自行合併或部署。
+最新 Boss／飛彈修訂見 [11月20日改動與驗證限制](docs/boss-escalation-nov20.md)、[同策略模型比較](docs/boss-route-observations-nov20.json) 與 [PR #13](https://github.com/CarlLee1983/p01-flight/pull/13)。原三關 Boss 製作與歷史失敗見 [boss-identities.md](docs/boss-identities.md)。私人站目前已部署的是 v32；新改動仍待精確 head CI、正常戰鬥影像與窄版覆核，未覆蓋試玩版。原38項正常流程和3項隔離展示分開記錄；展示不是通關證據。模擬手機不是實體手機，音訊解碼不是人工聽感；沒有合併依賴鏈。
 
 全域 batchSize 維持 4096，只對 Image/Text 使用 QuadSingle；第二關素材只在載入時烘焙接縫與段落透明邊，不逐幀重建大圖。效能以真 WebGL 提交與 RAF 間隔觀測，不把 CPU 繪圖命令時間稱作 GPU 時間。詳見 [渲染紀錄](docs/render-batching-performance.md)。
 

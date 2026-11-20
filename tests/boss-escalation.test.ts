@@ -77,3 +77,25 @@ it("polar final phase commits one bait rocket before a delayed split plasma fan"
   const centre = rocket[0].angle;
   expect(plasma.every((r) => Math.abs(r.angle - centre) >= 0.2999)).toBe(true);
 });
+
+it("larger river rockets diverge instead of sharing a six-pixel dual-barrel lane", () => {
+  const m = new FlightModel({
+    ...stage01,
+    waves: [],
+    pickups: [],
+    boss: { ...stage01.boss!, skin: "riverFortress", at: 0 },
+  });
+  m.start();
+  m.update(1 / 60);
+  const b = m.boss!;
+  b.phase = 3;
+  for (let cycle = 0; cycle < 3; cycle++) {
+    b.attackCycle = cycle;
+    const rays = bossAttackPlan(b, { x: 180, y: 540 }).filter(
+      (r) => r.style === "rocket",
+    );
+    const angles = rays.map((r) => r.angle).sort((a, b) => a - b);
+    for (let i = 1; i < angles.length; i++)
+      expect(angles[i] - angles[i - 1]).toBeGreaterThan(0.22);
+  }
+});

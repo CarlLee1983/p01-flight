@@ -58,7 +58,9 @@ export function bossAttackPlan(
             ? [boss.attackCycle % 2 ? -0.28 : 0.28, 0]
             : i === 2
               ? [-0.46, -0.2, 0.2, 0.46]
-              : [-0.02, 0.02];
+              : i === lead
+                ? [-0.16, 0.16]
+                : [-0.02, 0.02];
       for (const [j, angle] of fanAngles(a, offsets).entries())
         add(
           i,
