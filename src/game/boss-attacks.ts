@@ -41,8 +41,16 @@ export function bossAttackPlan(
     return clamp(Math.atan2(player.x - p.x, player.y - p.y));
   };
   if (boss.skin === "riverFortress") {
+    const lead = active[boss.attackCycle % Math.max(1, active.length)];
     for (const i of active) {
-      const a = aim(i);
+      // One marked deck gun baits the player; escorts cover a fixed side lane.
+      // Breaking a gun removes its complete role, not only a cosmetic barrel.
+      const a =
+        phase === 1 || i === lead
+          ? aim(i)
+          : boss.attackCycle % 2
+            ? -0.28
+            : 0.28;
       const offsets =
         phase === 1
           ? [0, 0]
@@ -52,7 +60,13 @@ export function bossAttackPlan(
               ? [-0.46, -0.2, 0.2, 0.46]
               : [-0.02, 0.02];
       for (const [j, angle] of fanAngles(a, offsets).entries())
-        add(i, angle, i * 0.06, j < offsets.length / 2 ? -3 : 3, "shell");
+        add(
+          i,
+          angle,
+          i * 0.06,
+          j < offsets.length / 2 ? -3 : 3,
+          phase > 1 && i === lead ? "rocket" : "shell",
+        );
     }
     if (!active.length) {
       const offsets =
@@ -84,8 +98,11 @@ export function bossAttackPlan(
       for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, 0.13);
       add(null, aim(null), 0.02);
     } else {
-      for (const a of fanAngles(aim(null), [-0.5, -0.25, 0, 0.25, 0.5]))
-        add(null, a);
+      // Bait needle first, then a delayed split fan. The central opening in
+      // the plasma wall rewards moving after the aimed rocket is committed.
+      const angles = fanAngles(aim(null), [-0.6, -0.3, 0, 0.3, 0.6]);
+      add(null, angles[2], 0, 0, "rocket");
+      for (const i of [0, 1, 3, 4]) add(null, angles[i], 0.11);
       for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, 0.11);
     }
     if (!rays.length)
@@ -105,7 +122,8 @@ export function bossAttackPlan(
           ? [-0.5, -0.25, 0, 0.25, 0.5]
           : [-0.3, 0, 0.3];
     const centre = phase === 3 ? aim(null) : boss.attackCycle % 2 ? 0.1 : -0.1;
-    for (const a of fanAngles(centre, offsets)) add(null, a);
+    for (const [i, a] of fanAngles(centre, offsets).entries())
+      add(null, a, 0, 0, phase === 3 && i === 1 ? "rocket" : "plasma");
   }
   return rays;
 }

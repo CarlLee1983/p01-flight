@@ -1,0 +1,216 @@
+{
+  "scope": "Same host, seed, frame rate, control policy, two normal bombs at161/168s, ordinary damage and stage HP. Model observations, not WebGL/GPU or human difficulty. Volley counts are scheduled cycles, not independently counted complete volleys; existing 24 completion tests remain separate.",
+  "baselineHead": "bd0243a7407bce10cc3e8e2ef1885b68624b9179",
+  "baseline": [
+    {
+      "seed": 1,
+      "fps": 60,
+      "mode": "won",
+      "hp": 2,
+      "damage": 1,
+      "time": 174.63333333336445,
+      "travel": 4932,
+      "phases": {
+        "1": {
+          "seconds": 6.883333333333314,
+          "volleys": 2,
+          "movement": 350.59692006704176
+        },
+        "2": {
+          "seconds": 5.783333333333318,
+          "volleys": 3,
+          "movement": 71.90878674480317
+        },
+        "3": {
+          "seconds": 6.966666666666647,
+          "volleys": 4,
+          "movement": 302.76001033360956
+        }
+      }
+    },
+    {
+      "seed": 42,
+      "fps": 60,
+      "mode": "won",
+      "hp": 3,
+      "damage": 0,
+      "time": 174.05000000003065,
+      "travel": 3280,
+      "phases": {
+        "1": {
+          "seconds": 6.966666666666647,
+          "volleys": 2,
+          "movement": 351.17963297431186
+        },
+        "2": {
+          "seconds": 5.8499999999999845,
+          "volleys": 3,
+          "movement": 71.99104306400247
+        },
+        "3": {
+          "seconds": 6.2333333333333165,
+          "volleys": 3,
+          "movement": 282.6089348639779
+        }
+      }
+    },
+    {
+      "seed": 2026,
+      "fps": 60,
+      "mode": "won",
+      "hp": 3,
+      "damage": 0,
+      "time": 180.63333333336922,
+      "travel": 5060,
+      "phases": {
+        "1": {
+          "seconds": 8.016666666666644,
+          "volleys": 3,
+          "movement": 361.9198143555849
+        },
+        "2": {
+          "seconds": 6.399999999999983,
+          "volleys": 2,
+          "movement": 69.74190785912405
+        },
+        "3": {
+          "seconds": 11.216666666666804,
+          "volleys": 6,
+          "movement": 365.9764774357924
+        }
+      }
+    },
+    {
+      "seed": 42,
+      "fps": 30,
+      "mode": "won",
+      "hp": 3,
+      "damage": 0,
+      "time": 180.8166666667027,
+      "travel": 3786,
+      "phases": {
+        "1": {
+          "seconds": 8.633333333333313,
+          "volleys": 3,
+          "movement": 370.29394321539024
+        },
+        "2": {
+          "seconds": 7.533333333333316,
+          "volleys": 4,
+          "movement": 84.4950571229978
+        },
+        "3": {
+          "seconds": 9.666666666666643,
+          "volleys": 5,
+          "movement": 374.1082457208771
+        }
+      }
+    }
+  ],
+  "candidate": [
+    {
+      "seed": 1,
+      "fps": 60,
+      "mode": "won",
+      "hp": 2,
+      "damage": 1,
+      "time": 177.23333333336652,
+      "travel": 5236,
+      "phases": {
+        "1": {
+          "seconds": 7.316666666666646,
+          "volleys": 2,
+          "movement": 354.08731799031057
+        },
+        "2": {
+          "seconds": 5.699999999999985,
+          "volleys": 2,
+          "movement": 69.83509790571625
+        },
+        "3": {
+          "seconds": 9.216666666666704,
+          "volleys": 3,
+          "movement": 378.7902701171168
+        }
+      }
+    },
+    {
+      "seed": 42,
+      "fps": 60,
+      "mode": "won",
+      "hp": 3,
+      "damage": 0,
+      "time": 189.00000000004255,
+      "travel": 5320,
+      "phases": {
+        "1": {
+          "seconds": 8.199999999999987,
+          "volleys": 3,
+          "movement": 364.3480871955503
+        },
+        "2": {
+          "seconds": 10.350000000000094,
+          "volleys": 5,
+          "movement": 126.17108493207441
+        },
+        "3": {
+          "seconds": 15.450000000000347,
+          "volleys": 4,
+          "movement": 525.5515297656149
+        }
+      }
+    },
+    {
+      "seed": 2026,
+      "fps": 60,
+      "mode": "won",
+      "hp": 3,
+      "damage": 0,
+      "time": 197.11666666671567,
+      "travel": 7220,
+      "phases": {
+        "1": {
+          "seconds": 9.516666666666719,
+          "volleys": 4,
+          "movement": 384.5218744287324
+        },
+        "2": {
+          "seconds": 13.783333333333598,
+          "volleys": 7,
+          "movement": 148.20168094398977
+        },
+        "3": {
+          "seconds": 18.81666666666688,
+          "volleys": 5,
+          "movement": 638.9950826701473
+        }
+      }
+    },
+    {
+      "seed": 42,
+      "fps": 30,
+      "mode": "won",
+      "hp": 3,
+      "damage": 0,
+      "time": 180.8166666667027,
+      "travel": 4266,
+      "phases": {
+        "1": {
+          "seconds": 9.066666666666645,
+          "volleys": 4,
+          "movement": 376.9910002806815
+        },
+        "2": {
+          "seconds": 7.133333333333318,
+          "volleys": 4,
+          "movement": 78.33985125832952
+        },
+        "3": {
+          "seconds": 9.63333333333331,
+          "volleys": 3,
+          "movement": 395.9557720803804
+        }
+      }
+    }
+  ]
+}

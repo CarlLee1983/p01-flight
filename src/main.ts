@@ -1,5 +1,6 @@
 import {
   ROCKET_ART,
+  createRocketPose,
   rocketPresentation,
   drawRocketExhaust,
 } from "./game/hostile-rocket";
@@ -309,6 +310,7 @@ class FlightScene extends Phaser.Scene {
         `${import.meta.env.BASE_URL}assets/kenney/${file}.png`,
       );
   }
+  private rocketPose = createRocketPose();
   private presentedHits = new WeakMap<object, number>();
   sprite(
     key: string,
@@ -1041,7 +1043,20 @@ class FlightScene extends Phaser.Scene {
           overlay.fillStyle(color);
           overlay.lineStyle(1.5, 0xfff2e2);
           if (style === "rocket") {
-            const pose = rocketPresentation(shot, model.time);
+            const pose = rocketPresentation(shot, model.time, this.rocketPose);
+            // A pooled silhouette gives the ivory hull a dark edge over snow,
+            // water and player fire. One bounded quad, no particle history.
+            this.sprite(
+              ROCKET_ART.key,
+              shot.x,
+              shot.y,
+              ROCKET_ART.width + 2,
+              ROCKET_ART.height + 2,
+              1,
+              pose.angle,
+            )
+              .setTint(0x101521)
+              .setDepth(PRESENTATION_LAYERS.projectiles + 0.005);
             this.sprite(
               ROCKET_ART.key,
               shot.x,

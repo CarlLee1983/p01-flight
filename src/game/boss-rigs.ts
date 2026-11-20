@@ -6,6 +6,8 @@ export interface BossPose {
   y: number;
   roll: number;
   ringAngle: number;
+  armourSpanX?: number;
+  armourSpanY?: number;
   state: string;
   entered: boolean;
   canFire: boolean;
@@ -70,9 +72,9 @@ const RIGS: Record<BossSkin, BossRig> = {
     restY: 185,
   },
   polarRadar: {
-    key: "boss-polar-rotor-v2",
-    width: 104,
-    height: 104,
+    key: "enemy-gunship",
+    width: 112,
+    height: 98,
     partCount: 4,
     partKey: "boss-polar-sector-v2",
     wreckKey: "boss-polar-sector-wreck-v2",
@@ -82,7 +84,7 @@ const RIGS: Record<BossSkin, BossRig> = {
     partLabel: "護甲環",
     support: false,
     halfWidth: 47,
-    halfHeight: 47,
+    halfHeight: 40,
     partHalfWidth: 20,
     partHalfHeight: 10,
     entrySeconds: 2.6,
@@ -111,6 +113,8 @@ export function bossPose(
     y = rig.restY,
     roll = 0,
     ringAngle = 0,
+    armourSpanX = 70,
+    armourSpanY = 70,
     state = "approach",
     canFire = entered,
     fireWindow = 3600;
@@ -172,17 +176,26 @@ export function bossPose(
     const q = t % 3.6,
       cycle = Math.floor(t / 3.6);
     ringAngle = ((cycle + ease(q / 0.65)) * Math.PI) / 3;
+    // The four independent generators unfold around a mechanical carrier.
+    // Only the shift interval moves across lanes; firing remains a readable hold.
+    const unfold = ease(phaseAge / 0.8);
+    armourSpanX =
+      phase === 1 ? 64 : phase === 2 ? 64 + 12 * unfold : 76 + 6 * unfold;
+    armourSpanY =
+      phase === 1 ? 40 : phase === 2 ? 40 + 22 * unfold : 62 + 14 * unfold;
     if (phase === 3) {
-      const from = cycle % 2 ? 230 : 130;
-      x = from + (360 - 2 * from) * ease(q / 0.65);
-      y = 210 + Math.sin(t * 0.65) * 10;
+      const shift = ease(q / 0.8),
+        side = cycle % 2 ? 1 : -1;
+      x = 180 + side * 50 * (1 - 2 * shift);
+      y = 210 + side * 30 * (1 - 2 * shift);
     } else {
       x += Math.sin(t * 0.45) * 36;
       y += Math.sin(t * 0.65) * 6;
     }
-    roll = age * 0.25 + (phase === 3 ? phaseAge * 0.35 : 0);
-    state = q < 0.65 ? "index-ring" : "locked-ring";
-    canFire = q >= 0.65;
+    roll = Math.sin(t * 0.8) * 0.08;
+    const shiftSeconds = phase === 3 ? 0.8 : 0.65;
+    state = q < shiftSeconds ? "index-ring" : "locked-ring";
+    canFire = q >= shiftSeconds;
     fireWindow = canFire ? 3.6 - q : 0;
   }
   if (!entered) {
@@ -195,19 +208,26 @@ export function bossPose(
           : 180;
     y =
       -60 +
-      ((skin === "polarRadar" && phase === 3 ? 210 : rig.restY) + 60) *
+      ((skin === "polarRadar" && phase === 3 ? 180 : rig.restY) + 60) *
         approach;
     roll =
-      skin === "command"
-        ? -0.14 * approach
-        : skin === "polarRadar"
-          ? (age * 0.25 + (phase === 3 ? phaseAge * 0.35 : 0)) * approach
-          : 0;
+      skin === "command" ? -0.14 * approach : skin === "polarRadar" ? 0 : 0;
     state = "approach";
     canFire = false;
     fireWindow = 0;
   }
-  return { x, y, roll, ringAngle, state, entered, canFire, fireWindow };
+  return {
+    x,
+    y,
+    roll,
+    ringAngle,
+    armourSpanX,
+    armourSpanY,
+    state,
+    entered,
+    canFire,
+    fireWindow,
+  };
 }
 export function rotateLocal(x: number, y: number, angle: number) {
   return {
@@ -223,8 +243,8 @@ export function bossMount(
   if (skin === "polarRadar") {
     const angle = pose.ringAngle + (index * Math.PI) / 2;
     return {
-      x: pose.x + Math.sin(angle) * 70,
-      y: pose.y + Math.cos(angle) * 70,
+      x: pose.x + Math.sin(angle) * (pose.armourSpanX ?? 70),
+      y: pose.y + Math.cos(angle) * (pose.armourSpanY ?? 70),
       angle,
       rotation: -angle,
     };
@@ -315,6 +335,12 @@ export function bossCoreContains(
   y: number,
   padding = 0,
 ) {
+  if (boss.skin === "polarRadar") {
+    // The visible central reactor, not the entire carrier, is the weak point.
+    // Lower generators remain hittable without the hull swallowing their shots.
+    const p = rotateLocal(x - boss.x, y - boss.y, -(boss.roll ?? 0));
+    return (p.x / (32 + padding)) ** 2 + (p.y / (32 + padding)) ** 2 < 1;
+  }
   if (boss.skin !== "riverFortress")
     return bossBodyContains(boss, x, y, padding);
   const c = bossCorePoint(boss),

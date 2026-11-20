@@ -47,6 +47,20 @@ export function drawBoss(
     (boss.roll ?? 0) * degrees,
     boss,
   );
+  if (boss.skin === "polarRadar") {
+    // Reuse the licensed mechanical hull and original rotor as separate parts,
+    // rather than scaling a disk into another colour of the previous Boss.
+    sprite(
+      "boss-polar-rotor-v2",
+      boss.x,
+      boss.y,
+      64,
+      64,
+      1,
+      time * 22,
+      boss,
+    ).setDepth(1.5);
+  }
   if (boss.skin === "riverFortress") {
     const bow = bossBowMount(boss);
     sprite(

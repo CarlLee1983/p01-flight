@@ -85,9 +85,7 @@ test("normal Stage02 clear connects to polar Stage03, clears, retries and preser
               stage === "stage03" ? 4 : 3,
             );
             expect(s.bossPresentation.key).toBe(
-              stage === "stage03"
-                ? "boss-polar-rotor-v2"
-                : "boss-river-hull-v2",
+              stage === "stage03" ? "enemy-gunship" : "boss-river-hull-v2",
             );
             await captureStage02Frame(page, `${stage}-boss-intact`);
             await page.setViewportSize({ width: 320, height: 700 });

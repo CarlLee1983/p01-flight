@@ -2,49 +2,77 @@ import type Phaser from "phaser";
 import type { EnemyBullet } from "./model";
 export const ROCKET_ART = {
   key: "hostile-missile-v2",
-  width: 8,
-  height: 18,
+  width: 11,
+  height: 26,
+  nozzle: 12,
 } as const;
-/** Body follows actual velocity; all exhaust vertices remain behind it. */
+type Point = { x: number; y: number };
+export interface RocketPose {
+  angle: number;
+  nozzle: Point;
+  outer: [Point, Point, Point];
+  inner: [Point, Point, Point];
+}
+export function createRocketPose(): RocketPose {
+  return {
+    angle: 0,
+    nozzle: { x: 0, y: 0 },
+    outer: [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ],
+    inner: [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ],
+  };
+}
+/** Actual velocity only. The live renderer supplies one reusable scratch pose:
+ * no arrays, point objects or closures are allocated per missile per frame. */
 export function rocketPresentation(
   shot: Pick<EnemyBullet, "x" | "y" | "vx" | "vy" | "id">,
   time: number,
-) {
+  pose: RocketPose = createRocketPose(),
+): RocketPose {
   const speed = Math.hypot(shot.vx, shot.vy),
     dx = speed ? shot.vx / speed : 0,
     dy = speed ? shot.vy / speed : 1;
-  const nozzle = { x: shot.x - dx * 8, y: shot.y - dy * 8 };
-  const length = 5 + (Math.sin(time * 47 + shot.id) * 0.5 + 0.5) * 4;
-  const point = (along: number, side: number) => ({
-    x: nozzle.x + dx * along + dy * side,
-    y: nozzle.y + dy * along - dx * side,
-  });
-  return {
-    angle: (-Math.atan2(dx, dy) * 180) / Math.PI,
-    nozzle,
-    outer: [point(0, -2), point(0, 2), point(-length, 0)],
-    inner: [point(0, -0.85), point(0, 0.85), point(-length * 0.7, 0)],
-  };
+  pose.angle = (-Math.atan2(dx, dy) * 180) / Math.PI;
+  pose.nozzle.x = shot.x - dx * ROCKET_ART.nozzle;
+  pose.nozzle.y = shot.y - dy * ROCKET_ART.nozzle;
+  const length = 7 + (Math.sin(time * 47 + shot.id) * 0.5 + 0.5) * 5;
+  for (let i = 0; i < 3; i++) {
+    const along = i === 2 ? -length : 0;
+    const side = i === 0 ? -2.8 : i === 1 ? 2.8 : 0;
+    pose.outer[i].x = pose.nozzle.x + dx * along + dy * side;
+    pose.outer[i].y = pose.nozzle.y + dy * along - dx * side;
+    pose.inner[i].x = pose.nozzle.x + dx * along * 0.7 + dy * side * 0.4;
+    pose.inner[i].y = pose.nozzle.y + dy * along * 0.7 - dx * side * 0.4;
+  }
+  return pose;
 }
 export function drawRocketExhaust(
   g: Phaser.GameObjects.Graphics,
-  pose: ReturnType<typeof rocketPresentation>,
+  pose: RocketPose,
 ) {
-  const draw = (
-    points: { x: number; y: number }[],
-    color: number,
-    alpha: number,
-  ) =>
-    g
-      .fillStyle(color, alpha)
-      .fillTriangle(
-        points[0].x,
-        points[0].y,
-        points[1].x,
-        points[1].y,
-        points[2].x,
-        points[2].y,
-      );
-  draw(pose.outer, 0xff974a, 0.8);
-  draw(pose.inner, 0xfff1bc, 0.95);
+  const o = pose.outer,
+    i = pose.inner;
+  g.fillStyle(0xff974a, 0.9).fillTriangle(
+    o[0].x,
+    o[0].y,
+    o[1].x,
+    o[1].y,
+    o[2].x,
+    o[2].y,
+  );
+  g.fillStyle(0xfff1bc, 1).fillTriangle(
+    i[0].x,
+    i[0].y,
+    i[1].x,
+    i[1].y,
+    i[2].x,
+    i[2].y,
+  );
 }

@@ -50,7 +50,7 @@ for (const [skin, count] of [
       (window as any).__BOSS_STUDIO__(),
     );
     expect(snapshot.textures.every((t: any) => t.ready)).toBe(true);
-    for (const key of ["boss-cannon", "boss-cannon-broken"])
+    for (const key of ["boss-cannon", "boss-cannon-broken", "enemy-gunship"])
       expect(snapshot.textures.find((t: any) => t.key === key).source).toBe(
         "HTMLImageElement",
       );
@@ -61,6 +61,12 @@ for (const [skin, count] of [
       path: `docs/boss-${skin}-intact.png`,
       fullPage: true,
     });
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.screenshot({
+      path: `docs/boss-${skin}-phase1-320.png`,
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1000, height: 900 });
     for (const phase of ["2", "3"]) {
       await page.locator("#phase").selectOption(phase);
       await page.waitForTimeout(10000);
@@ -68,6 +74,12 @@ for (const [skin, count] of [
         path: `docs/boss-${skin}-phase${phase}.png`,
         fullPage: true,
       });
+      await page.setViewportSize({ width: 320, height: 700 });
+      await page.screenshot({
+        path: `docs/boss-${skin}-phase${phase}-320.png`,
+        fullPage: true,
+      });
+      await page.setViewportSize({ width: 1000, height: 900 });
     }
     await page.locator("#break").click();
     await expect(page.locator("#status")).toContainText(`部件 ${count - 1}`);

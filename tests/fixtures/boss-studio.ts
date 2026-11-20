@@ -52,6 +52,7 @@ class Studio extends Phaser.Scene {
           ...NEXT_ASSETS,
           "boss",
           "boss-cannon",
+          "enemy-gunship",
           "boss-cannon-broken",
           "boss-support",
         ].map((key) => ({
