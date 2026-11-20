@@ -114,8 +114,8 @@
       "mode": "won",
       "hp": 2,
       "damage": 1,
-      "time": 177.23333333336652,
-      "travel": 5236,
+      "time": 178.3333333333674,
+      "travel": 5320,
       "phases": {
         "1": {
           "seconds": 7.316666666666646,
@@ -128,9 +128,9 @@
           "movement": 69.83509790571625
         },
         "3": {
-          "seconds": 9.216666666666704,
-          "volleys": 3,
-          "movement": 378.7902701171168
+          "seconds": 10.316666666666759,
+          "volleys": 5,
+          "movement": 331.32403879821555
         }
       }
     },
@@ -140,8 +140,8 @@
       "mode": "won",
       "hp": 3,
       "damage": 0,
-      "time": 189.00000000004255,
-      "travel": 5320,
+      "time": 185.25000000003956,
+      "travel": 4320,
       "phases": {
         "1": {
           "seconds": 8.199999999999987,
@@ -154,9 +154,9 @@
           "movement": 126.17108493207441
         },
         "3": {
-          "seconds": 15.450000000000347,
+          "seconds": 11.700000000000161,
           "volleys": 4,
-          "movement": 525.5515297656149
+          "movement": 428.09854994141637
         }
       }
     },
@@ -166,8 +166,8 @@
       "mode": "won",
       "hp": 3,
       "damage": 0,
-      "time": 197.11666666671567,
-      "travel": 7220,
+      "time": 200.80000000005194,
+      "travel": 6992,
       "phases": {
         "1": {
           "seconds": 9.516666666666719,
@@ -180,9 +180,9 @@
           "movement": 148.20168094398977
         },
         "3": {
-          "seconds": 18.81666666666688,
-          "volleys": 5,
-          "movement": 638.9950826701473
+          "seconds": 22.500000000000004,
+          "volleys": 10,
+          "movement": 647.7257807655569
         }
       }
     },
@@ -192,8 +192,8 @@
       "mode": "won",
       "hp": 3,
       "damage": 0,
-      "time": 180.8166666667027,
-      "travel": 4266,
+      "time": 179.4833333333683,
+      "travel": 3978,
       "phases": {
         "1": {
           "seconds": 9.066666666666645,
@@ -206,11 +206,176 @@
           "movement": 78.33985125832952
         },
         "3": {
-          "seconds": 9.63333333333331,
+          "seconds": 8.299999999999981,
           "volleys": 3,
-          "movement": 395.9557720803804
+          "movement": 163.17165420658816
         }
       }
     }
-  ]
+  ],
+  "stationaryAfterBossEntry": {
+    "scope": "Same pre-Boss route, fixed seed42, ordinary firing and bombs161/168. Stops steering when Boss enters. These are model observations, not human gameplay.",
+    "baseline": [
+      {
+        "seed": 42,
+        "fps": 60,
+        "mode": "lost",
+        "hp": 0,
+        "damage": 3,
+        "time": 173.38333333336345,
+        "travel": 1620,
+        "phases": {
+          "1": {
+            "seconds": 6.016666666666651,
+            "volleys": 2,
+            "movement": 346.93740801162335
+          },
+          "2": {
+            "seconds": 6.016666666666651,
+            "volleys": 2,
+            "movement": 71.3827583840002
+          },
+          "3": {
+            "seconds": 6.366666666666649,
+            "volleys": 3,
+            "movement": 303.2408073721662
+          }
+        }
+      },
+      {
+        "seed": 42,
+        "fps": 30,
+        "mode": "lost",
+        "hp": 0,
+        "damage": 3,
+        "time": 180.71666666670262,
+        "travel": 2154,
+        "phases": {
+          "1": {
+            "seconds": 9.699999999999976,
+            "volleys": 4,
+            "movement": 387.2007384047221
+          },
+          "2": {
+            "seconds": 8.433333333333314,
+            "volleys": 3,
+            "movement": 98.2572229050814
+          },
+          "3": {
+            "seconds": 7.633333333333316,
+            "volleys": 3,
+            "movement": 251.13627667745757
+          }
+        }
+      }
+    ],
+    "rejected358fd743": [
+      {
+        "seed": 42,
+        "fps": 60,
+        "mode": "won",
+        "hp": 1,
+        "damage": 2,
+        "time": 181.80000000003682,
+        "travel": 1620,
+        "phases": {
+          "1": {
+            "seconds": 7.583333333333312,
+            "volleys": 3,
+            "movement": 356.7758344815233
+          },
+          "2": {
+            "seconds": 8.666666666666677,
+            "volleys": 4,
+            "movement": 99.66703593766668
+          },
+          "3": {
+            "seconds": 10.550000000000104,
+            "volleys": 3,
+            "movement": 395.3869248276751
+          }
+        }
+      },
+      {
+        "seed": 42,
+        "fps": 30,
+        "mode": "won",
+        "hp": 1,
+        "damage": 2,
+        "time": 182.13333333337042,
+        "travel": 2154,
+        "phases": {
+          "1": {
+            "seconds": 9.73333333333331,
+            "volleys": 4,
+            "movement": 387.7401115339398
+          },
+          "2": {
+            "seconds": 8.466666666666647,
+            "volleys": 3,
+            "movement": 98.55831399874545
+          },
+          "3": {
+            "seconds": 8.933333333333312,
+            "volleys": 2,
+            "movement": 293.0729629874237
+          }
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "seed": 42,
+        "fps": 60,
+        "mode": "lost",
+        "hp": 0,
+        "damage": 3,
+        "time": 180.2333333333689,
+        "travel": 1620,
+        "phases": {
+          "1": {
+            "seconds": 7.583333333333312,
+            "volleys": 3,
+            "movement": 356.7758344815233
+          },
+          "2": {
+            "seconds": 8.666666666666677,
+            "volleys": 4,
+            "movement": 99.66703593766668
+          },
+          "3": {
+            "seconds": 9.000000000000027,
+            "volleys": 3,
+            "movement": 269.3658954603986
+          }
+        }
+      },
+      {
+        "seed": 42,
+        "fps": 30,
+        "mode": "lost",
+        "hp": 0,
+        "damage": 3,
+        "time": 180.3166666667023,
+        "travel": 2154,
+        "phases": {
+          "1": {
+            "seconds": 9.73333333333331,
+            "volleys": 4,
+            "movement": 387.7401115339398
+          },
+          "2": {
+            "seconds": 8.466666666666647,
+            "volleys": 3,
+            "movement": 98.55831399874545
+          },
+          "3": {
+            "seconds": 7.166666666666651,
+            "volleys": 2,
+            "movement": 305.18463627629575
+          }
+        }
+      }
+    ]
+  }
 }

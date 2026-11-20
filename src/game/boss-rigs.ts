@@ -173,8 +173,11 @@ export function bossPose(
     roll = Math.sin((t * Math.PI) / 4) * (phase === 1 ? 0.06 : 0.1);
     if (phase === 3) y += Math.sin((t * Math.PI) / 4) ** 2 * 12;
   } else {
-    const q = t % 3.6,
-      cycle = Math.floor(t / 3.6);
+    // The final phase holds its new lane long enough for complete alternating
+    // volleys. Frequent resets must not make standing still safer than dodging.
+    const period = phase === 3 ? 4.4 : 3.6,
+      q = t % period,
+      cycle = Math.floor(t / period);
     ringAngle = ((cycle + ease(q / 0.65)) * Math.PI) / 3;
     // The four independent generators unfold around a mechanical carrier.
     // Only the shift interval moves across lanes; firing remains a readable hold.
@@ -196,7 +199,7 @@ export function bossPose(
     const shiftSeconds = phase === 3 ? 0.8 : 0.65;
     state = q < shiftSeconds ? "index-ring" : "locked-ring";
     canFire = q >= shiftSeconds;
-    fireWindow = canFire ? 3.6 - q : 0;
+    fireWindow = canFire ? period - q : 0;
   }
   if (!entered) {
     const approach = ease(age / rig.entrySeconds);

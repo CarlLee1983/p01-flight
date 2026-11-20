@@ -95,3 +95,45 @@ it("stationary firing is not a normal observed-input survival route", () => {
   );
   expect(m.mode).toBe("lost");
 });
+
+it.each([30, 60])(
+  "standing still after Stage03 Boss entry loses with the same firing and bombs at %i FPS",
+  (fps) => {
+    const m = new FlightModel(createStage03(42));
+    m.start();
+    const hulls = new VisibleHullTracker();
+    let held: Steering = 0,
+      next = 0,
+      bombs = 0;
+    for (let i = 0; i < 205 * fps && m.mode === "playing"; i++) {
+      if ((m.time >= 161 && bombs === 0) || (m.time >= 168 && bombs === 1))
+        if (m.useBomb()) bombs++;
+      if (m.boss?.active) held = 0;
+      else if (m.time >= next) {
+        held = chooseAction(
+          {
+            player: m.player,
+            hostileProjectiles: [
+              ...m.enemyBullets.filter((b) => b.active),
+              ...hulls.observe(
+                m.time,
+                m.enemies.filter((e) => e.active),
+              ),
+            ],
+          },
+          held,
+          bossAimGoal(m.boss, m.player.x),
+        );
+        next = m.time + 0.08;
+      }
+      advanceFrame(m, 1 / fps, held, 0, true, false);
+    }
+    console.log(
+      "BOSS_STATIONARY_AFTER_ENTRY " +
+        JSON.stringify({ fps, mode: m.mode, hp: m.hp, time: m.time, bombs }),
+    );
+    expect(bombs).toBe(2);
+    expect(m.mode).toBe("lost");
+    expect(m.hp).toBe(0);
+  },
+);
