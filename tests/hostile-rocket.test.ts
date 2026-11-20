@@ -1,8 +1,10 @@
-import { it, expect } from "vitest";
+import { it, expect, vi } from "vitest";
 import {
   rocketPresentation,
   createRocketPose,
   ROCKET_ART,
+  ROCKET_RENDER,
+  createRocketTexture,
 } from "../src/game/hostile-rocket";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -57,4 +59,45 @@ it("renderer scratch reuses every exhaust vertex while leaving the shot untouche
     }
   }
   expect(shot).toEqual(original);
+});
+
+it("rasterizes the rim once and reuses one cached texture across repeated draws", () => {
+  const keys = new Set<string>([ROCKET_ART.key]);
+  const ctx = {
+    drawImage: vi.fn(),
+    fillRect: vi.fn(),
+    globalCompositeOperation: "source-over",
+    fillStyle: "",
+  };
+  const canvas = { width: 0, height: 0, getContext: () => ctx };
+  const makeCanvas = vi.fn(() => canvas as unknown as HTMLCanvasElement);
+  const source = {};
+  const scene = {
+    textures: {
+      exists: (key: string) => keys.has(key),
+      get: () => ({ getSourceImage: () => source }),
+      addCanvas: vi.fn((key: string) => keys.add(key)),
+    },
+  };
+  for (let i = 0; i < 1000; i++)
+    expect(createRocketTexture(scene as any, makeCanvas)).toBe(ROCKET_RENDER);
+  expect(makeCanvas).toHaveBeenCalledTimes(1);
+  expect(scene.textures.addCanvas).toHaveBeenCalledTimes(1);
+  expect(canvas.width).toBe(52);
+  expect(canvas.height).toBe(112);
+  expect(ctx.drawImage).toHaveBeenCalledTimes(9);
+  expect(ctx.globalCompositeOperation).toBe("source-over");
+  expect(ctx.drawImage.mock.calls.at(-1)).toEqual([source, 4, 4, 44, 104]);
+});
+it("does not bake a missing source or pretend a missing canvas context is ready", () => {
+  const makeCanvas = vi.fn(
+    () => ({ getContext: () => null }) as unknown as HTMLCanvasElement,
+  );
+  const scene = { textures: { exists: () => false } };
+  expect(createRocketTexture(scene as any, makeCanvas)).toBe(ROCKET_ART);
+  expect(makeCanvas).not.toHaveBeenCalled();
+  const loaded = {
+    textures: { exists: (key: string) => key === ROCKET_ART.key },
+  };
+  expect(createRocketTexture(loaded as any, makeCanvas)).toBe(ROCKET_ART);
 });

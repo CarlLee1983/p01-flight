@@ -1,5 +1,7 @@
 import {
   ROCKET_ART,
+  ROCKET_RENDER,
+  createRocketTexture,
   createRocketPose,
   rocketPresentation,
   drawRocketExhaust,
@@ -82,6 +84,7 @@ let overlay: Phaser.GameObjects.Graphics;
 let impacts: Phaser.GameObjects.Graphics;
 let renderedImpactPrimitives = 0;
 let renderedHostileMissiles = 0;
+let renderedHostileMissileQuads = 0;
 
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
@@ -311,6 +314,8 @@ class FlightScene extends Phaser.Scene {
       );
   }
   private rocketPose = createRocketPose();
+  private rocketArt: { key: string; width: number; height: number } =
+    ROCKET_ART;
   private presentedHits = new WeakMap<object, number>();
   sprite(
     key: string,
@@ -382,6 +387,7 @@ class FlightScene extends Phaser.Scene {
     createPickupLabelTextures(this);
     createCannonTextures(this);
     createEnemyModuleTextures(this);
+    this.rocketArt = createRocketTexture(this);
     createRaiderTextures(this);
     this.pickupNotice = this.add
       .text(180, 90, "", {
@@ -726,6 +732,7 @@ class FlightScene extends Phaser.Scene {
     impacts.clear();
     renderedImpactPrimitives = 0;
     renderedHostileMissiles = 0;
+    renderedHostileMissileQuads = 0;
     hud.clear();
     for (const item of this.coastalObjects) {
       if ("setVisible" in item)
@@ -1044,28 +1051,17 @@ class FlightScene extends Phaser.Scene {
           overlay.lineStyle(1.5, 0xfff2e2);
           if (style === "rocket") {
             const pose = rocketPresentation(shot, model.time, this.rocketPose);
-            // A pooled silhouette gives the ivory hull a dark edge over snow,
-            // water and player fire. One bounded quad, no particle history.
+            const beforeQuads = this.visualIndex;
             this.sprite(
-              ROCKET_ART.key,
+              this.rocketArt.key,
               shot.x,
               shot.y,
-              ROCKET_ART.width + 2,
-              ROCKET_ART.height + 2,
-              1,
-              pose.angle,
-            )
-              .setTint(0x101521)
-              .setDepth(PRESENTATION_LAYERS.projectiles + 0.005);
-            this.sprite(
-              ROCKET_ART.key,
-              shot.x,
-              shot.y,
-              ROCKET_ART.width,
-              ROCKET_ART.height,
+              this.rocketArt.width,
+              this.rocketArt.height,
               1,
               pose.angle,
             ).setDepth(PRESENTATION_LAYERS.projectiles + 0.01);
+            renderedHostileMissileQuads += this.visualIndex - beforeQuads;
             drawRocketExhaust(overlay, pose);
             renderedHostileMissiles++;
           } else if (style === "needle") {
@@ -1429,8 +1425,13 @@ Object.defineProperty(window, "__P01__", {
     metalSprites: readMetalSpriteStatus(game.textures),
     nextAssets: nextAssetStatus(game.textures),
     hostileMissiles: {
-      textureKey: ROCKET_ART.key,
+      textureKey: game.textures.exists(ROCKET_RENDER.key)
+        ? ROCKET_RENDER.key
+        : ROCKET_ART.key,
+      sourceTextureKey: ROCKET_ART.key,
+      cacheReady: game.textures.exists(ROCKET_RENDER.key),
       rendered: renderedHostileMissiles,
+      renderedQuads: renderedHostileMissileQuads,
       bodyPixels: [ROCKET_ART.width, ROCKET_ART.height],
     },
     bossPresentation: {

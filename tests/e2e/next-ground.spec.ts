@@ -44,6 +44,15 @@ test("mobile missile vehicle and flak emplacement rotate, fire and are destroyed
         true,
       );
       const observed = await state(page);
+      expect(observed.hostileMissiles).toMatchObject({
+        cacheReady: true,
+        textureKey: "hostile-missile-outlined",
+        sourceTextureKey: "hostile-missile-v2",
+        bodyPixels: [11, 26],
+      });
+      expect(observed.hostileMissiles.renderedQuads).toBe(
+        observed.hostileMissiles.rendered,
+      );
       expect(
         observed.nextAssets.find((a: any) => a.key === "hostile-missile-v2"),
       ).toMatchObject({ ready: true, bitmap: true });

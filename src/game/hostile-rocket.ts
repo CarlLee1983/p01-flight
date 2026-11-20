@@ -6,6 +6,53 @@ export const ROCKET_ART = {
   height: 26,
   nozzle: 12,
 } as const;
+/** One cached texture includes the dark rim: no second Image per projectile. */
+export const ROCKET_RENDER = {
+  key: "hostile-missile-outlined",
+  width: 13,
+  height: 28,
+} as const;
+export function createRocketTexture(
+  scene: Pick<Phaser.Scene, "textures">,
+  makeCanvas = () => document.createElement("canvas"),
+): { key: string; width: number; height: number } {
+  if (scene.textures.exists(ROCKET_RENDER.key)) return ROCKET_RENDER;
+  if (!scene.textures.exists(ROCKET_ART.key)) return ROCKET_ART;
+  const canvas = makeCanvas(),
+    scale = 4;
+  canvas.width = ROCKET_RENDER.width * scale;
+  canvas.height = ROCKET_RENDER.height * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return ROCKET_ART;
+  const source = scene.textures
+    .get(ROCKET_ART.key)
+    .getSourceImage() as CanvasImageSource;
+  // Bake an alpha-derived one-pixel rim once; retain the original metal pixels.
+  for (let x = -1; x <= 1; x++)
+    for (let y = -1; y <= 1; y++) {
+      if (!x && !y) continue;
+      ctx.drawImage(
+        source,
+        (1 + x) * scale,
+        (1 + y) * scale,
+        ROCKET_ART.width * scale,
+        ROCKET_ART.height * scale,
+      );
+    }
+  ctx.globalCompositeOperation = "source-in";
+  ctx.fillStyle = "#101521";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.drawImage(
+    source,
+    scale,
+    scale,
+    ROCKET_ART.width * scale,
+    ROCKET_ART.height * scale,
+  );
+  scene.textures.addCanvas(ROCKET_RENDER.key, canvas);
+  return ROCKET_RENDER;
+}
 type Point = { x: number; y: number };
 export interface RocketPose {
   angle: number;
