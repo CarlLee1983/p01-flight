@@ -68,7 +68,8 @@ it.each([30, 60, 120])(
         times.push(m.time);
       }
       console.log("Boss burst audit", { fps, phase, totals, times });
-      expect(times[1]).toBeCloseTo(times[0]);
+      // Full four-pulse volleys wait for a complete stationary firing window.
+      expect(times.every((time) => time < 40)).toBe(true);
       expect(totals[1]).toBe(totals[0] * 4);
     }
   },

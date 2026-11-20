@@ -1,0 +1,29 @@
+{
+  "key": "hostile-missile-v2",
+  "path": "public/assets/original/hostile-missile-v2.webp",
+  "sourceBlob": "04fdbaaf01d5a0a4a57f1683dc120212105ee5a5",
+  "sourceSHA256": "4a3293272e1315cccccefb04968b98c3f1f031b81fddc5503f6cdc6c50cdf5b9",
+  "sha256": "4355583c43b9004183413d5b37a0de0344a963bb88c70711f2ab12bb166c952d",
+  "tool": "built-in image_gen",
+  "prompt": "Use case: stylized-concept. Asset type: one transparent top-down enemy missile sprite for a detailed 16-bit arcade vertical shooter. ONE small original mechanical missile, strict orthographic overhead, pointed warhead facing DOWN, engine nozzle UP. Slim ivory/silver metal body, dark navy edge outline, small swept steel fins near the rear, one burnt-orange hazard band and dark recesses. Chunky clean pixel clusters, readable at only 8 by 18 game pixels, coherent with textured 1990s military arcade aircraft. Strong complete silhouette, aspect around width1 height2.25, NOT a simple triangle or plain colored capsule. Keep details substantial and sparse, avoid microscopic decoration. No flame (animated exhaust will be attached separately), no smoke, no motion streak, no exterior shadow or glow, no background, no text or logo. Isolated complete unclipped object centered on genuinely transparent canvas with clear margins.",
+  "import": {
+    "alphaCutoffForBounds": 16,
+    "sourceBounds": [
+      164,
+      133,
+      672,
+      1742
+    ],
+    "pixels": [
+      32,
+      72
+    ],
+    "displayPixels": [
+      8,
+      18
+    ],
+    "headDirection": "down",
+    "flame": "runtime Graphics; not baked into the body"
+  },
+  "ownership": "Original generated game sprite; no external paid assets."
+}

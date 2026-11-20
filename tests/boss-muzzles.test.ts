@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { FlightModel } from "../src/game/model";
-import { bossMuzzle } from "../src/game/boss-muzzles";
+import { bossMuzzle, bossSideTargets } from "../src/game/boss-muzzles";
 import { stage01 } from "../src/data/stage";
 
 it.each([30, 60, 120])(
@@ -17,7 +17,7 @@ it.each([30, 60, 120])(
     const dt = 1 / fps;
     while (!m.boss?.attackWarning) m.update(dt);
     const boss = m.boss!;
-    const angles = [...boss.attackAngles];
+    const target = bossSideTargets(m.player.x, m.player.y, boss.attackCycle);
     let previous = 0;
     for (let frame = 0; frame < fps * 2 && m.emittedBossShots < 8; frame++) {
       m.update(dt);
@@ -26,11 +26,15 @@ it.each([30, 60, 120])(
       expect(fresh).toHaveLength(2);
       fresh.forEach((bullet, i) => {
         const muzzle = bossMuzzle(boss, i, 2);
-        expect(muzzle.x).toBeCloseTo(boss.x + (i === 0 ? -68 : 68));
-        expect(muzzle.y).toBeCloseTo(boss.y + 42);
+        const part = boss.cannons[i],
+          a = part.aimAngle ?? 0;
+        expect(muzzle.x).toBeCloseTo(part.x + Math.sin(a) * 22);
+        expect(muzzle.y).toBeCloseTo(part.y + Math.cos(a) * 22);
         expect(bullet.x - bullet.vx * dt).toBeCloseTo(muzzle.x);
         expect(bullet.y - bullet.vy * dt).toBeCloseTo(muzzle.y);
-        expect(Math.atan2(bullet.vx, bullet.vy)).toBeCloseTo(angles[i]);
+        expect(
+          muzzle.x + (bullet.vx / bullet.vy) * (target.y - muzzle.y),
+        ).toBeCloseTo(target.xs[i]);
       });
       previous = m.emittedBossShots;
     }
@@ -38,10 +42,8 @@ it.each([30, 60, 120])(
     boss.cannons[0].active = false;
     expect(bossMuzzle(boss, 0, 5).active).toBe(false);
     expect(bossMuzzle(boss, 4, 5).active).toBe(true);
-    expect(bossMuzzle(boss, 2, 5)).toMatchObject({
-      x: boss.x,
-      y: boss.y + 28,
-      active: true,
-    });
+    const core = bossMuzzle(boss, 2, 5);
+    expect(core.x).toBeCloseTo(boss.x - Math.sin(boss.roll ?? 0) * 28);
+    expect(core.y).toBeCloseTo(boss.y + Math.cos(boss.roll ?? 0) * 28);
   },
 );

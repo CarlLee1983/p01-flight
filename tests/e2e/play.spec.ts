@@ -314,7 +314,7 @@ test("corrupt save and blocked storage are safe", async ({ page }) => {
   await page.getByRole("button", { name: "開始飛行" }).click();
   expect((await state(page)).mode).toBe("playing");
 });
-test("browser closes and reopens with persisted settings and record", async () => {
+test("browser closes and reopens with persisted settings and record", async ({}, info) => {
   test.setTimeout(600000);
   const { chromium } = await import("@playwright/test");
   const { mkdtemp, rm } = await import("node:fs/promises");
@@ -323,6 +323,10 @@ test("browser closes and reopens with persisted settings and record", async () =
   let context = await chromium.launchPersistentContext(dir, {
     headless: true,
     executablePath: process.env.CHROMIUM_PATH,
+    recordVideo: {
+      dir: info.outputPath("persistence-video"),
+      size: { width: 500, height: 700 },
+    },
   });
   try {
     let page = await context.newPage();
@@ -341,9 +345,21 @@ test("browser closes and reopens with persisted settings and record", async () =
     await evadeUntil(page, BOSS_AT + 21);
     await page.keyboard.press("x");
     await expect.poll(async () => (await state(page)).bombs).toBe(0);
-    await expect
-      .poll(async () => (await state(page)).mode, { timeout: 45000 })
-      .toBe("won");
+    // Moving Bosses may survive the second bomb. Keep normal steering and
+    // fire active through the actual outcome, rather than parking for 45s.
+    // The original victory, score and closed-profile persistence assertions stay.
+    try {
+      await withKeyboardPilot(page, async () => {
+        await expect
+          .poll(async () => (await state(page)).mode, { timeout: 45000 })
+          .toBe("won");
+      });
+    } finally {
+      await info.attach("persistent-normal-outcome", {
+        body: JSON.stringify(await state(page)),
+        contentType: "application/json",
+      });
+    }
     const score = (await state(page)).score;
     await context.close();
     context = await chromium.launchPersistentContext(dir, {

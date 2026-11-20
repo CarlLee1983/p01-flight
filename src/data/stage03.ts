@@ -175,7 +175,7 @@ export function createStage03(seed: number): StageConfig {
         id: "boss",
         at: 155,
         title: "極地雷眼",
-        hint: "交替側掃、分散扇面與鎖定齊射",
+        hint: "擊破護甲供能環，趁核心開放反擊",
       },
     ],
     pickups: [
@@ -193,7 +193,7 @@ export function createStage03(seed: number): StageConfig {
     ],
     boss: {
       at: 155,
-      hp: 200,
+      hp: 320,
       sideCannonHp: 28,
       fireEvery: 1.2,
       bulletSpeed: 150,

@@ -1,9 +1,23 @@
+import {
+  ROCKET_ART,
+  ROCKET_RENDER,
+  createRocketTexture,
+  createRocketPose,
+  rocketPresentation,
+  drawRocketExhaust,
+} from "./game/hostile-rocket";
+import { drawBoss } from "./game/boss-presentation";
+import { bossRig, bossCoreState, bossArmourRemaining } from "./game/boss-rigs";
 import { keyboardEdge } from "./game/keyboard-event";
 import { NEXT_ASSETS, nextAssetStatus } from "./game/next-assets";
 import { isGroundRole, isNewAirRole, NEW_ENEMY_ART } from "./game/enemy-roles";
 import { bossVisual } from "./game/boss-visual";
 import { STAGE_CATALOG, stageDetails, stageConfig } from "./game/stage-catalog";
-import { METAL_SPRITES, METAL_EXHAUST, readMetalSpriteStatus } from "./game/metal-sprites";
+import {
+  METAL_SPRITES,
+  METAL_EXHAUST,
+  readMetalSpriteStatus,
+} from "./game/metal-sprites";
 import { enemyMount, enemyBank } from "./game/enemy-mounts";
 import {
   configureTextureBatch,
@@ -22,10 +36,9 @@ import { createCannonTextures } from "./game/cannon-art";
 import {
   shouldFlashBody,
   bossChargeSources,
-  CANNON_ART,
   PRESENTATION_LAYERS,
 } from "./game/combat-presentation";
-import { groundMuzzle, BOSS_BODY } from "./game/hostile-visuals";
+import { groundMuzzle } from "./game/hostile-visuals";
 import Phaser from "phaser";
 import {
   stageUnlocked,
@@ -70,11 +83,14 @@ let label: Phaser.GameObjects.Text;
 let overlay: Phaser.GameObjects.Graphics;
 let impacts: Phaser.GameObjects.Graphics;
 let renderedImpactPrimitives = 0;
+let renderedHostileMissiles = 0;
+let renderedHostileMissileQuads = 0;
 
 let hud: Phaser.GameObjects.Graphics;
 let readCombatLayer = () => 0;
 let readPickupNotice = (): string | null => null;
-let readPickupBounds = (): {x: number; y: number; bottom: number} | null => null;
+let readPickupBounds = (): { x: number; y: number; bottom: number } | null =>
+  null;
 let readBackgroundInfo: () => Record<string, unknown> = () => ({});
 const renderMetrics = new RenderMetrics();
 let frameCount = 0,
@@ -96,7 +112,7 @@ function bindTouchAction(id: string, action: () => void) {
 function start(fresh = false) {
   if (!stageUnlocked(selectedStage, saves.data)) return;
   if (fresh) stageSeed = pinnedSeed ?? newStageSeed();
-  model.stage = stageConfig(selectedStage,stageSeed);
+  model.stage = stageConfig(selectedStage, stageSeed);
   touch.cancel();
   void audio.unlock();
   previous = { shots: 0, kills: 0, hurt: 0, pickup: 0, phase: 0, parts: 0 };
@@ -141,9 +157,9 @@ function renderPanel() {
     ? `<p class="notice" role="status">${saves.warning}</p>`
     : "";
   if (model.mode === "menu")
-    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / ${stageNumber}</p><h2>${stageDetails(selectedStage).title}</h2><p class="brief">${stageDetails(selectedStage).brief}</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><label>選擇關卡<select id="stage-select">${STAGE_CATALOG.map(stage=>`<option value="${stage.id}" ${selectedStage===stage.id?"selected":""} ${stageUnlocked(stage.id,saves.data)?"":"disabled"}>Stage ${stage.number} ${stage.title}${stageUnlocked(stage.id,saves.data)?"":"（前關通關後解鎖）"}</option>`).join("")}</select></label><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">授權街機配樂與原創音效，Boss 戰切換戰鬥曲。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
+    panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / ${stageNumber}</p><h2>${stageDetails(selectedStage).title}</h2><p class="brief">${stageDetails(selectedStage).brief}</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><label>選擇關卡<select id="stage-select">${STAGE_CATALOG.map((stage) => `<option value="${stage.id}" ${selectedStage === stage.id ? "selected" : ""} ${stageUnlocked(stage.id, saves.data) ? "" : "disabled"}>Stage ${stage.number} ${stage.title}${stageUnlocked(stage.id, saves.data) ? "" : "（前關通關後解鎖）"}</option>`).join("")}</select></label><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">授權街機配樂與原創音效，Boss 戰切換戰鬥曲。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目兩側砲座可分別擊破，減少該側彈幕；核心始終可直接攻擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目武器可分別擊破：指揮艦翼炮、河艦甲板炮、雷眼護甲環。留意充能後移位，河艦艦尾艦橋是弱點；雷眼須先破護甲，再趁核心開放反擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
     panel.innerHTML = `<h2>${model.mode === "won" ? `Stage ${stageNumber} 通關` : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${model.stage.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p>${model.mode === "won" && nextStage(selectedStage) ? `<button id="next-stage">前往 Stage ${stageDetails(nextStage(selectedStage)!).number}</button>` : ""}<button id="retry">再飛一次</button>${selectedStage !== "stage-01" ? '<button id="new-sortie" class="secondary">重新編隊出擊</button>' : ""}<button id="menu" class="secondary">返回標題</button>${warning}`;
   document
@@ -152,11 +168,12 @@ function renderPanel() {
       const id = (event.target as HTMLSelectElement).value as StageId;
       if (!stageUnlocked(id, saves.data)) return;
       selectedStage = id;
-      model.stage = stageConfig(id,stageSeed);
+      model.stage = stageConfig(id, stageSeed);
       renderPanel();
     });
   document.querySelector("#next-stage")?.addEventListener("click", () => {
-    const next=nextStage(selectedStage);if(!next)return;
+    const next = nextStage(selectedStage);
+    if (!next) return;
     selectedStage = next;
     start(true);
   });
@@ -249,7 +266,11 @@ class FlightScene extends Phaser.Scene {
   visuals: Phaser.GameObjects.Image[] = [];
   visualIndex = 0;
   preload() {
-    for (const key of NEXT_ASSETS) this.load.image(key,import.meta.env.BASE_URL + "assets/original/" + key + ".webp");
+    for (const key of NEXT_ASSETS)
+      this.load.image(
+        key,
+        import.meta.env.BASE_URL + "assets/original/" + key + ".webp",
+      );
     for (const sprite of METAL_SPRITES)
       this.load.image(sprite.key, import.meta.env.BASE_URL + sprite.path);
     for (const file of [
@@ -273,8 +294,14 @@ class FlightScene extends Phaser.Scene {
         import.meta.env.BASE_URL + "assets/original/" + file + ".png",
       );
     for (const kind of ["river", "bridge", "mine", "dam", "reservoir"])
-      this.load.image("canyon-" + kind, import.meta.env.BASE_URL + "assets/original/canyon-" + kind + ".webp");
-    this.load.image("river-supply-barge", import.meta.env.BASE_URL + "assets/original/river-supply-barge.webp");
+      this.load.image(
+        "canyon-" + kind,
+        import.meta.env.BASE_URL + "assets/original/canyon-" + kind + ".webp",
+      );
+    this.load.image(
+      "river-supply-barge",
+      import.meta.env.BASE_URL + "assets/original/river-supply-barge.webp",
+    );
     for (const file of [
       "playerShip1_blue",
       "enemyRed1",
@@ -286,6 +313,9 @@ class FlightScene extends Phaser.Scene {
         `${import.meta.env.BASE_URL}assets/kenney/${file}.png`,
       );
   }
+  private rocketPose = createRocketPose();
+  private rocketArt: { key: string; width: number; height: number } =
+    ROCKET_ART;
   private presentedHits = new WeakMap<object, number>();
   sprite(
     key: string,
@@ -341,7 +371,11 @@ class FlightScene extends Phaser.Scene {
     );
     this.canyon = new CanyonBackground(this);
     readBackgroundInfo = () =>
-      selectedStage === "stage-01" ? this.background.diagnostics() : selectedStage === "stage-02" ? this.canyon.diagnostics() : this.polar?.diagnostics() ?? {theme:"polar",artReady:false};
+      selectedStage === "stage-01"
+        ? this.background.diagnostics()
+        : selectedStage === "stage-02"
+          ? this.canyon.diagnostics()
+          : (this.polar?.diagnostics() ?? { theme: "polar", artReady: false });
     readCombatLayer = () =>
       Math.max(
         3,
@@ -353,6 +387,7 @@ class FlightScene extends Phaser.Scene {
     createPickupLabelTextures(this);
     createCannonTextures(this);
     createEnemyModuleTextures(this);
+    this.rocketArt = createRocketTexture(this);
     createRaiderTextures(this);
     this.pickupNotice = this.add
       .text(180, 90, "", {
@@ -380,12 +415,12 @@ class FlightScene extends Phaser.Scene {
     readPickupBounds = () => {
       if (!this.pickupNotice.visible) return null;
       const b = this.pickupNotice.getBounds();
-      return {x: b.x, y: b.y, bottom: b.bottom};
+      return { x: b.x, y: b.y, bottom: b.bottom };
     };
     this.bossAdvice = this.add
       .text(180, 600, "", {
         fontFamily: "monospace",
-        fontSize: "11px",
+        fontSize: "13px",
         color: "#ffc69f",
         align: "center",
         backgroundColor: "#102935dd",
@@ -412,22 +447,34 @@ class FlightScene extends Phaser.Scene {
     this.input.keyboard!.disableGlobalCapture();
     // Handle edge-triggered actions on keydown so a press released between
     // render frames is not lost. Ignore OS key-repeat to avoid pause toggles.
-    this.input.keyboard!.on("keydown-P", keyboardEdge<KeyboardEvent>(() => {
-      model.pause();
-      renderPanel();
-    }));
-    this.input.keyboard!.on("keydown-ENTER", keyboardEdge<KeyboardEvent>(() => {
-      if (["menu", "won", "lost"].includes(model.mode)) start();
-    }));
-    this.input.keyboard!.on("keydown-C", keyboardEdge<KeyboardEvent>(() => {
-      if (model.switchWeapon()) audio.play("power");
-    }));
-    this.input.keyboard!.on("keydown-X", keyboardEdge<KeyboardEvent>(() => {
-      if (model.useBomb()) {
-        audio.play("bomb");
-        this.cameras.main.shake(180, 0.008);
-      }
-    }));
+    this.input.keyboard!.on(
+      "keydown-P",
+      keyboardEdge<KeyboardEvent>(() => {
+        model.pause();
+        renderPanel();
+      }),
+    );
+    this.input.keyboard!.on(
+      "keydown-ENTER",
+      keyboardEdge<KeyboardEvent>(() => {
+        if (["menu", "won", "lost"].includes(model.mode)) start();
+      }),
+    );
+    this.input.keyboard!.on(
+      "keydown-C",
+      keyboardEdge<KeyboardEvent>(() => {
+        if (model.switchWeapon()) audio.play("power");
+      }),
+    );
+    this.input.keyboard!.on(
+      "keydown-X",
+      keyboardEdge<KeyboardEvent>(() => {
+        if (model.useBomb()) {
+          audio.play("bomb");
+          this.cameras.main.shake(180, 0.008);
+        }
+      }),
+    );
     const canvas = this.game.canvas;
     const clearTouch = () => touch.cancel();
     canvas.addEventListener("pointerdown", (event) => {
@@ -658,7 +705,7 @@ class FlightScene extends Phaser.Scene {
       this.sectionNotice
         .setVisible(true)
         .setText(
-          `${stageDetails(selectedStage).boss}接近 · ${Math.ceil((model.stage.boss?.at ?? 0) - model.time)}\n保留炸彈，留意兩側砲座`,
+          `${stageDetails(selectedStage).boss}接近 · ${Math.ceil((model.stage.boss?.at ?? 0) - model.time)}\n保留炸彈，留意${bossRig(model.stage.boss?.skin).partLabel}`,
         );
     }
     this.bossAdvice.setVisible(
@@ -667,9 +714,16 @@ class FlightScene extends Phaser.Scene {
     this.bossAdvice.setText(
       patrol
         ? "留意炮口充能 · 移位後追擊巡邏艦"
-        : model.boss?.cannons.some((c) => c.active)
-          ? "擊破側炮可減少彈幕 · 核心可直接攻擊"
-          : "側炮全毀 · 集中攻擊核心",
+        : model.boss?.skin === "polarRadar" &&
+            bossCoreState(model.boss) !== "open"
+          ? bossCoreState(model.boss) === "armored"
+            ? `核心防護中 · 本階段再擊破${bossArmourRemaining(model.boss)}片護甲`
+            : "核心換位封閉 · 留意護甲充能"
+          : model.boss?.cannons.some((c) => c.active)
+            ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
+            : model.boss?.skin === "riverFortress"
+              ? "甲板炮已毀 · 避開船首火力，攻擊艦橋"
+              : `${bossRig(model.boss?.skin).partLabel}已毀 · 集中攻擊核心`,
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
 
@@ -677,6 +731,8 @@ class FlightScene extends Phaser.Scene {
     overlay.clear();
     impacts.clear();
     renderedImpactPrimitives = 0;
+    renderedHostileMissiles = 0;
+    renderedHostileMissileQuads = 0;
     hud.clear();
     for (const item of this.coastalObjects) {
       if ("setVisible" in item)
@@ -685,7 +741,8 @@ class FlightScene extends Phaser.Scene {
         );
     }
     this.canyon.update(model.time, selectedStage === "stage-02");
-    if (selectedStage === "stage-03" && !this.polar) this.polar = new CanyonBackground(this,"polar");
+    if (selectedStage === "stage-03" && !this.polar)
+      this.polar = new CanyonBackground(this, "polar");
     this.polar?.update(model.time, selectedStage === "stage-03");
     if (selectedStage === "stage-01")
       this.background.update(
@@ -743,8 +800,7 @@ class FlightScene extends Phaser.Scene {
         }
       for (const e of model.enemies)
         if (e.active) {
-          const grounded =
-            isGroundRole(e.behavior);
+          const grounded = isGroundRole(e.behavior);
           graphics.fillStyle(0x04131e, grounded ? 0.35 : 0.22);
           graphics.fillEllipse(
             e.x + (grounded ? 5 : 12),
@@ -753,8 +809,13 @@ class FlightScene extends Phaser.Scene {
             grounded ? 40 : 20,
           );
           if (isNewAirRole(e.behavior)) {
-            const art=NEW_ENEMY_ART[e.behavior];this.sprite(art.key,e.x,e.y,art.width,art.height,1,0,e);
-            if((e.telegraph??0)>0){const socket=enemyMount(e);overlay.fillStyle(0xffd18b,.8);overlay.fillCircle(socket.x,socket.y,3);}
+            const art = NEW_ENEMY_ART[e.behavior];
+            this.sprite(art.key, e.x, e.y, art.width, art.height, 1, 0, e);
+            if ((e.telegraph ?? 0) > 0) {
+              const socket = enemyMount(e);
+              overlay.fillStyle(0xffd18b, 0.8);
+              overlay.fillCircle(socket.x, socket.y, 3);
+            }
             continue;
           }
           if (e.behavior === "gatekeeper") {
@@ -792,13 +853,47 @@ class FlightScene extends Phaser.Scene {
           }
           if (isGroundRole(e.behavior)) {
             if (e.behavior === "groundDepot") {
-              if (selectedStage === "stage-03" && e.groundSurface !== "water") this.sprite("missile-truck-base",e.x,e.y,72,72,1,0,e).setDepth(0);
-              else this.sprite(selectedStage !== "stage-01" ? "river-supply-barge" : "ground-depot", e.x, e.y, 70, 48, 1, 0, e).setDepth(0);
+              if (selectedStage === "stage-03" && e.groundSurface !== "water")
+                this.sprite(
+                  "missile-truck-base",
+                  e.x,
+                  e.y,
+                  72,
+                  72,
+                  1,
+                  0,
+                  e,
+                ).setDepth(0);
+              else
+                this.sprite(
+                  selectedStage !== "stage-01"
+                    ? "river-supply-barge"
+                    : "ground-depot",
+                  e.x,
+                  e.y,
+                  70,
+                  48,
+                  1,
+                  0,
+                  e,
+                ).setDepth(0);
             } else {
-              this.sprite(e.behavior === "missileTruck" ? "missile-truck-base" : "ground-base", e.x, e.y, 72, 72).setDepth(0);
+              this.sprite(
+                e.behavior === "missileTruck"
+                  ? "missile-truck-base"
+                  : "ground-base",
+                e.x,
+                e.y,
+                72,
+                72,
+              ).setDepth(0);
               // Texture is down-facing; Phaser clockwise rotation is opposite our aim-from-down axis.
               this.sprite(
-                e.behavior === "missileTruck" ? "missile-truck-head" : e.behavior === "flakBattery" ? "flak-head" : "ground-turret",
+                e.behavior === "missileTruck"
+                  ? "missile-truck-head"
+                  : e.behavior === "flakBattery"
+                    ? "flak-head"
+                    : "ground-turret",
                 e.x,
                 e.y,
                 48,
@@ -935,25 +1030,40 @@ class FlightScene extends Phaser.Scene {
             dy = shot.vy / speed;
           const style = shot.visual ?? "needle";
           const color =
-            style === "rocket" ? 0xb2df73 : style === "plasma"
-              ? 0xd78dff
-              : style === "shell"
-                ? 0xffbc69
-                : 0xff6d91;
-          // Short, bounded afterimage; collision remains the existing model radius.
-          overlay.lineStyle(3, color, 0.32);
-          overlay.lineBetween(
-            shot.x - dx * 10,
-            shot.y - dy * 10,
-            shot.x,
-            shot.y,
-          );
+            style === "rocket"
+              ? 0xffb66f
+              : style === "plasma"
+                ? 0xd78dff
+                : style === "shell"
+                  ? 0xffbc69
+                  : 0xff6d91;
+          if (style !== "rocket") {
+            // Short, bounded afterimage; collision remains the existing model radius.
+            overlay.lineStyle(3, color, 0.32);
+            overlay.lineBetween(
+              shot.x - dx * 10,
+              shot.y - dy * 10,
+              shot.x,
+              shot.y,
+            );
+          }
           overlay.fillStyle(color);
           overlay.lineStyle(1.5, 0xfff2e2);
           if (style === "rocket") {
-            overlay.lineStyle(4,0x8eb55a);overlay.lineBetween(shot.x-dx*4,shot.y-dy*4,shot.x+dx*4,shot.y+dy*4);
-            overlay.fillStyle(0xfff0c0);overlay.fillTriangle(shot.x+dx*8,shot.y+dy*8,shot.x+dy*3,shot.y-dx*3,shot.x-dy*3,shot.y+dx*3);
-            overlay.lineStyle(2,0xff9b51,.85);overlay.lineBetween(shot.x-dx*7,shot.y-dy*7,shot.x-dx*12,shot.y-dy*12);
+            const pose = rocketPresentation(shot, model.time, this.rocketPose);
+            const beforeQuads = this.visualIndex;
+            this.sprite(
+              this.rocketArt.key,
+              shot.x,
+              shot.y,
+              this.rocketArt.width,
+              this.rocketArt.height,
+              1,
+              pose.angle,
+            ).setDepth(PRESENTATION_LAYERS.projectiles + 0.01);
+            renderedHostileMissileQuads += this.visualIndex - beforeQuads;
+            drawRocketExhaust(overlay, pose);
+            renderedHostileMissiles++;
           } else if (style === "needle") {
             overlay.fillTriangle(
               shot.x + dx * 6,
@@ -1054,92 +1164,8 @@ class FlightScene extends Phaser.Scene {
           Math.min(620, model.player.y + 20),
         );
       }
-      if (model.boss?.active) {
-        this.sprite(
-          "boss-support",
-          model.boss.x,
-          model.boss.y,
-          184,
-          100,
-        ).setDepth(0.8);
-        this.sprite(
-          bossVisual(model.stage.boss?.skin).key,
-          model.boss.x,
-          model.boss.y,
-          BOSS_BODY.width,
-          BOSS_BODY.height,
-          1,
-          Math.sin(model.time * 1.8) * BOSS_BODY.bankDegrees * bossVisual(model.stage.boss?.skin).bank,
-          model.boss,
-        );
-        for (const cannon of model.boss.cannons) {
-          this.sprite(
-            cannon.active ? "boss-cannon" : "boss-cannon-broken",
-            cannon.x,
-            cannon.y,
-            CANNON_ART.width,
-            CANNON_ART.height,
-            1,
-            0,
-            cannon,
-          ).setDepth(2);
-          if (cannon.active) {
-            overlay.fillStyle(0x182630);
-            overlay.fillRect(cannon.x - 12, cannon.y - 24, 24, 2);
-            overlay.fillStyle(0xffc779);
-            overlay.fillRect(
-              cannon.x - 12,
-              cannon.y - 24,
-              (24 * cannon.hp) / cannon.maxHp,
-              2,
-            );
-          } else {
-            overlay.fillStyle(0xe28c59, 0.45 + Math.sin(model.time * 9) * 0.15);
-            overlay.fillCircle(cannon.x, cannon.y + 4, 1.5);
-          }
-        }
-        if (model.boss.attackWarning > 0) {
-          // Three centre rays are one charging reactor, not three stacked rings.
-          for (const source of bossChargeSources(model.boss)) {
-            overlay.fillStyle(0xffd179, 0.85);
-            overlay.fillCircle(source.x, source.y, 3);
-            overlay.lineStyle(1.5, 0xffd179, 0.9);
-            overlay.lineBetween(
-              source.x - 6,
-              source.y + 2,
-              source.x - 3,
-              source.y + 6,
-            );
-            overlay.lineBetween(
-              source.x + 6,
-              source.y + 2,
-              source.x + 3,
-              source.y + 6,
-            );
-          }
-        }
-        // Reactor pulses convey phase escalation without altering collision bounds.
-        overlay.fillStyle(model.boss.phase === 3 ? 0xff805a : 0xffbf73, 0.6);
-        overlay.fillCircle(
-          model.boss.x,
-          model.boss.y + 24,
-          3 + Math.sin(model.time * 12),
-        );
-        if (model.boss.telegraph > 0) {
-          // Phase transition brackets sit outside the hull instead of covering it.
-          overlay.lineStyle(2, 0xffd179, 0.85);
-          for (const side of [-1, 1]) {
-            const x = model.boss.x + side * 88;
-            overlay.lineBetween(x, model.boss.y - 18, x, model.boss.y + 12);
-            overlay.lineBetween(
-              x,
-              model.boss.y - 18,
-              x - side * 8,
-              model.boss.y - 18,
-            );
-          }
-        }
-      }
+      if (model.boss?.active)
+        drawBoss(model.boss, this.sprite.bind(this), overlay, model.time);
       for (const drone of model.supportDrones) {
         this.sprite("player", drone.x, drone.y, 22, 22, 0.95);
         this.sprite("fire03", drone.x, drone.y + 16, 5, 11, 0.85, 180);
@@ -1398,7 +1424,21 @@ Object.defineProperty(window, "__P01__", {
     background: readBackgroundInfo(),
     metalSprites: readMetalSpriteStatus(game.textures),
     nextAssets: nextAssetStatus(game.textures),
-    bossPresentation: bossVisual(model.stage.boss?.skin),
+    hostileMissiles: {
+      textureKey: game.textures.exists(ROCKET_RENDER.key)
+        ? ROCKET_RENDER.key
+        : ROCKET_ART.key,
+      sourceTextureKey: ROCKET_ART.key,
+      cacheReady: game.textures.exists(ROCKET_RENDER.key),
+      rendered: renderedHostileMissiles,
+      renderedQuads: renderedHostileMissileQuads,
+      bodyPixels: [ROCKET_ART.width, ROCKET_ART.height],
+    },
+    bossPresentation: {
+      ...bossVisual(model.stage.boss?.skin),
+      coreState: model.boss ? bossCoreState(model.boss) : null,
+      remainingArmour: model.boss ? bossArmourRemaining(model.boss) : 0,
+    },
     renderer: {
       type: game.renderer.type,
       batchSize: game.config.batchSize,

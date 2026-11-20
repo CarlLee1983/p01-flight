@@ -46,6 +46,8 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
   await page.keyboard.down("Space");
   const roleFrames: {role: string; id: number; requestedGameTime: number; completedGameTime: number; file: string}[] = [];
   const photographed = new Set<string>();
+  const bossPhases=new Set<number>();
+  const bossPhaseFrames: unknown[]=[];
   let first = false,
     second = false,
     observingBossEntry = false,
@@ -59,6 +61,12 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     const deadline = Date.now() + 550000;
     while (Date.now() < deadline) {
       const s = await state(page);
+      if(s.boss?.active&&s.boss.motion?.entered&&!bossPhases.has(s.boss.phase)){
+        bossPhases.add(s.boss.phase);
+        await captureStage02Frame(page,`stage02-boss-phase${s.boss.phase}`);
+        const after=await state(page);
+        bossPhaseFrames.push({requested:{time:s.time,phase:s.boss.phase},completed:{time:after.time,phase:after.boss?.phase}});
+      }
       if (s.mode !== "playing") {
         expect(s.mode).toBe("won");
         break;
@@ -77,7 +85,7 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
         observingBossEntry = true;
       }
       if (s.time >= 146.8 && s.boss?.active && !bossCaptured) {
-        expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(2);
+        expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(3);
         bossCaptured = true;
         // The parallel keyboard pilot continues ordinary steering during captures.
         await captureStage02Frame(page, "stage02-boss-desktop");
@@ -129,6 +137,8 @@ test("Stage02 canyon, normal keyboard clear, retry seed and persisted record", a
     .toBe("won");
   const done = await state(page);
   expect(done.bossDefeated).toBe(true);
+  expect([...bossPhases].sort()).toEqual([1,2,3]);
+  await testInfo.attach('stage02-boss-phase-frames',{body:JSON.stringify(bossPhaseFrames,null,2),contentType:'application/json'});
   expect(brokenCaptured, "damaged Boss pods were captured during normal combat").toBe(true);
   const presentation = done.renderMetrics.presentationCoverage;
   for (const role of ["straight", "weave", "cross", "brakeRaider", "hookWing", "carrier", "groundBattery", "groundDepot", "gatekeeper", "outrider", "bomber", "missileTruck", "flakBattery"]) expect(presentation[role]?.visible, role + " actually appeared").toBeTruthy();
@@ -326,7 +336,7 @@ test("Stage02 full CDP touch sortie clears and preserves its result", async ({},
         if (after.mode === "won") break;
       }
       const hullHazards = visibleHulls.observe(s.time, s.activeEnemies);
-      const next = chooseTouchTarget({...s, hostileProjectiles: [...s.hostileProjectiles, ...hullHazards]}, target, budget);
+      const next = chooseTouchTarget({...s, hostileProjectiles: [...s.hostileProjectiles, ...hullHazards]}, target, budget, s.boss?.active?s.boss.x:undefined);
       const changed = Math.abs(next - target) > 1;
       target = next;
       anchor.x = box.x + box.width / 2 + ((target - 180) * box.width) / 360;
