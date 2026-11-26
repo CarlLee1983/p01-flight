@@ -1,3 +1,4 @@
+import { bossAimGoal } from "../boss-counterplay";
 import { test, expect, chromium } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -103,6 +104,7 @@ test("polar front completes with CDP touch, rotates and retains records after br
           { ...s, hostileProjectiles: [...s.hostileProjectiles, ...hazards] },
           target,
           budget,
+          bossAimGoal(s.boss, s.player.x),
         ),
         changed = Math.abs(next - target) > 1;
       target = next;

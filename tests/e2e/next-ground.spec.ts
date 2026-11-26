@@ -31,6 +31,45 @@ test("mobile missile vehicle and flak emplacement rotate, fire and are destroyed
     const target = snapshot.activeEnemies.find((e: any) => e.behavior === role);
     expect(target).toBeTruthy();
     expect(target.shotsFired).toBeGreaterThan(0);
+    if (role === "missileTruck") {
+      await withKeyboardPilot(
+        page,
+        () =>
+          expect
+            .poll(async () => (await state(page)).hostileMissiles.rendered, {
+              timeout: 5000,
+            })
+            .toBeGreaterThan(0),
+        undefined,
+        true,
+      );
+      const observed = await state(page);
+      expect(observed.hostileMissiles).toMatchObject({
+        cacheReady: true,
+        textureKey: "hostile-missile-outlined",
+        sourceTextureKey: "hostile-missile-v3",
+        bodyPixels: [11, 26],
+      });
+      expect(observed.hostileMissiles.renderedQuads).toBe(
+        observed.hostileMissiles.rendered,
+      );
+      expect(
+        observed.nextAssets.find((a: any) => a.key === "hostile-missile-v3"),
+      ).toMatchObject({ ready: true, bitmap: true });
+      await withKeyboardPilot(
+        page,
+        () => captureStage02Frame(page, "stage03-missile-sprite-flight"),
+        undefined,
+        true,
+      );
+      await info.attach("missile-sprite-resource", {
+        body: JSON.stringify({
+          time: observed.time,
+          missiles: observed.hostileMissiles,
+        }),
+        contentType: "application/json",
+      });
+    }
     const id = target.id,
       angle = target.turretAngle;
     await withKeyboardPilot(
@@ -43,17 +82,29 @@ test("mobile missile vehicle and flak emplacement rotate, fire and are destroyed
     // truck pass the player's firing line. Move a real 60px, usually toward
     // the observed gun, then counterattack while returning to its lane.
     const playerX = (await state(page)).player.x;
-    const direction = Math.abs(target.x - playerX) > 60
-      ? Math.sign(target.x - playerX) : (playerX < 180 ? 1 : -1);
+    const direction =
+      Math.abs(target.x - playerX) > 60
+        ? Math.sign(target.x - playerX)
+        : playerX < 180
+          ? 1
+          : -1;
     const turnGoal = Math.max(40, Math.min(320, playerX + direction * 60));
     await keyboardMoveTo(page, turnGoal, 16);
     await withKeyboardPilot(
       page,
-      () => expect.poll(async () => {
-        const current = (await state(page)).activeEnemies.find((e: any) => e.id === id);
-        expect(current).toBeTruthy();
-        return Math.abs(current.turretAngle - angle);
-      }, { timeout: 5000, intervals: [40] }).toBeGreaterThan(0.02),
+      () =>
+        expect
+          .poll(
+            async () => {
+              const current = (await state(page)).activeEnemies.find(
+                (e: any) => e.id === id,
+              );
+              expect(current).toBeTruthy();
+              return Math.abs(current.turretAngle - angle);
+            },
+            { timeout: 5000, intervals: [40] },
+          )
+          .toBeGreaterThan(0.02),
       turnGoal,
       true,
     );
@@ -70,22 +121,44 @@ test("mobile missile vehicle and flak emplacement rotate, fire and are destroyed
       page,
       async () => {
         try {
-          await expect.poll(async () => {
-            const observed = await state(page);
-            const actor = observed.activeEnemies.find((e: any) => e.id === id);
-            if (observed.time - lastRecorded >= 0.25) {
-              combatTrace.push({time: observed.time, player: observed.player,
-                hp: observed.hp, actor: actor ?? null});
-              if (combatTrace.length > 160) combatTrace.shift();
-              lastRecorded = observed.time;
-            }
-            return observed.renderMetrics.presentationCoverage[role]?.destroyed;
-          }, {timeout:35000, intervals:[40]}).toBeTruthy();
+          await expect
+            .poll(
+              async () => {
+                const observed = await state(page);
+                const actor = observed.activeEnemies.find(
+                  (e: any) => e.id === id,
+                );
+                if (observed.time - lastRecorded >= 0.25) {
+                  combatTrace.push({
+                    time: observed.time,
+                    player: observed.player,
+                    hp: observed.hp,
+                    actor: actor ?? null,
+                  });
+                  if (combatTrace.length > 160) combatTrace.shift();
+                  lastRecorded = observed.time;
+                }
+                return observed.renderMetrics.presentationCoverage[role]
+                  ?.destroyed;
+              },
+              { timeout: 35000, intervals: [40] },
+            )
+            .toBeTruthy();
         } finally {
           await info.attach(`${role}-bounded-counterattack-trace`, {
-            body: JSON.stringify({id, playerX, turnGoal, angle,
-              turnedAngle:turned.turretAngle, combatTrace}, null, 2),
-            contentType:"application/json",
+            body: JSON.stringify(
+              {
+                id,
+                playerX,
+                turnGoal,
+                angle,
+                turnedAngle: turned.turretAngle,
+                combatTrace,
+              },
+              null,
+              2,
+            ),
+            contentType: "application/json",
           });
         }
         await captureStage02Frame(page, `stage03-${role}-destroyed`);

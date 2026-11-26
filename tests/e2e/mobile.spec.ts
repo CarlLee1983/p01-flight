@@ -241,7 +241,7 @@ test("Stage 01 can clear entirely through touch and preserves the record", async
         s,
         previousTarget,
         deliveryBudget,
-        goalX,
+        goalX ?? (s.boss?.active ? s.boss.x : undefined),
       );
       const targetChanged = Math.abs(target - previousTarget) > 1;
       previousTarget = target;

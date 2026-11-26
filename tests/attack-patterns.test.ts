@@ -110,6 +110,7 @@ describe.each([30, 60, 120])("readable attack contracts at %i FPS", (fps) => {
       expect(boss.attackWarning).toBeGreaterThan(0);
       const planned = [...boss.attackAngles];
       expect(planned.length).toBe(phase === 1 ? 2 : phase === 2 ? 5 : 3);
+      const plans = boss.attackPlan!.map((ray) => ({ ...ray }));
       const cycle = boss.attackCycle;
       const warning = boss.attackWarning;
       expect(warning).toBeGreaterThan(0.6);
@@ -126,10 +127,16 @@ describe.each([30, 60, 120])("readable attack contracts at %i FPS", (fps) => {
         m.update(1 / fps);
       expect(boss.attackCycle).toBe(cycle + 1);
       const shots = m.enemyBullets.filter((b) => b.active);
-      expect(shots).toHaveLength(planned.length - 1);
-      shots.forEach((bullet, j) =>
-        expect(Math.atan2(bullet.vx, bullet.vy)).toBeCloseTo(planned[j + 1]),
-      );
+      const surviving = plans.filter((ray) => ray.mount !== 0);
+      expect(shots).toHaveLength(surviving.length);
+      shots.forEach((bullet, j) => {
+        const ray = surviving[j];
+        if (ray.target)
+          expect(
+            bullet.x + (bullet.vx / bullet.vy) * (ray.target.y - bullet.y),
+          ).toBeCloseTo(ray.target.x);
+        else expect(Math.atan2(bullet.vx, bullet.vy)).toBeCloseTo(ray.angle);
+      });
       expect(boss.attackWarning).toBe(0);
       expect(boss.attackAngles).toEqual([]);
       m.start();

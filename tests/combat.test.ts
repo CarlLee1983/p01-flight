@@ -156,10 +156,12 @@ describe("combat increment", () => {
     m.bullets.push({ id: 2, x: 50, y: 200, active: true });
     m.update(0);
     expect(m.pickups).toHaveLength(1);
-    m.boss!.y = 100;
+    m.boss!.age = 2.1;
+    m.update(0);
+    const hitY = m.boss!.y;
     m.bullets.push(
-      { id: 3, x: 180, y: 100, active: true },
-      { id: 4, x: 180, y: 100, active: true },
+      { id: 3, x: 180, y: hitY, active: true },
+      { id: 4, x: 180, y: hitY, active: true },
     );
     m.update(0);
     expect(m.mode).toBe("won");
@@ -283,13 +285,17 @@ describe("weapon and encounter progression", () => {
     expect(m.enemyBullets.every((b) => !b.active)).toBe(true);
     run(m, 1);
     expect(m.enemyBullets.every((b) => !b.active)).toBe(true);
-    run(m, 0.7);
+    const beforePhase2 = m.emittedBossShots;
+    for (let i = 0; i < 120 && m.emittedBossShots === beforePhase2; i++)
+      m.update(1 / 60);
     expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(5);
     m.boss!.hp = 50;
     m.update(0);
     expect(m.boss!.phase).toBe(3);
     expect(m.boss!.telegraph).toBe(1.2);
-    run(m, 1.7);
+    const beforePhase3 = m.emittedBossShots;
+    for (let i = 0; i < 8 * 60 && m.emittedBossShots === beforePhase3; i++)
+      m.update(1 / 60);
     expect(m.enemyBullets.filter((b) => b.active)).toHaveLength(3);
   });
   it("formations are ordered, distinct, with a quiet supply window before boss", () => {
@@ -839,8 +845,12 @@ describe("encounter sections and breakable cannons", () => {
       const boss = m.boss!,
         left = boss.cannons[0],
         right = boss.cannons[1];
-      expect(left.x).toBeCloseTo(boss.x - 68);
-      expect(right.x).toBeCloseTo(boss.x + 68);
+      expect(left.x).toBeCloseTo(
+        boss.x - 68 * Math.cos(boss.roll ?? 0) - 20 * Math.sin(boss.roll ?? 0),
+      );
+      expect(right.x).toBeCloseTo(
+        boss.x + 68 * Math.cos(boss.roll ?? 0) - 20 * Math.sin(boss.roll ?? 0),
+      );
       m.bullets.push({
         id: 900,
         x: left.x,
@@ -859,7 +869,8 @@ describe("encounter sections and breakable cannons", () => {
       const before = m.enemyBullets.filter((b) => b.active).length;
       boss.telegraph = 0;
       boss.fireCooldown = 0;
-      m.update(0);
+      for (let i = 0; i < fps * 2 && m.emittedBossShots === 0; i++)
+        m.update(1 / fps);
       expect(m.enemyBullets.filter((b) => b.active).length - before).toBe(1);
       m.bullets.push({
         id: 901,

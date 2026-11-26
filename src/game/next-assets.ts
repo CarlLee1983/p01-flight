@@ -1,6 +1,15 @@
+export const COMBAT_VECTOR_ASSETS = [
+  "hostile-missile-v3",
+  "boss-polar-reactor",
+  "boss-polar-hinge",
+] as const;
 export const NEXT_ASSETS = [
-  "boss-canyon",
-  "boss-polar",
+  "boss-river-hull-v2",
+  "boss-river-turret-v2",
+  "boss-river-turret-wreck-v2",
+  "boss-polar-rotor-v2",
+  "boss-polar-sector-v2",
+  "boss-polar-sector-wreck-v2",
   "enemy-outrider",
   "enemy-bomber",
   "missile-truck-base",
@@ -16,7 +25,7 @@ export function nextAssetStatus(textures: {
   exists(key: string): boolean;
   get(key: string): { source?: { image?: unknown }[] } | undefined;
 }) {
-  return NEXT_ASSETS.map((key) => ({
+  return [...NEXT_ASSETS, ...COMBAT_VECTOR_ASSETS].map((key) => ({
     key,
     ready: textures.exists(key),
     bitmap:

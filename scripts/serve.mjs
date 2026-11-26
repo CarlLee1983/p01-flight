@@ -22,6 +22,7 @@ createServer(async (req, res) => {
       ".js": "text/javascript",
       ".css": "text/css",
       ".png": "image/png",
+      ".svg": "image/svg+xml",
       ".json": "application/json",
     };
     res

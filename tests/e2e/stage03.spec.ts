@@ -81,9 +81,11 @@ test("normal Stage02 clear connects to polar Stage03, clears, retries and preser
           }
           if (s.time >= bossAt + 1.8 && s.boss?.active && !intact) {
             intact = true;
-            expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(2);
+            expect(s.boss.cannons.filter((c: any) => c.active)).toHaveLength(
+              stage === "stage03" ? 4 : 3,
+            );
             expect(s.bossPresentation.key).toBe(
-              stage === "stage03" ? "boss-polar" : "boss-canyon",
+              stage === "stage03" ? "boss-polar-reactor" : "boss-river-hull-v2",
             );
             await captureStage02Frame(page, `${stage}-boss-intact`);
             await page.setViewportSize({ width: 320, height: 700 });

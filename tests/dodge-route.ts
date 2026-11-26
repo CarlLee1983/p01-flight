@@ -16,7 +16,22 @@ export function dodgeDirection(m: FlightModel, fallback: number): number {
   if (!stay)
     return (
       fallback ||
-      (Math.abs(m.player.x - 180) > 10 ? Math.sign(180 - m.player.x) : 0)
+      (Math.abs(
+        m.player.x -
+          (m.boss?.active &&
+          ((m.boss.skin !== "command" && m.boss.skin !== undefined) ||
+            m.bombs === 0)
+            ? m.boss.x
+            : 180),
+      ) > 10
+        ? Math.sign(
+            (m.boss?.active &&
+            ((m.boss.skin !== "command" && m.boss.skin !== undefined) ||
+              m.bombs === 0)
+              ? m.boss.x
+              : 180) - m.player.x,
+          )
+        : 0)
     );
   const left = m.player.x > 55 ? danger(m.player.x - 36) : Infinity;
   const right =
