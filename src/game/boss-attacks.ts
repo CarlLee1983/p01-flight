@@ -122,6 +122,20 @@ export function bossAttackPlan(
     }
     if (!rays.length)
       for (const a of fanAngles(aim(null), [-0.3, 0, 0.3])) add(null, a);
+  } else if (boss.skin === "ascentGate" || boss.skin === "orbitalLattice") {
+    const orbital = boss.skin === "orbitalLattice";
+    for (const i of active)
+      for (const a of fanAngles(
+        aim(i),
+        orbital ? [-0.22, 0.22] : [-0.16, 0.16],
+      ))
+        add(i, a, i * 0.09, 0, "rocket");
+    const split = (orbital && boss.attackCycle % 2) || phase === 3;
+    for (const [i, a] of fanAngles(
+      split ? 0 : aim(null),
+      split ? [-0.72, -0.39, 0.39, 0.72] : [-0.3, 0, 0.3],
+    ).entries())
+      add(null, a, i * 0.08, 0, "plasma");
   } else if (phase === 1 && active.length) {
     const target = bossSideTargets(player.x, player.y, boss.attackCycle);
     for (const i of active) {

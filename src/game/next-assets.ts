@@ -2,6 +2,13 @@ export const COMBAT_VECTOR_ASSETS = [
   "hostile-missile-v3",
   "boss-polar-reactor",
   "boss-polar-hinge",
+  "boss-ascent-gate",
+  "boss-ascent-cell",
+  "boss-ascent-scrap",
+  "boss-orbital-lattice",
+  "boss-orbital-node",
+  "boss-orbital-scrap",
+  "enemy-ascent-interceptor",
 ] as const;
 export const NEXT_ASSETS = [
   "boss-river-hull-v2",
