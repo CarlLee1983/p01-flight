@@ -1,5 +1,11 @@
-/** Three concrete rigs share geometry contracts, not a universal enemy engine. */
-export type BossSkin = "command" | "riverFortress" | "polarRadar";
+import { BEAM_PROFILES } from "./sustained-fire";
+/** Five concrete rigs share geometry contracts, not a universal enemy engine. */
+export type BossSkin =
+  | "command"
+  | "riverFortress"
+  | "polarRadar"
+  | "ascentGate"
+  | "orbitalLattice";
 export type BossPhase = 1 | 2 | 3;
 export interface BossPose {
   x: number;
@@ -90,6 +96,44 @@ const RIGS: Record<BossSkin, BossRig> = {
     entrySeconds: 2.6,
     restY: 190,
   },
+  ascentGate: {
+    key: "boss-ascent-gate",
+    width: 112,
+    height: 92,
+    partCount: 2,
+    partKey: "boss-ascent-cell",
+    wreckKey: "boss-ascent-scrap",
+    partWidth: 36,
+    partHeight: 42,
+    muzzleY: 16,
+    partLabel: "側翼電池",
+    support: false,
+    halfWidth: 47,
+    halfHeight: 38,
+    partHalfWidth: 15,
+    partHalfHeight: 17,
+    entrySeconds: BEAM_PROFILES.ascentGate.entry,
+    restY: 150,
+  },
+  orbitalLattice: {
+    key: "boss-orbital-lattice",
+    width: 188,
+    height: 122,
+    partCount: 3,
+    partKey: "boss-orbital-node",
+    wreckKey: "boss-orbital-scrap",
+    partWidth: 35,
+    partHeight: 28,
+    muzzleY: 10,
+    partLabel: "星門節點",
+    support: false,
+    halfWidth: 83,
+    halfHeight: 49,
+    partHalfWidth: 14,
+    partHalfHeight: 11,
+    entrySeconds: BEAM_PROFILES.orbitalLattice.entry,
+    restY: 166,
+  },
 };
 export function bossRig(skin: BossSkin = "command") {
   return RIGS[skin];
@@ -172,6 +216,22 @@ export function bossPose(
     }
     roll = Math.sin((t * Math.PI) / 4) * (phase === 1 ? 0.06 : 0.1);
     if (phase === 3) y += Math.sin((t * Math.PI) / 4) ** 2 * 12;
+  } else if (skin === "ascentGate" || skin === "orbitalLattice") {
+    const orbital = skin === "orbitalLattice",
+      v = BEAM_PROFILES[skin],
+      q = t % v.period,
+      cycle = Math.floor(t / v.period);
+    const shift = orbital ? 1.8 : 1.35,
+      span = orbital ? (phase === 1 ? 32 : 50) : phase === 1 ? 42 : 68;
+    x +=
+      (cycle % 2 ? -1 : 1) *
+      span *
+      (cycle === 0 ? ease(q / shift) : 2 * ease(q / shift) - 1);
+    y += q < shift ? Math.sin((Math.PI * q) / shift) * (orbital ? 9 : 30) : 0;
+    state =
+      q < shift ? "reposition" : q < v.end ? "beam-hold" : "salvo-recovery";
+    canFire = q >= v.end;
+    fireWindow = canFire ? v.period - q : 0;
   } else {
     // The final phase holds its new lane long enough for complete alternating
     // volleys. Frequent resets must not make standing still safer than dodging.
@@ -251,6 +311,21 @@ export function bossMount(
       angle,
       rotation: -angle,
     };
+  }
+  if (skin === "ascentGate" || skin === "orbitalLattice") {
+    const offsets =
+      skin === "ascentGate"
+        ? [
+            [-64, 8],
+            [64, 8],
+          ]
+        : [
+            [-86, -12],
+            [76, -20],
+            [0, -70],
+          ];
+    const [x, y] = offsets[index] ?? [0, 0];
+    return { x: pose.x + x, y: pose.y + y, angle: 0, rotation: 0 };
   }
   const offsets =
     skin === "riverFortress"
@@ -344,6 +419,11 @@ export function bossCoreContains(
     const p = rotateLocal(x - boss.x, y - boss.y, -(boss.roll ?? 0));
     return (p.x / (32 + padding)) ** 2 + (p.y / (32 + padding)) ** 2 < 1;
   }
+  if (boss.skin === "ascentGate" || boss.skin === "orbitalLattice")
+    return (
+      Math.hypot(x - boss.x, y - boss.y) <
+      (boss.skin === "ascentGate" ? 31 : 37) + padding
+    );
   if (boss.skin !== "riverFortress")
     return bossBodyContains(boss, x, y, padding);
   const c = bossCorePoint(boss),

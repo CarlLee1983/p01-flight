@@ -27,6 +27,7 @@ export type PickupKind =
   | "missile"
   | "support";
 export interface Wave {
+  sustain?: "lance";
   groundSurface?: "land" | "water";
   at: number;
   x: number;
@@ -67,7 +68,7 @@ export interface StageConfig {
     bulletSpeed: number;
     burstShots?: number;
     sideCannonHp?: number;
-    pattern?: "canyon" | "polar";
+    pattern?: "canyon" | "polar" | "ascent" | "orbital";
     skin?: import("../game/boss-visual").BossSkin;
     points: number;
   };

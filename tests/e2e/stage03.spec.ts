@@ -181,7 +181,7 @@ test("normal Stage02 clear connects to polar Stage03, clears, retries and preser
     ).toBeTruthy();
   }
   await saveStage02Sampler(page, info, "stage03");
-  await expect(page.locator("#next-stage")).toHaveCount(0);
+  await expect(page.locator("#next-stage")).toHaveText("前往 Stage 04");
   await page.locator("#retry").click();
   s = await state(page);
   expect(s.stageId).toBe("stage-03");

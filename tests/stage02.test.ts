@@ -75,7 +75,9 @@ describe("Stage02 seeded formations", () => {
     expect(reloaded.data.stages["stage-01"].bestScore).toBe(2000);
     expect(reloaded.data.stages["stage-02"].clearCount).toBe(1);
     expect(nextStage("stage-02")).toBe("stage-03");
-    expect(nextStage("stage-03")).toBe(null);
+    expect(nextStage("stage-03")).toBe("stage-04");
+    expect(nextStage("stage-04")).toBe("stage-05");
+    expect(nextStage("stage-05")).toBe(null);
   });
 });
 it.each([1, 2, 3, 4, 5, 42, 99, 2026])(
@@ -113,7 +115,8 @@ it.each([1, 2, 3, 4, 5, 42, 99, 2026])(
                     ![
                       "groundBattery",
                       "groundDepot",
-                      "missileTruck", "flakBattery",
+                      "missileTruck",
+                      "flakBattery",
                       "carrier",
                       "gatekeeper",
                     ].includes(e.behavior!),
@@ -123,8 +126,15 @@ it.each([1, 2, 3, 4, 5, 42, 99, 2026])(
                     x: e.x + offset,
                     y: e.y,
                     vx:
-                      e.behavior === "cross" || e.behavior === "outrider" ? (e.direction ?? 1) * e.speed : 0,
-                    vy: e.behavior === "cross" ? 0 : e.behavior === "outrider" ? e.speed*.35 : e.speed,
+                      e.behavior === "cross" || e.behavior === "outrider"
+                        ? (e.direction ?? 1) * e.speed
+                        : 0,
+                    vy:
+                      e.behavior === "cross"
+                        ? 0
+                        : e.behavior === "outrider"
+                          ? e.speed * 0.35
+                          : e.speed,
                   })),
                 ),
             ],

@@ -1,3 +1,5 @@
+import { FRONT_MAPS, FrontBackground } from "./game/front-background";
+import { drawSustainedFire } from "./game/front-fire-presentation";
 import {
   ROCKET_ART,
   ROCKET_RENDER,
@@ -67,6 +69,7 @@ try {
 } catch {}
 const saves = new BrowserSaveRepository(storage);
 let selectedStage: StageId = "stage-01";
+let incomingLaunch = false;
 const seedText = new URLSearchParams(location.search).get("seed");
 const pinnedSeed =
   seedText !== null &&
@@ -163,9 +166,9 @@ function renderPanel() {
   if (model.mode === "menu")
     panel.innerHTML = `<p class="eyebrow">COASTAL STRIKE / ${stageNumber}</p><h2>${stageDetails(selectedStage).title}</h2><p class="brief">${stageDetails(selectedStage).brief}</p><p class="brief">鍵盤 C 換武器；觸控按住畫面拖曳連射</p><p>最高分 <strong class="stat">${record?.bestScore ?? 0}</strong></p><p>${record?.cleared ? "已通關" : "尚未通關"} · 通關 ${record?.clearCount ?? 0} 次</p><label>選擇關卡<select id="stage-select">${STAGE_CATALOG.map((stage) => `<option value="${stage.id}" ${selectedStage === stage.id ? "selected" : ""} ${stageUnlocked(stage.id, saves.data) ? "" : "disabled"}>Stage ${stage.number} ${stage.title}${stageUnlocked(stage.id, saves.data) ? "" : "（前關通關後解鎖）"}</option>`).join("")}</select></label><button id="start">開始飛行</button><details><summary>設定與本機紀錄</summary><p class="help">授權街機配樂與原創音效，Boss 戰切換戰鬥曲。音量設為 0 即靜音，設定保存在本機。</p><label>音樂<input id="music" type="range" min="0" max="1" step=".1" value="${saves.data.settings.musicVolume}"></label><label>音效<input id="sfx" type="range" min="0" max="1" step=".1" value="${saves.data.settings.sfxVolume}"></label><button id="reset" class="secondary">重設本機紀錄</button></details>${warning}`;
   else if (model.mode === "playing" || model.mode === "paused")
-    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目武器可分別擊破：指揮艦翼炮、河艦甲板炮、雷眼護甲環。留意充能後移位，河艦艦尾艦橋是弱點；雷眼須先破護甲，再趁核心開放反擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "paused" ? "暫停中" : "航程進行中"}</h2><p>鍵盤按住 Space／Z，或觸控拖曳移動並連射。留意敵機炮口充能後移位，避開飛行中的敵彈。</p><p>補給航道可喘息整備。頭目武器可分別擊破。第三關先拆護甲再打核心；第四、五關看底部閃標，離開光束航道後再反擊。<br><b>X／側欄炸彈：衝擊炸彈 ×2</b>，清除敵彈並重創敵機。</p><button id="pause">${model.mode === "paused" ? "繼續" : "暫停"}</button><button id="menu" class="secondary">返回標題</button><p class="help">離開分頁會自動暫停。未完成航程不會寫入結算。</p>${warning}`;
   else
-    panel.innerHTML = `<h2>${model.mode === "won" ? `Stage ${stageNumber} 通關` : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${model.stage.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p>${model.mode === "won" && nextStage(selectedStage) ? `<button id="next-stage">前往 Stage ${stageDetails(nextStage(selectedStage)!).number}</button>` : ""}<button id="retry">再飛一次</button>${selectedStage !== "stage-01" ? '<button id="new-sortie" class="secondary">重新編隊出擊</button>' : ""}<button id="menu" class="secondary">返回標題</button>${warning}`;
+    panel.innerHTML = `<h2>${model.mode === "won" ? (selectedStage === "stage-05" ? "星門已摧毀：全戰役通關" : `Stage ${stageNumber} 通關`) : model.lostReason === "timeout" ? "頭目突圍，任務失敗" : "飛行結束"}</h2><p class="stat">${model.score} 分</p><p>航程 ${model.time.toFixed(1)} / ${model.stage.duration} 秒</p><p>最高分 ${record?.bestScore ?? 0} · 通關 ${record?.clearCount ?? 0} 次</p>${model.mode === "won" && nextStage(selectedStage) ? `<button id="next-stage">前往 Stage ${stageDetails(nextStage(selectedStage)!).number}</button>` : ""}<button id="retry">再飛一次</button>${selectedStage !== "stage-01" ? '<button id="new-sortie" class="secondary">重新編隊出擊</button>' : ""}<button id="menu" class="secondary">返回標題</button>${warning}`;
   document
     .querySelector("#stage-select")
     ?.addEventListener("change", (event) => {
@@ -178,6 +181,7 @@ function renderPanel() {
   document.querySelector("#next-stage")?.addEventListener("click", () => {
     const next = nextStage(selectedStage);
     if (!next) return;
+    incomingLaunch = next === "stage-05";
     selectedStage = next;
     start(true);
   });
@@ -253,6 +257,8 @@ class FlightScene extends Phaser.Scene {
   background!: CoastalBackground;
   canyon!: CanyonBackground;
   polar?: CanyonBackground;
+  lateFront?: FrontBackground;
+  private beamCue = false;
   coastalObjects: Phaser.GameObjects.GameObject[] = [];
   pickupGuide: Phaser.GameObjects.Text[] = [];
   pickupNotice!: Phaser.GameObjects.Text;
@@ -270,7 +276,7 @@ class FlightScene extends Phaser.Scene {
   visuals: Phaser.GameObjects.Image[] = [];
   visualIndex = 0;
   preload() {
-    for (const key of COMBAT_VECTOR_ASSETS)
+    for (const key of [...COMBAT_VECTOR_ASSETS, ...FRONT_MAPS])
       this.load.image(
         key,
         import.meta.env.BASE_URL + "assets/original/" + key + ".svg",
@@ -384,7 +390,12 @@ class FlightScene extends Phaser.Scene {
         ? this.background.diagnostics()
         : selectedStage === "stage-02"
           ? this.canyon.diagnostics()
-          : (this.polar?.diagnostics() ?? { theme: "polar", artReady: false });
+          : selectedStage === "stage-03"
+            ? (this.polar?.diagnostics() ?? { theme: "polar", artReady: false })
+            : (this.lateFront?.diagnostics(selectedStage) ?? {
+                theme: "late-front",
+                artReady: false,
+              });
     readCombatLayer = () =>
       Math.max(
         3,
@@ -542,6 +553,10 @@ class FlightScene extends Phaser.Scene {
     renderPanel();
   }
   update(_time: number, delta: number) {
+    if (incomingLaunch) {
+      incomingLaunch = false;
+      this.cameras.main.fadeIn(850, 4, 9, 29);
+    }
     if (model.mode !== this.lastDrawMode) {
       this.endingAge = 0;
       this.lastDrawMode = model.mode;
@@ -717,28 +732,38 @@ class FlightScene extends Phaser.Scene {
           `${stageDetails(selectedStage).boss}接近 · ${Math.ceil((model.stage.boss?.at ?? 0) - model.time)}\n保留炸彈，留意${bossRig(model.stage.boss?.skin).partLabel}`,
         );
     }
+    const sustainedFire = model.sustainedFire;
+    const charging =
+      model.mode === "playing" &&
+      sustainedFire.some((ray) => ray.state === "charge");
+    if (charging && !this.beamCue) audio.play("phase");
+    this.beamCue = charging;
     this.bossAdvice.setVisible(
       model.mode === "playing" && (!!model.boss?.active || !!patrol),
     );
     this.bossAdvice.setText(
-      patrol
-        ? "留意炮口充能 · 移位後追擊巡邏艦"
-        : model.boss?.skin === "polarRadar" &&
-            bossCoreState(model.boss) !== "open"
-          ? bossCoreState(model.boss) === "armored"
-            ? `核心防護中 · 本階段再擊破${bossArmourRemaining(model.boss)}片護甲`
-            : "核心換位封閉 · 留意護甲充能"
-          : model.boss?.skin === "polarRadar" &&
-              model.boss.phase === 3 &&
-              model.boss.attackWarning > 0
-            ? model.boss.attackCycle % 2
-              ? "雙側飛彈充能 · 等中央電漿通過"
-              : "鎖定飛彈充能 · 移位後反擊"
-            : model.boss?.cannons.some((c) => c.active)
-              ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
-              : model.boss?.skin === "riverFortress"
-                ? "甲板炮已毀 · 避開船首火力，攻擊艦橋"
-                : `${bossRig(model.boss?.skin).partLabel}已毀 · 集中攻擊核心`,
+      charging
+        ? "光束充能 · 離開底部閃標的航道"
+        : sustainedFire.length
+          ? "持續火力 · 從空隙橫移"
+          : patrol
+            ? "留意炮口充能 · 移位後追擊巡邏艦"
+            : model.boss?.skin === "polarRadar" &&
+                bossCoreState(model.boss) !== "open"
+              ? bossCoreState(model.boss) === "armored"
+                ? `核心防護中 · 本階段再擊破${bossArmourRemaining(model.boss)}片護甲`
+                : "核心換位封閉 · 留意護甲充能"
+              : model.boss?.skin === "polarRadar" &&
+                  model.boss.phase === 3 &&
+                  model.boss.attackWarning > 0
+                ? model.boss.attackCycle % 2
+                  ? "雙側飛彈充能 · 等中央電漿通過"
+                  : "鎖定飛彈充能 · 移位後反擊"
+                : model.boss?.cannons.some((c) => c.active)
+                  ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
+                  : model.boss?.skin === "riverFortress"
+                    ? "甲板炮已毀 · 避開船首火力，攻擊艦橋"
+                    : `${bossRig(model.boss?.skin).partLabel}已毀 · 集中攻擊核心`,
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
 
@@ -759,6 +784,12 @@ class FlightScene extends Phaser.Scene {
     if (selectedStage === "stage-03" && !this.polar)
       this.polar = new CanyonBackground(this, "polar");
     this.polar?.update(model.time, selectedStage === "stage-03");
+    if (
+      (selectedStage === "stage-04" || selectedStage === "stage-05") &&
+      !this.lateFront
+    )
+      this.lateFront = new FrontBackground(this);
+    this.lateFront?.update(selectedStage, model.time);
     if (selectedStage === "stage-01")
       this.background.update(
         model.mode === "menu"
@@ -834,9 +865,16 @@ class FlightScene extends Phaser.Scene {
             continue;
           }
           if (e.behavior === "gatekeeper") {
-            this.sprite("enemy-patrol", e.x, e.y, 104, 76, 1, 0, e).setDepth(
-              1.5,
-            );
+            this.sprite(
+              e.sustain ? "enemy-ascent-interceptor" : "enemy-patrol",
+              e.x,
+              e.y,
+              104,
+              76,
+              1,
+              0,
+              e,
+            ).setDepth(1.5);
             for (const side of [-1, 1])
               this.sprite(
                 "fire03",
@@ -1181,6 +1219,7 @@ class FlightScene extends Phaser.Scene {
       }
       if (model.boss?.active)
         drawBoss(model.boss, this.sprite.bind(this), overlay, model.time);
+      drawSustainedFire(sustainedFire, graphics);
       for (const drone of model.supportDrones) {
         this.sprite("player", drone.x, drone.y, 22, 22, 0.95);
         this.sprite("fire03", drone.x, drone.y + 16, 5, 11, 0.85, 180);
@@ -1419,6 +1458,7 @@ Object.defineProperty(window, "__P01__", {
     supportDrones: model.supportDrones,
     boss: model.boss ? { ...model.boss } : null,
     bossDefeated: model.bossDefeated,
+    sustainedFire: model.sustainedFire,
     section: model.section,
     partsDestroyed: model.partsDestroyed,
     weaponTime: model.weaponTime,

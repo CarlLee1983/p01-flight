@@ -55,7 +55,9 @@ describe("next-fronts contracts", () => {
     );
     expect(data.has(SAVE_KEY)).toBe(true);
     expect(nextStage("stage-02")).toBe("stage-03");
-    expect(nextStage("stage-03")).toBe(null);
+    expect(nextStage("stage-03")).toBe("stage-04");
+    expect(nextStage("stage-04")).toBe("stage-05");
+    expect(nextStage("stage-05")).toBe(null);
     expect(stageConfig("stage-03", 42)).toEqual(createStage03(42));
   });
   it.each(Array.from({ length: 32 }, (_, i) => i))(

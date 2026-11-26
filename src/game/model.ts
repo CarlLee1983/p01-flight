@@ -1,3 +1,4 @@
+import { sustainedRays, sustainedHit, MINI_BEAM } from "./sustained-fire";
 import {
   bossRig,
   bossCoreState,
@@ -43,6 +44,8 @@ export interface Body {
   hitIds?: number[];
 }
 export interface Enemy extends Body {
+  sustain?: "lance";
+  beamAge?: number;
   groundSurface?: "land" | "water";
   enteredPlayfield?: boolean;
   brakeElapsed?: number;
@@ -261,6 +264,13 @@ export class FlightModel {
     return true;
   }
   /** Call once per input edge, never once per held-key frame. */
+  get sustainedFire() {
+    const pattern = this.stage.boss?.pattern;
+    return (pattern === "ascent" || pattern === "orbital") &&
+      (this.mode === "playing" || this.mode === "paused")
+      ? sustainedRays(this.boss, this.enemies)
+      : [];
+  }
   useBomb(): boolean {
     if (this.mode !== "playing" || this.bombs <= 0 || this.bombFlash > 0)
       return false;
@@ -607,6 +617,8 @@ export class FlightModel {
         {
           id: ++this.serial,
           maxHp: w.hp,
+          sustain: w.sustain,
+          beamAge: undefined,
           groundSurface: w.groundSurface,
           hitUntil: 0,
           y: w.spawnY ?? -24,
@@ -758,9 +770,15 @@ export class FlightModel {
           const holding = e.age < (e.holdFor ?? 9);
           if (holding) {
             e.y = Math.min(150, e.y + e.speed * dt);
-            e.x =
-              (e.originX ?? 180) +
-              Math.sin(e.age * 0.9) * (e.strafeWidth ?? 75);
+            const beamCycle = (e.beamAge ?? 0) % MINI_BEAM.period;
+            if (
+              !e.sustain ||
+              beamCycle < MINI_BEAM.charge ||
+              beamCycle >= MINI_BEAM.end
+            )
+              e.x =
+                (e.originX ?? 180) +
+                Math.sin(e.age * 0.9) * (e.strafeWidth ?? 75);
             e.attackPattern = (["left", "right", "aim"] as const)[
               (e.gateCycle ?? 0) % 3
             ];
@@ -770,7 +788,8 @@ export class FlightModel {
                 : e.attackPattern === "right"
                   ? [0.59, 0.72, 0.85].map((x) => x * this.stage.width)
                   : [];
-            if (e.y >= 150) {
+            if (e.y >= 150 && e.sustain) e.beamAge = (e.beamAge ?? 0) + dt;
+            if (e.y >= 150 && !e.sustain) {
               e.fireCooldown = (e.fireCooldown ?? 1.4) - dt;
               if (e.fireCooldown <= 0.75 && e.aimAngle === undefined)
                 e.aimAngle = Math.atan2(
@@ -811,6 +830,7 @@ export class FlightModel {
             }
           } else {
             e.y += e.speed * dt;
+            e.beamAge = undefined;
             e.telegraph = 0;
             e.attackPattern = undefined;
             e.attackLanes = [];
@@ -1334,6 +1354,12 @@ export class FlightModel {
             part.active &&
             bossPartContains(this.boss!, part, this.player.x, this.player.y, 8),
         ))
+    )
+      this.damage();
+    if (
+      this.sustainedFire.some((ray) =>
+        sustainedHit(ray, this.player.x, this.player.y),
+      )
     )
       this.damage();
     this.effects = this.effects
