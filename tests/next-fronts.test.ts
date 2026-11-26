@@ -252,7 +252,7 @@ it.each([
 );
 
 it("new asset diagnostics remain readable before any Phaser missing texture exists", async () => {
-  const { nextAssetStatus, NEXT_ASSETS } = await import(
+  const { nextAssetStatus, NEXT_ASSETS, COMBAT_VECTOR_ASSETS } = await import(
     "../src/game/next-assets"
   );
   const status = nextAssetStatus({
@@ -261,7 +261,7 @@ it("new asset diagnostics remain readable before any Phaser missing texture exis
       throw Error("unexpected unready texture read");
     },
   });
-  expect(status).toHaveLength(NEXT_ASSETS.length);
+  expect(status).toHaveLength(NEXT_ASSETS.length + COMBAT_VECTOR_ASSETS.length);
   expect(status.every((a) => !a.ready && !a.bitmap)).toBe(true);
 });
 

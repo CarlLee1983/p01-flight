@@ -9,7 +9,7 @@ import {
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import source from "../docs/hostile-missile-art.json";
-it("enemy missile is a tiny original bitmap with the documented content hash", () => {
+it("legacy enemy missile bitmap retains its documented content hash", () => {
   const bytes = readFileSync(source.path);
   expect(createHash("sha256").update(bytes).digest("hex")).toBe(source.sha256);
   expect(bytes.length).toBeLessThan(4096);
@@ -100,4 +100,12 @@ it("does not bake a missing source or pretend a missing canvas context is ready"
     textures: { exists: (key: string) => key === ROCKET_ART.key },
   };
   expect(createRocketTexture(loaded as any, makeCanvas)).toBe(ROCKET_ART);
+});
+
+it("active missile art is the complete versioned vector with alpha margins", () => {
+  const path = `public/assets/original/${ROCKET_ART.key}.svg`;
+  const art = readFileSync(path, "utf8");
+  expect(ROCKET_ART.key).toBe("hostile-missile-v3");
+  expect(art).toContain('viewBox="0 0 11 26"');
+  expect(art).not.toMatch(/<image|<script|<rect/);
 });

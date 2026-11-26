@@ -102,9 +102,22 @@ export function bossAttackPlan(
     } else {
       // Bait needle first, then a delayed split fan. The central opening in
       // the plasma wall rewards moving after the aimed rocket is committed.
-      const angles = fanAngles(aim(null), [-0.6, -0.3, 0, 0.3, 0.6]);
-      add(null, angles[2], 0, 0, "rocket");
-      for (const i of [0, 1, 3, 4]) add(null, angles[i], 0.11);
+      const target = aim(null);
+      if (boss.attackCycle % 2 === 0) {
+        const angles = fanAngles(target, [-0.6, -0.3, 0, 0.3, 0.6]);
+        add(null, angles[2], 0, 0, "rocket");
+        for (const i of [0, 1, 3, 4]) add(null, angles[i], 0.11);
+      } else {
+        // Counter-pattern: put the rockets on the edges of a narrow gate.
+        // An early plasma shot holds the middle only briefly, then the
+        // centre reopens. Do not chase the player after charging.
+        const angles = fanAngles(target, [-0.52, -0.24, 0, 0.24, 0.52]);
+        add(null, angles[2]);
+        add(null, angles[0]);
+        add(null, angles[4]);
+        add(null, angles[1], 0.11, -12, "rocket");
+        add(null, angles[3], 0.11, 12, "rocket");
+      }
       for (const i of active) add(i, boss.cannons[i].aimAngle ?? 0, 0.11);
     }
     if (!rays.length)
@@ -134,7 +147,7 @@ export function bossCadence(boss: Boss, base: number) {
     boss.skin === "riverFortress"
       ? [1, 0.9, 0.7]
       : boss.skin === "polarRadar"
-        ? [1, 0.9, 0.8]
+        ? [1, 0.9, 0.7]
         : [1, 1, 0.7];
   return base * multipliers[boss.phase - 1];
 }

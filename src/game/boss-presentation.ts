@@ -48,16 +48,32 @@ export function drawBoss(
     boss,
   );
   if (boss.skin === "polarRadar") {
-    // Reuse the licensed mechanical hull and original rotor as separate parts,
-    // rather than scaling a disk into another colour of the previous Boss.
+    // The arms attach to live generator pivots. Breaking a generator leaves
+    // a short broken arm rather than a full-length working linkage.
+    for (const part of boss.cannons) {
+      const dx = part.x - boss.x,
+        dy = part.y - boss.y;
+      const length = Math.hypot(dx, dy);
+      const extension = part.active ? 1 : 0.58;
+      sprite(
+        "boss-polar-hinge",
+        boss.x + (dx * extension) / 2,
+        boss.y + (dy * extension) / 2,
+        length * extension,
+        14,
+        part.active ? 1 : 0.65,
+        Math.atan2(dy, dx) * degrees,
+      ).setDepth(0.9);
+    }
+    const state = bossCoreState(boss);
     sprite(
       "boss-polar-rotor-v2",
       boss.x,
       boss.y,
       64,
       64,
-      1,
-      time * 22,
+      state === "open" ? 1 : 0.72,
+      time * 22 + Math.sin(time * 3) * 8,
       boss,
     ).setDepth(1.5);
   }

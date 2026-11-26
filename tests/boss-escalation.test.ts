@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { FlightModel } from "../src/game/model";
 import { stage01 } from "../src/data/stage";
+import { bossShotOrigin } from "../src/game/boss-muzzles";
 import { bossAttackPlan } from "../src/game/boss-attacks";
 import { bossPose, bossMount, bossCoreContains } from "../src/game/boss-rigs";
 
@@ -98,4 +99,36 @@ it("larger river rockets diverge instead of sharing a six-pixel dual-barrel lane
     for (let i = 1; i < angles.length; i++)
       expect(angles[i] - angles[i - 1]).toBeGreaterThan(0.22);
   }
+});
+
+it("polar phase three alternates an aimed rocket and a timed gate without raising projectile count", () => {
+  const m = new FlightModel({
+    ...stage01,
+    waves: [],
+    pickups: [],
+    boss: { ...stage01.boss!, skin: "polarRadar", at: 0 },
+  });
+  m.start();
+  m.update(1 / 60);
+  const b = m.boss!;
+  b.phase = 3;
+  b.cannons.forEach((c) => {
+    c.active = false;
+  });
+  const player = { x: 180, y: 540 };
+  const first = bossAttackPlan(b, player);
+  b.attackCycle = 1;
+  const second = bossAttackPlan(b, player);
+  expect(second).toHaveLength(first.length);
+  const gate = second.filter((ray) => ray.style === "rocket");
+  expect(gate).toHaveLength(2);
+  expect(gate.every((ray) => ray.delay === 0.11)).toBe(true);
+  expect(
+    bossShotOrigin(b, gate[1]).x - bossShotOrigin(b, gate[0]).x,
+  ).toBeCloseTo(24);
+  const middle = second[0];
+  expect(middle).toMatchObject({ style: "plasma", delay: 0 });
+  expect(middle.angle - gate[0].angle).toBeCloseTo(0.24);
+  expect(gate[1].angle - middle.angle).toBeCloseTo(0.24);
+  expect(second.every((ray) => Number.isFinite(ray.angle))).toBe(true);
 });

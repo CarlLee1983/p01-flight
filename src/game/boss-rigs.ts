@@ -72,7 +72,7 @@ const RIGS: Record<BossSkin, BossRig> = {
     restY: 185,
   },
   polarRadar: {
-    key: "enemy-gunship",
+    key: "boss-polar-reactor",
     width: 112,
     height: 98,
     partCount: 4,

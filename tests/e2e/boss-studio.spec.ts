@@ -50,7 +50,13 @@ for (const [skin, count] of [
       (window as any).__BOSS_STUDIO__(),
     );
     expect(snapshot.textures.every((t: any) => t.ready)).toBe(true);
-    for (const key of ["boss-cannon", "boss-cannon-broken", "enemy-gunship"])
+    for (const key of [
+      "boss-cannon",
+      "boss-cannon-broken",
+      "enemy-gunship",
+      "boss-polar-reactor",
+      "boss-polar-hinge",
+    ])
       expect(snapshot.textures.find((t: any) => t.key === key).source).toBe(
         "HTMLImageElement",
       );

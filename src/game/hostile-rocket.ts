@@ -1,7 +1,7 @@
 import type Phaser from "phaser";
 import type { EnemyBullet } from "./model";
 export const ROCKET_ART = {
-  key: "hostile-missile-v2",
+  key: "hostile-missile-v3",
   width: 11,
   height: 26,
   nozzle: 12,

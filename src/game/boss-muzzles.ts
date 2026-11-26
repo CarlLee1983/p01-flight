@@ -35,7 +35,7 @@ export function bossShotOrigin(
   }
   const local =
     boss.skin === "polarRadar"
-      ? { x: 0, y: 0 }
+      ? rotateLocal(ray.lateral, 0, boss.roll ?? 0)
       : rotateLocal(ray.lateral, 28, boss.roll ?? 0);
   return {
     x: boss.x + local.x,

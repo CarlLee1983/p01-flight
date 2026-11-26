@@ -47,14 +47,14 @@ test("mobile missile vehicle and flak emplacement rotate, fire and are destroyed
       expect(observed.hostileMissiles).toMatchObject({
         cacheReady: true,
         textureKey: "hostile-missile-outlined",
-        sourceTextureKey: "hostile-missile-v2",
+        sourceTextureKey: "hostile-missile-v3",
         bodyPixels: [11, 26],
       });
       expect(observed.hostileMissiles.renderedQuads).toBe(
         observed.hostileMissiles.rendered,
       );
       expect(
-        observed.nextAssets.find((a: any) => a.key === "hostile-missile-v2"),
+        observed.nextAssets.find((a: any) => a.key === "hostile-missile-v3"),
       ).toMatchObject({ ready: true, bitmap: true });
       await withKeyboardPilot(
         page,

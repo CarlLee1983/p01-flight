@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { FlightModel } from "../../src/game/model";
 import { stage01 } from "../../src/data/stage";
 import { drawBoss } from "../../src/game/boss-presentation";
-import { NEXT_ASSETS } from "../../src/game/next-assets";
+import { COMBAT_VECTOR_ASSETS, NEXT_ASSETS } from "../../src/game/next-assets";
 import { createEnemyModuleTextures } from "../../src/game/enemy-modules-art";
 import { METAL_SPRITES } from "../../src/game/metal-sprites";
 import { createCannonTextures } from "../../src/game/cannon-art";
@@ -28,6 +28,8 @@ class Studio extends Phaser.Scene {
   g!: Phaser.GameObjects.Graphics;
   keys!: Phaser.Types.Input.Keyboard.CursorKeys;
   preload() {
+    for (const key of COMBAT_VECTOR_ASSETS)
+      this.load.image(key, "/assets/original/" + key + ".svg");
     for (const asset of METAL_SPRITES)
       this.load.image(asset.key, "/" + asset.path);
     for (const key of NEXT_ASSETS)
@@ -50,6 +52,7 @@ class Studio extends Phaser.Scene {
         parts: model.boss?.cannons,
         textures: [
           ...NEXT_ASSETS,
+          ...COMBAT_VECTOR_ASSETS,
           "boss",
           "boss-cannon",
           "enemy-gunship",

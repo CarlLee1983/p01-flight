@@ -9,7 +9,11 @@ import {
 import { drawBoss } from "./game/boss-presentation";
 import { bossRig, bossCoreState, bossArmourRemaining } from "./game/boss-rigs";
 import { keyboardEdge } from "./game/keyboard-event";
-import { NEXT_ASSETS, nextAssetStatus } from "./game/next-assets";
+import {
+  COMBAT_VECTOR_ASSETS,
+  NEXT_ASSETS,
+  nextAssetStatus,
+} from "./game/next-assets";
 import { isGroundRole, isNewAirRole, NEW_ENEMY_ART } from "./game/enemy-roles";
 import { bossVisual } from "./game/boss-visual";
 import { STAGE_CATALOG, stageDetails, stageConfig } from "./game/stage-catalog";
@@ -266,6 +270,11 @@ class FlightScene extends Phaser.Scene {
   visuals: Phaser.GameObjects.Image[] = [];
   visualIndex = 0;
   preload() {
+    for (const key of COMBAT_VECTOR_ASSETS)
+      this.load.image(
+        key,
+        import.meta.env.BASE_URL + "assets/original/" + key + ".svg",
+      );
     for (const key of NEXT_ASSETS)
       this.load.image(
         key,
@@ -719,11 +728,17 @@ class FlightScene extends Phaser.Scene {
           ? bossCoreState(model.boss) === "armored"
             ? `核心防護中 · 本階段再擊破${bossArmourRemaining(model.boss)}片護甲`
             : "核心換位封閉 · 留意護甲充能"
-          : model.boss?.cannons.some((c) => c.active)
-            ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
-            : model.boss?.skin === "riverFortress"
-              ? "甲板炮已毀 · 避開船首火力，攻擊艦橋"
-              : `${bossRig(model.boss?.skin).partLabel}已毀 · 集中攻擊核心`,
+          : model.boss?.skin === "polarRadar" &&
+              model.boss.phase === 3 &&
+              model.boss.attackWarning > 0
+            ? model.boss.attackCycle % 2
+              ? "雙側飛彈充能 · 等中央電漿通過"
+              : "鎖定飛彈充能 · 移位後反擊"
+            : model.boss?.cannons.some((c) => c.active)
+              ? `擊破${bossRig(model.boss?.skin).partLabel}可減少彈幕 · ${model.boss?.skin === "riverFortress" ? "艦尾艦橋是弱點" : "核心可直接攻擊"}`
+              : model.boss?.skin === "riverFortress"
+                ? "甲板炮已毀 · 避開船首火力，攻擊艦橋"
+                : `${bossRig(model.boss?.skin).partLabel}已毀 · 集中攻擊核心`,
     );
     this.pickupGuide.forEach((text) => text.setVisible(model.mode === "menu"));
 
